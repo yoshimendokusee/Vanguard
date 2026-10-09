@@ -22,17 +22,30 @@
 const { assessRisk, validateObservations } = require('./risk');
 const { verifyModel } = require('./model');
 const { isIP } = require('node:net');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const PROMPT_VERSION = 'vanguard-extract-v1';
 
 function aiConfig() {
   const ollamaUrl = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+  let url;
+  try { url = new URL(ollamaUrl); } catch { throw new AiError('invalid-runtime-url', 'OLLAMA_URL must be an absolute local HTTP URL', 503); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || url.pathname !== '/') {
+    throw new AiError('invalid-runtime-url', 'OLLAMA_URL must contain only scheme, host and port', 503);
+  }
+  const positive = (name, fallback, max) => {
+    const value = Number(process.env[name] || fallback);
+    if (!Number.isSafeInteger(value) || value < 1 || value > max) throw new AiError('invalid-ai-config', `Invalid ${name}`, 503);
+    return value;
+  };
   return {
     ollamaUrl,
     model: process.env.OLLAMA_MODEL || 'qwen3:0.6b',
-    timeoutMs: Number(process.env.AI_TIMEOUT_MS) || 30000,
-    statusTimeoutMs: Number(process.env.AI_STATUS_TIMEOUT_MS) || 4000,
-    maxTranscript: Number(process.env.AI_MAX_TRANSCRIPT) || 4000,
+    timeoutMs: positive('AI_TIMEOUT_MS', 120000, 300000),
+    statusTimeoutMs: positive('AI_STATUS_TIMEOUT_MS', 4000, 30000),
+    maxTranscript: positive('AI_MAX_TRANSCRIPT', 4000, 4000),
+    numThreads: positive('AI_NUM_THREADS', 2, 32),
     promptVersion: PROMPT_VERSION,
   };
 }
@@ -229,11 +242,12 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: `Transcript (untrusted quoted speech, Tagalog/English/Taglish):\n"""${transcript}"""` },
         ],
-        options: { temperature: 0, num_predict: 128 },
+        options: { temperature: 0, num_predict: 128, num_thread: cfg.numThreads },
       }),
     });
     if (!res.ok) {
       if (res.status === 404) throw new AiError('model-missing', `Ollama has no model "${model || cfg.model}"`, 502);
+      if (res.status === 503) throw new AiError('runtime-busy', 'Local inference capacity is busy; retry this request', 503);
       throw new AiError('ollama-error', `Ollama replied with status ${res.status}`, 502);
     }
     const data = await res.json().catch(() => {
@@ -343,7 +357,7 @@ async function localModel(fetchImpl = fetch, opts = {}) {
       body: JSON.stringify({ model: manifest.ollamaModel }),
       signal: AbortSignal.timeout(cfg.statusTimeoutMs),
     });
-    if (!res.ok) throw new AiError('model-missing', 'Import the local Qwen artifact with qwen-setup.sh', 503);
+    if (!res.ok) throw new AiError(res.status === 404 ? 'model-missing' : 'ollama-error', 'Local Qwen import is not ready; inspect model-init and Ollama logs', 503);
     const data = await res.json();
     if (data.model_info?.['general.architecture'] !== 'qwen3'
       || !new RegExp(`^FROM .*sha256[-:]${manifest.sha256}\\s*$`, 'm').test(data.modelfile || '')) {
@@ -357,46 +371,65 @@ async function localModel(fetchImpl = fetch, opts = {}) {
 }
 
 async function aiHealth(fetchImpl = fetch) {
-  const cfg = aiConfig();
-  const result = { status: 'unavailable', model: cfg.model, runtime: 'ollama', model_loaded: false, inference_available: false };
+  const result = { contractVersion: 1, state: 'INITIALIZING', status: 'unavailable', model: 'qwen3:0.6b', runtime: 'ollama', model_loaded: false, inference_available: false };
   try {
+    const cfg = aiConfig();
+    result.model = cfg.model;
     await localModel(fetchImpl);
+    result.model_loaded = true;
     // Readiness requires fresh completed tokens, not merely a tag or an allocated runner.
     const res = await fetchImpl(`${cfg.ollamaUrl}/api/generate`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model: cfg.model, prompt: 'Reply OK. /no_think', think: false, stream: false, options: { num_predict: 8 } }),
+      body: JSON.stringify({ model: cfg.model, prompt: 'Reply OK. /no_think', think: false, stream: false, options: { num_predict: 8, num_thread: cfg.numThreads } }),
       signal: AbortSignal.timeout(cfg.timeoutMs),
     });
     const data = await res.json();
     if (!res.ok || data.model !== cfg.model || data.done !== true || data.done_reason !== 'stop'
       || !Number.isSafeInteger(data.eval_count) || data.eval_count < 1
       || typeof data.response !== 'string' || !data.response.trim()) throw new AiError('inference-failed', 'Readiness generation failed');
-    return { ...result, status: 'ready', model_loaded: true, inference_available: true };
-  } catch (error) { return { ...result, error: error.code || 'ollama-unreachable' }; }
+    return { ...result, state: 'READY', status: 'ready', inference_available: true };
+  } catch (error) {
+    const code = error.code || (error.name === 'TimeoutError' ? 'ollama-timeout' : 'ollama-unreachable');
+    let state = ['model-file-missing', 'model-size-mismatch', 'model-manifest-missing', 'model-missing'].includes(code) ? 'MODEL_MISSING'
+      : ['ollama-unreachable', 'ollama-timeout'].includes(code) ? 'UNAVAILABLE' : 'ERROR';
+    if (state === 'MODEL_MISSING') {
+      try {
+        const provisioning = JSON.parse(fs.readFileSync(path.join(process.env.QWEN_MODEL_DIR || path.join(__dirname, '../models/qwen3-0.6b'), 'provisioning.json')));
+        if (['INITIALIZING', 'MODEL_DOWNLOADING', 'MODEL_LOADING', 'ERROR'].includes(provisioning.state)) state = provisioning.state;
+      } catch {}
+    }
+    return { ...result, state, error: code };
+  }
 }
 
 async function aiStatus(fetchImpl = fetch) {
-  const cfg = aiConfig();
+  let cfg;
+  try { cfg = aiConfig(); } catch { const health = await aiHealth(fetchImpl); return { ...health, ok: true, available: false, modelAvailable: false }; }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), cfg.statusTimeoutMs);
   try {
     const res = await fetchImpl(`${cfg.ollamaUrl}/api/tags`, { signal: controller.signal });
-    if (!res.ok) return { ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-error', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
+    if (!res.ok) return { contractVersion: 1, state: 'ERROR', ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-error', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
     const data = await res.json().catch(() => ({}));
     const names = Array.isArray(data.models) ? data.models.map((m) => String(m.name || m.model || '')) : [];
     const modelAvailable = names.includes(cfg.model);
+    const health = await aiHealth(fetchImpl);
     return {
+      ...health,
+      state: !modelAvailable && health.state === 'READY' ? 'MODEL_MISSING' : health.state,
+      contractVersion: 1,
       ok: true,
-      available: modelAvailable,
+      available: modelAvailable && health.inference_available === true,
+      inference_available: modelAvailable && health.inference_available === true,
       model: cfg.model,
       modelAvailable,
       modelsSeen: names.length,
-      error: modelAvailable ? null : 'model-missing',
+      error: modelAvailable ? health.error || null : 'model-missing',
       promptVersion: cfg.promptVersion,
       maxTranscript: cfg.maxTranscript,
     };
   } catch {
-    return { ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-unreachable', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
+    return { contractVersion: 1, state: 'UNAVAILABLE', ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-unreachable', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
   } finally {
     clearTimeout(timer);
   }

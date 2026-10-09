@@ -1,3 +1,6 @@
+import './hub-client.js';
+
+  const VanguardApi = window.VanguardApi;
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
   // Keys must match the canonical finding names in watch/lib/nlp/triage_parser.dart.
   const PREP = {
@@ -52,6 +55,7 @@
   const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
   const $ = (id) => document.getElementById(id);
+  $('hub-token-save').onclick = () => VanguardApi.setToken($('hub-token').value).catch(error => toast(error.message));
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const num = (n) => new Intl.NumberFormat().format(n);
   const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
@@ -100,7 +104,7 @@
   // ---------- data ----------
   async function load() {
     try {
-      const res = await fetch('/api/triage');
+      const res = await VanguardApi.request('/api/triage');
       if (!res.ok) throw new Error('bad status');
       const next = await res.json();
       const fresh = firstLoad ? [] : next.filter((r) => !seen.has(r.id));
@@ -122,7 +126,7 @@
     btn.classList.add('loading');
     btn.setAttribute('aria-busy', 'true');
     try {
-      const res = await fetch(`/api/triage/${r.id}`, {
+      const res = await VanguardApi.request(`/api/triage/${r.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -464,7 +468,7 @@
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog); dialog.showModal();
     try {
-      const response = await fetch(`/api/triage/${r.id}`);
+      const response = await VanguardApi.request(`/api/triage/${r.id}`);
       if (!response.ok) throw new Error('Could not load evidence');
       const detail = await response.json();
       content.replaceChildren(el('h2', '', 'Original evidence'), el('pre', '', detail.raw_text));
@@ -475,7 +479,7 @@
       extract.onclick = async () => {
         extract.disabled = true; aiState.textContent = 'Extracting locally; original report is already stored…';
         try {
-          const response = await fetch(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, baseRevision: detail.revision }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.message || data.error || 'Inference failed');
@@ -526,7 +530,7 @@
         }
         save.disabled = true;
         try {
-          const response = await fetch(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...change, requestId: attempt.requestId }) });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Could not save revision');
@@ -965,23 +969,27 @@
   tick();
   setInterval(tick, 10000);
 
-  fetch('/api/config').then((r) => r.json()).then((c) => {
+  VanguardApi.request('/api/config').then((r) => r.json()).then((c) => {
     $('hospital').textContent = c.hospital;
     document.title = c.hospital + ' · Pre-Arrival Board';
   }).catch(() => {});
 
   // Live push; the poll is a safety net if the stream drops.
   function connect() {
-    const es = new EventSource('/api/events');
-    es.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; };
-    es.addEventListener('triage', () => load());
-    es.onerror = () => { $('conn').textContent = 'Reconnecting'; $('conn').className = 'conn down'; };
+    VanguardApi.events(
+      () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; },
+      () => load(),
+      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; });
   }
   readUrl();
   render();
   load();
   connect();
   setInterval(load, 10000);
+  const retryOutbox = () => VanguardApi.flush().catch(() => {});
+  retryOutbox();
+  window.addEventListener('online', retryOutbox);
+  setInterval(retryOutbox, 30000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 
   // Local AI triage assistant: talks to the hub's Qwen endpoints, never to Ollama directly.
@@ -999,14 +1007,13 @@
     function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
     async function refreshStatus() {
       try {
-        var s = await (await fetch('/api/ai/health')).json();
-        if (s && s.inference_available) { setConn(true, 'AI ready'); return; }
-        setConn(false, 'AI unavailable');
-        stateEl.textContent = (s && s.error === 'model-missing')
-          ? 'Qwen model is missing on the hospital computer. The board still works.'
-          : 'Local AI is unreachable. The board still works without it.';
+        var s = await (await VanguardApi.request('/api/ai/health')).json();
+        if (s && s.state === 'READY' && s.inference_available) { setConn(true, 'AI Live'); connEl.title = 'Pinned local Qwen generated completed tokens'; return; }
+        setConn(false, 'AI: ' + (s.state || 'UNAVAILABLE').toLowerCase().replaceAll('_', ' '));
+        connEl.title = 'Docker AI: ' + (s.state || 'UNAVAILABLE') + (s.error ? ' (' + s.error + ')' : '') + '. Inspect model-init/Ollama logs; reports remain local until acknowledged.';
       } catch (e) { setConn(false, 'AI unavailable'); }
     }
+    setInterval(refreshStatus, 30000);
     function errText(data, res) {
       var map = {
         'ollama-unreachable': 'Local AI is unreachable; is Ollama running on the hospital computer?',
@@ -1064,57 +1071,46 @@
       if (busy) return;
       var transcript = textEl.value;
       if (!transcript.trim()) { stateEl.textContent = 'Type a transcript first.'; return; }
-      lastExtraction = null; saveAttempt = null; reviewEl.hidden = true;
+      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
+      var eta = $('ai-eta').value === '' ? null : Number($('ai-eta').value);
+      if ((pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) || (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720))) { stateEl.textContent = 'Check patient count (1–99) and ETA (1–720 minutes), or leave unknown.'; return; }
+      lastExtraction = null; saveAttempt = null; reviewEl.hidden = false;
       busy = true; extractBtn.disabled = true; assistBtn.disabled = true;
-      stateEl.textContent = 'Working — asking local Qwen…';
+      stateEl.textContent = 'Saving original locally…';
       try {
-        var res = await fetch('/api/ai/' + kind, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: transcript, device: 'hospital-browser', sttEngine: 'typed/hub-form', sttRuntime: 'hub-ai-v1' })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { stateEl.textContent = errText(data, res); return; }
+        saveAttempt = { report: { localId: Date.now(), createdAt: new Date().toISOString(), reportId: VanguardApi.uuid(), encounterId: VanguardApi.uuid(),
+          rawText: transcript, location: $('ai-location').value.trim() || 'Unspecified', injuries: 'Unspecified', triage: 'Unassessed', patientCount: pc, ageGroup: $('ai-age').value, etaMinutes: eta } };
+        stateEl.textContent = 'Original will be saved locally before Qwen runs…';
+        var data = await VanguardApi.prepare(saveAttempt.report, kind);
         lastExtraction = data;
-        setConn(true, 'AI ready');
-        stateEl.textContent = 'Ready — review the extraction below before saving.';
+        setConn(true, 'AI Live');
         renderResult(data);
-      } catch (e) { stateEl.textContent = 'Could not reach the hub; the board still works.'; }
+        saveAttempt.report.processing = data.processing;
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === saveAttempt.report.reportId; })) throw Error('Hospital receipt pending');
+        stateEl.textContent = 'Saved and transmitted automatically; provisional Unassessed. Verify clinically.';
+        saveBtn.disabled = true;
+        load();
+      } catch (e) { stateEl.textContent = e.code === 'local-storage-unavailable' ? e.message : 'Processing or receipt unavailable; original saved locally and queued for automatic delivery.'; saveBtn.disabled = false; retryOutbox(); }
       finally { busy = false; extractBtn.disabled = false; assistBtn.disabled = false; }
     }
     extractBtn.onclick = function () { run('extract'); };
     assistBtn.onclick = function () { run('triage-assist'); };
     saveBtn.onclick = async function () {
       if (!lastExtraction || lastExtraction.processing.originalTranscript !== textEl.value) { saveStateEl.textContent = 'Transcript changed; extract it again before saving.'; return; }
-      var loc = $('ai-location').value.trim();
-      if (!loc) { saveStateEl.textContent = 'Enter a pickup location first.'; return; }
-      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
-      if (pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) { saveStateEl.textContent = 'Patients must be 1–99 or unknown.'; return; }
-      var ages = ['Infant', 'Child', 'Adult', 'Elderly', 'Unspecified'];
-      var ag = $('ai-age').value; if (ages.indexOf(ag) === -1) ag = 'Unspecified';
-      var etaRaw = $('ai-eta').value.trim();
-      var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
-      if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
-      var prov = { triage: 'Unassessed' };
-      var report = { location: loc, injuries: 'Unspecified', triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
-        rawText: lastExtraction.processing.originalTranscript, processing: lastExtraction.processing };
-      var signature = JSON.stringify(report);
-      if (!saveAttempt || saveAttempt.signature !== signature) saveAttempt = { signature: signature, report: Object.assign(report, { localId: Date.now(), createdAt: new Date().toISOString(), reportId: newUUID(), encounterId: newUUID() }) };
+      if (!saveAttempt) return;
+      var report = saveAttempt.report;
       saveBtn.disabled = true; saveStateEl.textContent = 'Saving…';
       try {
-        var res = await fetch('/api/sync-triage', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ watchId: 'HUB-AI', reports: [saveAttempt.report] })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { saveStateEl.textContent = 'Save failed; nothing was stored.'; return; }
-        if (data.rejected && data.rejected.length) { saveStateEl.textContent = 'Hub refused the report: ' + data.rejected[0].reason; return; }
-        saveStateEl.textContent = 'Saved as inbound (' + prov.triage + ', provisional) — verify clinically.';
-        if (!data.ackLocalIds || data.ackLocalIds.indexOf(saveAttempt.report.localId) === -1) throw new Error('No explicit receipt');
-        if (typeof toast === 'function') toast('AI report saved', prov.triage + ' · verify clinically', prov.triage);
+        await VanguardApi.retain(report);
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === report.reportId; })) throw Error('Hospital receipt pending');
+        saveStateEl.textContent = 'Hospital receipt acknowledged; verify clinically.';
+        if (typeof toast === 'function') toast('AI report saved', 'Unassessed · verify clinically', 'Unassessed');
         if (typeof load === 'function') load();
       } catch (e) { saveStateEl.textContent = 'Receipt unavailable; retain this form and retry the same report.'; }
       finally { saveBtn.disabled = false; }
     };
-    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; });
+    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; $(id).value = 'unknown'; });
     refreshStatus();
   })();

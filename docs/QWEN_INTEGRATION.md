@@ -1,5 +1,9 @@
 # Qwen3-0.6B integration — 2026-10-09
 
+Historical integration evidence. For current provisioning, credentials, readiness,
+validation and remaining blockers see [the 2026-10-10 connectivity report](global-ai-connectivity.md).
+The setup instructions below describe the earlier manual import workflow.
+
 Qwen performs real local text generation. It extracts **unverified claims**, never
 clinical urgency, diagnosis or death. Existing deterministic provisional rules and
 qualified verification remain authoritative. Saving or relaying a report has no

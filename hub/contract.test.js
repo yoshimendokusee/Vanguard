@@ -51,7 +51,7 @@ test('documented LAN example works end to end with the shipped dashboard', async
     assert.ok(assets.length >= 2, 'Dashboard must load JavaScript and CSS');
     for (const asset of assets) assert.equal((await fetch(base + asset[1])).status, 200);
     const source = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
-    new vm.Script(source, { filename: 'dashboard.js' });
+    new vm.Script(source.replace(/^import '\.\/hub-client\.js';\r?\n/m, ''), { filename: 'dashboard.js' });
     const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)];
     assert.ok(scripts.length > 0);
     for (const [index, script] of scripts.entries()) new vm.Script(script[1], { filename: `dashboard-${index}.js` });

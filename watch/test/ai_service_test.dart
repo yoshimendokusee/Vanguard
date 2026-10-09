@@ -54,10 +54,40 @@ AiService service(Future<http.Response> Function(http.BaseRequest) fn) =>
     AiService(client: MockClient(fn), hub: 'http://hub.test');
 
 void main() {
+  test(
+    'model tag alone and mismatched replies do not establish readiness',
+    () async {
+      final tag = service(
+        (_) async => http.Response('{"ok":true,"available":true}', 200),
+      );
+      final wrong = service(
+        (_) async => http.Response(
+          '{"ok":true,"processing":{"version":1,"originalTranscript":"different"}}',
+          200,
+        ),
+      );
+      try {
+        expect((await tag.status()).available, isFalse);
+        expect(
+          () => wrong.extract(transcript),
+          throwsA(isA<AiUnavailableException>()),
+        );
+      } finally {
+        tag.dispose();
+        wrong.dispose();
+      }
+    },
+  );
   test('status reports hub availability without blocking capture', () async {
     final up = service(
       (_) async => http.Response(
-        jsonEncode({'ok': true, 'available': true, 'model': 'qwen3:0.6b'}),
+        jsonEncode({
+          'ok': true,
+          'available': true,
+          'state': 'READY',
+          'inference_available': true,
+          'model': 'qwen3:0.6b',
+        }),
         200,
       ),
     );

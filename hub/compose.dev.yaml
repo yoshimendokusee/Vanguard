@@ -4,7 +4,7 @@ services:
       context: .
       target: development
     ports:
-      - "127.0.0.1:3301:3301"
+      - "127.0.0.1:${VITE_PORT:-3301}:3301"
     environment:
       VITE_API_TARGET: http://hub:3000
       VITE_USE_POLLING: "${VITE_USE_POLLING:-true}"

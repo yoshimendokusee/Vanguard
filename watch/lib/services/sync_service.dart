@@ -4,13 +4,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../db/triage_db.dart';
-
-/// Hospital hub address on the internet-free router. Override at build time:
-///   flutter run --dart-define=HUB_URL=http://192.168.8.10:3000
-const hubUrl = String.fromEnvironment(
-  'HUB_URL',
-  defaultValue: 'http://192.168.8.10:3000',
-);
+import 'hub_config.dart';
+export 'hub_config.dart' show hubUrl;
 
 class SyncOutcome {
   const SyncOutcome.ok(this.sent, this.duplicates) : error = null;
@@ -28,12 +23,16 @@ class SyncService {
     required this.pending,
     required this.acknowledge,
     http.Client? client,
+    this.hub = hubUrl,
+    this.token = hubToken,
   }) : _client = client ?? http.Client();
 
   final String watchId;
   final Future<List<TriageRow>> Function() pending;
   final Future<void> Function(Iterable<int>) acknowledge;
   final http.Client _client;
+  final String hub;
+  final String token;
   Future<SyncOutcome>? _inFlight;
   Timer? _retry;
   void Function(SyncOutcome)? _onOutcome;
@@ -109,8 +108,8 @@ class SyncService {
         final body = jsonEncode({'watchId': watchId, 'reports': wireReports});
         final res = await _client
             .post(
-              Uri.parse('$hubUrl/api/sync-triage'),
-              headers: {'Content-Type': 'application/json'},
+              hubEndpoint(hub, '/api/sync-triage'),
+              headers: hubHeaders(token: token),
               body: body,
             )
             .timeout(const Duration(seconds: 8));

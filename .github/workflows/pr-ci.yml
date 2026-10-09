@@ -124,7 +124,7 @@ jobs:
     name: Compose and container tests
     needs: repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -158,6 +158,8 @@ jobs:
             --mount "type=bind,source=$PWD/hub/public,target=/checks/public" \
             --mount "type=bind,source=$PWD/hub/qa,target=/checks/qa,readonly" \
             vanguard-dev-ci:local node /checks/qa/hmr-check.cjs
+      - name: Fresh clone provisioning and real Qwen connectivity
+        run: node scripts/connectivity-check.cjs
 
   gate:
     name: PR acceptance gate

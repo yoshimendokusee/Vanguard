@@ -223,3 +223,34 @@ do not prove physical Watch memory, speech, thermals, background transfer or del
 See `QWEN_INTEGRATION.md`, `QWEN_AUDIT.md` and `QWEN_RESULTS.md` for exact status,
 resource measurements, setup and scripts. The system remains a synthetic prototype
 with unauthenticated HTTP and unencrypted storage, not a real-patient deployment.
+
+
+## Global connectivity update — 2026-10-10
+
+See `global-ai-connectivity.md` for current verification and remaining acceptance
+blockers. Root and legacy Compose now initialize a named verified-weights volume
+from existing GGUF bytes or a pinned first-time download, without host Ollama/LFS.
+Ollama retains its internal network and imported-model volume; SQLite paths and
+schema v2 remain unchanged. Earlier statements above that require prior checkout
+weights for Docker startup are historical.
+
+The web central client uses same-origin requests, UUID request headers, token-aware
+SSE/polling and an account-scoped durable outbox with one atomic key per report.
+Original capture is saved before inference; generated metadata is validated and
+hospital transmission is automatic. Failed extraction can submit an Unassessed
+original. Only an explicit scoped receipt removes an outbox entry.
+
+Apple Qwen stays entirely local. Shared readiness states measure token generation;
+LAN URL validation, device credentials, bounded foreground retries and receipt
+validation are separate. Native tokens use Keychain. iPhone transcribes locally
+when the Speech runtime/locale supports it; Watch audio uses the existing paired
+fallback because Watch offline STT is still unimplemented. Hardware execution is
+unverified. Manual URL/token pairing is the reliable LAN configuration fallback;
+automatic Bonjour discovery is not implemented across Docker/native networks.
+
+LAN binding now requires server-side per-user/device credentials. Device principals
+can submit only their assigned watch IDs and cannot read hospital records; operators
+share the hospital board intentionally. Existing anonymous synthetic localhost use
+remains compatible. Authenticated status/correction events record the operator ID.
+HTTP and local storage remain unencrypted; credentials alone do not establish
+patient-data safety or clinical validity.

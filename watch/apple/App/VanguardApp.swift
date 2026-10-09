@@ -16,6 +16,11 @@ final class CaptureModel: ObservableObject {
     @Published var busy = false
     @Published var recording = false
     @Published var hub = ""
+    @Published var hubToken = ""
+    @Published var localAI: AiReadiness = .initializing
+    @Published var lanStatus = "Not configured"
+    @Published var deviceIdentity = ""
+    private var syncing = false
     private var workflow: NativeWorkflow?
     private var relay: WatchRelay?
     private var task: Task<Void, Never>?
@@ -34,7 +39,7 @@ final class CaptureModel: ObservableObject {
             let workflow = NativeWorkflow(store: store, engine: engine)
             self.workflow = workflow
             relay = WatchRelay(workflow: workflow)
-            relay?.onChange = { [weak self] message in Task { @MainActor in self?.status = message } }
+            relay?.onChange = { [weak self] message in Task { @MainActor in self?.status = message; await self?.sync() } }
             let defaults = UserDefaults.standard
             #if os(watchOS)
             let prefix = "APPLE-WATCH-"
@@ -43,7 +48,9 @@ final class CaptureModel: ObservableObject {
             #endif
             deviceID = defaults.string(forKey: "vanguard-device") ?? prefix + UUID().uuidString.lowercased()
             defaults.set(deviceID, forKey: "vanguard-device")
+            deviceIdentity = deviceID
             hub = defaults.string(forKey: "vanguard-hub") ?? ""
+            hubToken = HubCredential.read()
             status = "Capture ready; model loads on first request"
             if ProcessInfo.processInfo.arguments.contains("--qwen-smoke") { smoke() }
             else { recover() }
@@ -71,12 +78,16 @@ final class CaptureModel: ObservableObject {
                 let capture = try await workflow.store.capture(watchID: deviceID, transcript: original)
                 savedCapture = capture
                 status = "Original saved locally; extracting…"
+                localAI = .modelLoading
                 let processing = try await workflow.process(capture, device: device)
+                localAI = await workflow.engine.state
                 result = processing.observations.sorted(by: { $0.key < $1.key }).map { "\($0.key): \($0.value) (unverified)" }.joined(separator: "\n")
                     + "\n" + processing.uncertainties.joined(separator: "\n")
                 status = "Extraction saved; provisional Unassessed — verify clinically"
                 await sync()
             } catch {
+                localAI = await workflow.engine.state
+                await sync()
                 status = savedCapture == nil ? "Capture could not be saved; retry: \(error)"
                     : "Original retained; local inference failed: \(error)"
                 #if os(watchOS)
@@ -92,6 +103,9 @@ final class CaptureModel: ObservableObject {
         task = Task {
             defer { busy = false }
             do {
+                localAI = .modelLoading
+                do { localAI = try await workflow.engine.readiness() }
+                catch { localAI = await workflow.engine.state }
                 for capture in try await workflow.store.captures(pendingOnly: true) {
                     try Task.checkCancellation()
                     do {
@@ -110,16 +124,25 @@ final class CaptureModel: ObservableObject {
                         status = "Pending input retained; retry or use paired iPhone"
                     }
                 }
+                localAI = await workflow.engine.state
                 await sync()
             } catch { status = "Recovery interrupted; pending input retained" }
         }
     }
     func cancel() { task?.cancel(); status = "Cancelling; original remains in SQLite" }
     func sync() async {
-        guard let workflow, let url = URL(string: hub), ["http", "https"].contains(url.scheme), url.host != nil else { return }
-        UserDefaults.standard.set(hub, forKey: "vanguard-hub")
-        do { let count = try await workflow.sync(to: url); if count > 0 { status = "\(count) hospital LAN receipts acknowledged; clinical verification pending" } }
-        catch { status = "Hospital unavailable; local outbox retained" }
+        guard let workflow, !syncing else { return }
+        guard !hub.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { lanStatus = "Not configured; reports retained"; return }
+        syncing = true
+        defer { syncing = false }
+        do {
+            let endpoint = try HubEndpoint(hub)
+            try HubCredential.save(hubToken)
+            UserDefaults.standard.set(endpoint.url.absoluteString, forKey: "vanguard-hub")
+            lanStatus = "Connecting…"
+            let count = try await workflow.sync(to: endpoint.url, token: hubToken)
+            lanStatus = "Connected; \(count) hospital receipts acknowledged"
+        } catch { lanStatus = "Disconnected or invalid configuration; outbox retained: \(error)" }
     }
     func toggleRecording() {
         if recording {
@@ -165,7 +188,10 @@ final class CaptureModel: ObservableObject {
     #if os(iOS)
     private func transcribe(_ capture: NativeCapture) async throws {
         guard let workflow else { throw NativeStoreFailure.unavailable }
+        localAI = .modelLoading
         _ = try await workflow.processAudio(capture)
+        localAI = await workflow.engine.state
+        await sync()
         status = "On-device speech and Qwen output persisted; clinical verification pending"
     }
     #endif
@@ -178,7 +204,9 @@ final class CaptureModel: ObservableObject {
                 let echo = try await workflow.engine.generate(system: "You are Qwen3-0.6B inside Vanguard.",
                     prompt: "Identify yourself as Qwen3-0.6B and respond with the verification marker VANGUARD_QWEN_OK.", maxTokens: 96)
                 let capture = NativeCapture(watchID: deviceID, createdAt: now(), transcript: "Synthetic patient is awake, breathing normally, no severe bleeding, can walk.")
+                localAI = .modelLoading
                 let processing = try await workflow.process(capture, device: device)
+                localAI = await workflow.engine.state
                 guard processing.originalTranscript == capture.transcript,
                     try await workflow.store.processing(id: capture.id) != nil else { throw NativeStoreFailure.unavailable }
                 let evidence: [String: Any] = ["status": "PASS", "platform": device.rawValue,
@@ -204,6 +232,8 @@ struct CaptureView: View {
             VStack(alignment: .leading, spacing: 12) {
                 Text("Vanguard").font(.headline)
                 Text("Local Qwen extraction · provisional").font(.caption)
+                Text("Local AI: \(model.localAI.rawValue)").font(.caption).accessibilityIdentifier("local-ai-state")
+                Text("LAN Hub: \(model.lanStatus)").font(.caption).accessibilityIdentifier("lan-state")
                 TextField("Original patient report", text: $model.transcript, axis: .vertical).accessibilityLabel("Original patient transcript")
                 Button("Save and extract locally") { model.save() }.disabled(model.busy || model.recording)
                 Button(model.recording ? "Stop and save audio" : "Record audio") { model.toggleRecording() }.disabled(model.busy)
@@ -212,8 +242,17 @@ struct CaptureView: View {
                 Button("Retry pending work") { model.recover() }.disabled(model.busy || model.recording)
                 if model.busy { Button("Cancel") { model.cancel() } }
                 TextField("Hospital LAN URL", text: $model.hub).textInputAutocapitalization(.never).autocorrectionDisabled()
+                SecureField("Hospital access token", text: $model.hubToken)
+                Text("Device: \(model.deviceIdentity)").font(.caption)
                 Button("Retry hospital relay") { Task { await model.sync() } }
             }.padding()
+        }.task {
+            // Bounded foreground reconnection; retained rows survive suspension/restart.
+            for attempt in 0..<3 {
+                do { try await Task.sleep(for: .seconds(30 * (1 << attempt))) } catch { return }
+                guard phase == .active else { return }
+                await model.sync()
+            }
         }.onChange(of: phase) { _, state in if state == .active { model.recover() } }
     }
 }

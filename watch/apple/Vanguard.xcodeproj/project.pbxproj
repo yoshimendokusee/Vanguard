@@ -133,6 +133,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = A01C5ECD0623FA5E7B97197E /* Build configuration list for PBXNativeTarget "VanguardPhone" */;
 			buildPhases = (
+				ABCD01234567890123456789 /* Verify pinned Qwen */,
 				3FEFA977A2086F1134B8891B /* Sources */,
 				A91CF18C647C30C2471A3092 /* Frameworks */,
 				39FF03880F67B3CB15E65F87 /* Resources */,
@@ -155,6 +156,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 124FD6EB643ADB44C71A5987 /* Build configuration list for PBXNativeTarget "VanguardWatch" */;
 			buildPhases = (
+				ABCD01234567890123456788 /* Verify pinned Qwen */,
 				EB33ED172B6CBC1908C2A20E /* Sources */,
 				459855A1DC07986499255891 /* Frameworks */,
 				6CBD4D1E8D63C33B0EC3A967 /* Resources */,
@@ -222,6 +224,29 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		ABCD01234567890123456789 /* Verify pinned Qwen */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			name = "Verify pinned Qwen";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ncd \"$SRCROOT/../../models/qwen3-0.6b\"\n/usr/bin/shasum -a 256 --check checksums.sha256\n";
+		};
+		ABCD01234567890123456788 /* Verify pinned Qwen */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			name = "Verify pinned Qwen";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ncd \"$SRCROOT/../../models/qwen3-0.6b\"\n/usr/bin/shasum -a 256 --check checksums.sha256\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		3FEFA977A2086F1134B8891B /* Sources */ = {
