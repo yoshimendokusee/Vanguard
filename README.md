@@ -1,4 +1,4 @@
-# Vanguard-Wrist: offline medical triage → hospital pre-arrival
+# WristCue: offline medical triage → hospital pre-arrival
 
 A rescuer taps a Wear OS watch and describes the patient(s) out loud. The watch
 transcribes **on-device** (Vosk), extracts a structured medical triage report with a
