@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key><string>ph.vanguard.watchmac.dev</string>
+	<key>CFBundleName</key><string>Vanguard Watch (Mac dev host)</string>
+	<key>CFBundleVersion</key><string>1</string>
+	<key>NSMicrophoneUsageDescription</key><string>Record a synthetic test report to try the Vanguard Watch workflow on this Mac.</string>
+	<key>NSSpeechRecognitionUsageDescription</key><string>Transcribe the test recording on this Mac without network recognition.</string>
+</dict>
+</plist>

@@ -13,7 +13,9 @@ module llama {
 }
 MAP
 libraries=()
-for platform in macos iphoneos iphonesimulator watchos watchsimulator; do
+# PLATFORMS overrides the slice list, e.g. when the watchOS Simulator SDK is not installed.
+platforms=${PLATFORMS:-"macos iphoneos iphonesimulator watchos watchsimulator"}
+for platform in $platforms; do
   case "$platform" in
     macos) system=Darwin; sdk=macosx; arch=arm64; minimum=14.0 ;;
     iphone*) system=iOS; sdk="$platform"; arch=arm64; minimum=17.0 ;;

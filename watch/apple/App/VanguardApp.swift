@@ -4,8 +4,28 @@ import AVFoundation
 
 @main
 struct VanguardApp: App {
+    #if os(watchOS)
+    // The Apple Watch app is the voice-report workflow (ten screens, see VanguardApple/WatchUI).
+    @State private var runtime = Result { try VoiceRuntime() }
+    var body: some Scene {
+        WindowGroup {
+            switch runtime {
+            case .success(let runtime): WatchRootView(controller: runtime.controller)
+            case .failure: Text("Local storage is unavailable. Reports cannot be saved. Restart the watch app.").padding()
+            }
+        }
+    }
+    #else
     @StateObject private var model = CaptureModel()
-    var body: some Scene { WindowGroup { CaptureView(model: model) } }
+    var body: some Scene {
+        WindowGroup {
+            CaptureView(model: model)
+                // Speech permission can only be asked while the app is in the foreground. Without it the iPhone could not
+                // transcribe audio that the Watch sends while this app is in the background.
+                .task { _ = await OnDeviceTranscriber.requestPermission() }
+        }
+    }
+    #endif
 }
 
 @MainActor
