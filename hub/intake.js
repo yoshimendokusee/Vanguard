@@ -9,7 +9,7 @@
  * edit every value before saving.
  */
 
-const { retrieve, normalize } = require('./rag/knowledge');
+const { retrieve, normalize, CLITIC_GAP, findPhraseSpan } = require('./rag/knowledge');
 
 const NUMBER_WORDS = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
@@ -22,6 +22,7 @@ const toNumber = (token) => (/^\d+$/.test(token) ? Number(token) : NUMBER_WORDS[
 const PATIENT_NOUNS = 'patients?|pasyente|victims?|biktima|casualt(?:y|ies)|persons?|people|tao|katao|injured|sugatan|bata|children|kids?|adults?|matanda|lalaki|babae|survivors?|riders?|passengers?';
 const MINUTE_UNITS = 'minutes?|mins?|minuto';
 const HOUR_UNITS = 'hours?|hrs?|oras';
+const DURATION_UNITS = 'minutes?|mins?|minutos?|minuto|hours?|hrs?|oras?|days?|dias?|días?|weeks?|semanas?|months?|meses?';
 const ETA_CUES = /\b(eta|arriv\w*|away|out|papunta|patungo|darating|dadating|dating|on the way|en route|to the hospital|sa ospital|bago makarating|makarating)\b/i;
 const AGE_GROUPS = ['Infant', 'Child', 'Adult', 'Elderly'];
 
@@ -76,7 +77,9 @@ function findLocation(transcript, index) {
 }
 
 function findPatientCount(transcript) {
-  const m = new RegExp(`\\b${NUM}\\s+(?:na\\s+)?(?:${PATIENT_NOUNS})\\b`, 'iu').exec(transcript);
+  // Clitic particles may sit between the number and the noun: "dalawa na bata",
+  // "tatlong po siyang tao". The gap only absorbs particles, never content words.
+  const m = new RegExp(`\\b${NUM}${CLITIC_GAP}(?:${PATIENT_NOUNS})\\b`, 'iu').exec(transcript);
   if (!m) return null;
   const value = toNumber(m[1]);
   return Number.isInteger(value) && value >= 1 && value <= 99 ? { value, evidence: m[0] } : null;
@@ -121,6 +124,32 @@ function findEta(transcript) {
   return null;
 }
 
+function findSymptomDuration(transcript) {
+  const re = new RegExp(`\\b${NUM}\\s*(${DURATION_UNITS})\\b`, 'giu');
+  for (const match of transcript.matchAll(re)) {
+    const start = match.index;
+    const end = start + match[0].length;
+    const before = transcript.slice(Math.max(0, start - 28), start);
+    const after = transcript.slice(end, end + 16);
+    const beforeCue = /\b(?:for|since|past|mula|simula)\b[^.!?;:,]{0,24}$/i.exec(before);
+    const afterCue = /^\s*(?:na|nang|ago)\b/i.exec(after);
+    if (!beforeCue && !afterCue) continue;
+    if (ETA_CUES.test(before + after) && !beforeCue && !/\bago\b/i.test(afterCue[0])) continue;
+    const value = toNumber(match[1]);
+    if (!Number.isInteger(value) || value < 1) continue;
+    const unitText = match[2].toLowerCase();
+    const unit = /^(?:minutes?|mins?|minutos?|minuto)/.test(unitText) ? 'minutes'
+      : /^(?:hours?|hrs?|oras?)/.test(unitText) ? 'hours'
+        : /^(?:days?|d[ií]as?)/.test(unitText) ? 'days'
+          : /^(?:weeks?|semanas?)/.test(unitText) ? 'weeks' : 'months';
+    const excerpt = beforeCue
+      ? transcript.slice(start - before.length + beforeCue.index, end)
+      : transcript.slice(start, end + afterCue[0].length).trim();
+    return { value, unit, evidence: excerpt };
+  }
+  return null;
+}
+
 const FINDING_CATEGORIES = new Set(['injury', 'condition', 'mechanism', 'symptom']);
 
 /**
@@ -130,13 +159,19 @@ const FINDING_CATEGORIES = new Set(['injury', 'condition', 'mechanism', 'symptom
 function injuriesFor(transcript, index, observationInjuries) {
   const terms = [];
   const seen = new Set();
+  const covered = new Set();
   const push = (label) => {
     const key = label.toLowerCase();
     if (!seen.has(key)) { seen.add(key); terms.push(label); }
   };
-  observationInjuries.forEach(push);
+  observationInjuries.forEach((label) => {
+    push(label);
+    covered.add(label.toLowerCase());
+    if (label === 'Difficulty breathing') covered.add('shortness of breath');
+    if (label === 'Ambulatory') covered.add('can walk');
+  });
   for (const match of index ? retrieve(index, transcript, { limit: 12 }) : []) {
-    if (!match.negated && FINDING_CATEGORIES.has(match.category)) push(match.english);
+    if (!match.negated && FINDING_CATEGORIES.has(match.category) && !covered.has(match.english.toLowerCase())) push(match.english);
   }
   let joined = '';
   const used = [];
@@ -149,11 +184,22 @@ function injuriesFor(transcript, index, observationInjuries) {
   return { value: joined || 'Unspecified', terms: used };
 }
 
+function terminologyFindings(transcript, index) {
+  return (index ? retrieve(index, transcript, { limit: 12 }) : []).flatMap((match, position) => {
+    if (match.negated || !FINDING_CATEGORIES.has(match.category)) return [];
+    const hit = findPhraseSpan(transcript, match.matched);
+    if (!hit) return [];
+    return [{ id: `reported-term-${position + 1}`, kind: match.category === 'mechanism' || match.category === 'injury' ? 'incident' : 'symptom',
+      name: match.english.slice(0, 100), value: 'reported', unit: null, source: 'model-inferred', excerpt: hit.quote, contradictory: false }];
+  });
+}
+
 function extractReportFields(transcript, index, observationInjuries = []) {
   const location = findLocation(transcript, index);
   const patientCount = findPatientCount(transcript);
   const ageGroup = findAgeGroup(transcript);
   const eta = findEta(transcript);
+  const symptomDuration = findSymptomDuration(transcript);
   const injuries = injuriesFor(transcript, index, observationInjuries);
   return {
     fields: {
@@ -161,6 +207,7 @@ function extractReportFields(transcript, index, observationInjuries = []) {
       patientCount: patientCount ? patientCount.value : null,
       ageGroup: ageGroup ? ageGroup.value : 'Unspecified',
       etaMinutes: eta ? eta.value : null,
+      symptomDuration: symptomDuration ? { value: symptomDuration.value, unit: symptomDuration.unit } : null,
       injuries: injuries.value,
     },
     evidence: {
@@ -168,10 +215,12 @@ function extractReportFields(transcript, index, observationInjuries = []) {
       patientCount: patientCount ? patientCount.evidence : null,
       ageGroup: ageGroup ? ageGroup.evidence : null,
       etaMinutes: eta ? eta.evidence : null,
+      symptomDuration: symptomDuration ? symptomDuration.evidence : null,
     },
     locationBasis: location ? location.basis : null,
     notes: ageGroup && ageGroup.mixed ? ['Different age groups were mentioned; age group left unspecified'] : [],
+    findings: terminologyFindings(transcript, index),
   };
 }
 
-module.exports = { extractReportFields, findLocation, findPatientCount, findAgeGroup, findEta, injuriesFor };
+module.exports = { extractReportFields, findLocation, findPatientCount, findAgeGroup, findEta, findSymptomDuration, injuriesFor };

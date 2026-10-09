@@ -35,6 +35,30 @@ void main() {
     expect(r.injuries, ['Abrasion', 'Ambulatory']);
   });
 
+  test('Tagalog clitic particles inside a phrase still match', () {
+    expect(parser.parse('nahihirapan siyang huminga').injuries, [
+      'Difficulty breathing',
+    ]);
+    expect(parser.parse('hindi po siya makalakad').injuries, [
+      'Non-ambulatory',
+    ]);
+    expect(
+      parser.parse('dalawang po bata, nahihirapan huminga').patientCount,
+      2,
+    );
+  });
+
+  test('content words still break a phrase', () {
+    expect(
+      parser.parse('hirap nang matinding huminga').injuries,
+      isNot(contains('Difficulty breathing')),
+    );
+    expect(
+      parser.parse('hindi ngayon makalakad').injuries,
+      isNot(contains('Non-ambulatory')),
+    );
+  });
+
   test('"cannot walk" is Delayed, never Minor', () {
     final r = parser.parse('hindi makalakad, may sugat');
     expect(r.triage, TriageParser.delayed);

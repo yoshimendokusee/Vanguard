@@ -94,18 +94,28 @@ class TriageParser {
       'hindi humihinga',
       'di humihinga',
       'not breathing',
+      'walang hininga',
+      'wala nang hininga',
       'walang pulso',
       'no pulse',
     ]),
     _Injury('Difficulty breathing', _Tier.immediate, [
       'hirap huminga',
       'nahihirapan huminga',
+      'mahirap huminga',
       'hirap sa paghinga',
       'hinihingal',
+      'hindi makahinga',
+      'di makahinga',
+      'kinakapos ng hininga',
+      'kinakapos sa hininga',
+      'kapos hininga',
       'difficulty breathing',
       'shortness of breath',
       'can t breathe',
+      'cant breathe',
       'cannot breathe',
+      'unable to breathe',
     ]),
     _Injury('Drowning', _Tier.immediate, [
       'nalunod',
@@ -119,6 +129,8 @@ class TriageParser {
       'nawalan ng malay',
       'walang ulirat',
       'nawalan ng ulirat',
+      'hindi sumasagot',
+      'di sumasagot',
       'unconscious',
       'unresponsive',
     ]),
@@ -133,6 +145,7 @@ class TriageParser {
         'severe bleeding',
         'massive bleeding',
         'heavy bleeding',
+        'profuse bleeding',
         'hemorrhage',
       ],
       supersedes: ['Bleeding'],
@@ -241,6 +254,8 @@ class TriageParser {
         'cannot walk',
         'can t walk',
         'cant walk',
+        'could not walk',
+        'cannot stand',
         'unable to walk',
       ],
       supersedes: ['Ambulatory'],
@@ -265,8 +280,10 @@ class TriageParser {
     _Injury('Ambulatory', _Tier.minor, [
       'nakakalakad',
       'makalakad',
+      'kayang maglakad',
       'nakakatayo',
       'can walk',
+      'able to walk',
       'walking',
     ]),
 
@@ -375,6 +392,71 @@ class TriageParser {
   };
   static const Set<String> _hourWords = {'oras', 'hour', 'hours', 'hr', 'hrs'};
 
+  /// Tagalog clitics, linkers and politeness particles may sit inside a phrase
+  /// without changing its claim: "nahihirapan siyang huminga" is still
+  /// "nahihirapan huminga". Negators and content words are deliberately absent,
+  /// so a skipped particle can never hide a denial or an unrelated word.
+  static const Set<String> _clitics = {
+    'po',
+    'ho',
+    'opo',
+    'oho',
+    'na',
+    'ng',
+    'nang',
+    'pa',
+    'ba',
+    'nga',
+    'naman',
+    'lang',
+    'lamang',
+    'din',
+    'rin',
+    'daw',
+    'raw',
+    'talaga',
+    'muna',
+    'pala',
+    'yata',
+    'ulit',
+    'sana',
+    'ay',
+    'yung',
+    'eh',
+    'ako',
+    'akong',
+    'ka',
+    'kang',
+    'ko',
+    'kong',
+    'mo',
+    'mong',
+    'siya',
+    'siyang',
+    'niya',
+    'niyang',
+    'kami',
+    'kaming',
+    'tayo',
+    'tayong',
+    'kayo',
+    'kayong',
+    'sila',
+    'silang',
+    'namin',
+    'nating',
+    'natin',
+    'nila',
+    'nilang',
+    'kaniya',
+    'kanya',
+    'kanyang',
+    'akin',
+    'atin',
+    'ating',
+  };
+  static const int _maxCliticGap = 4;
+
   TriageResult parse(String transcript) {
     final tokens = _tokenize(transcript);
 
@@ -429,11 +511,16 @@ class TriageParser {
     for (var i = 0; i + 1 < tokens.length; i++) {
       final n = _number(tokens[i]);
       if (n == null || n < 1 || n > 99) continue;
-      // Allow a linker: "dalawa na bata".
-      final next = tokens[i + 1] == 'na' && i + 2 < tokens.length
-          ? tokens[i + 2]
-          : tokens[i + 1];
-      if (_personWords.contains(next)) return n;
+      // Allow clitics/linkers: "dalawa na bata", "tatlong po siyang tao".
+      var j = i + 1;
+      var skipped = 0;
+      while (j < tokens.length &&
+          skipped < _maxCliticGap &&
+          _clitics.contains(tokens[j])) {
+        j++;
+        skipped++;
+      }
+      if (j < tokens.length && _personWords.contains(tokens[j])) return n;
     }
     return 1;
   }
@@ -465,18 +552,40 @@ class TriageParser {
       .where((t) => t.isNotEmpty)
       .toList();
 
-  /// Sliding-window phrase match where each word may differ slightly.
+  /// Sliding-window phrase match where each word may differ slightly and
+  /// Tagalog clitic particles between words are skipped: "nahihirapan siyang
+  /// huminga" still matches "nahihirapan huminga".
   static bool _containsPhrase(List<String> tokens, String phrase) {
     final words = phrase.split(' ');
-    for (var i = 0; i + words.length <= tokens.length; i++) {
-      var ok = true;
-      for (var j = 0; j < words.length; j++) {
-        if (!_close(tokens[i + j], words[j])) {
-          ok = false;
-          break;
-        }
+    for (var i = 0; i < tokens.length; i++) {
+      if (_matchWords(tokens, i, words, 0)) return true;
+    }
+    return false;
+  }
+
+  /// Matches `words[j]` onward at `tokens[i]`, allowing up to [_maxCliticGap]
+  /// clitic particles between consecutive phrase words. Only starts skipping
+  /// after the first word matched, so a phrase cannot start inside a clitic run.
+  static bool _matchWords(
+    List<String> tokens,
+    int i,
+    List<String> words,
+    int j,
+  ) {
+    if (j == words.length) return true;
+    var k = i;
+    var skipped = 0;
+    while (k < tokens.length) {
+      if (_close(tokens[k], words[j]) &&
+          _matchWords(tokens, k + 1, words, j + 1)) {
+        return true;
       }
-      if (ok) return true;
+      if (j > 0 && skipped < _maxCliticGap && _clitics.contains(tokens[k])) {
+        skipped++;
+        k++;
+        continue;
+      }
+      return false;
     }
     return false;
   }

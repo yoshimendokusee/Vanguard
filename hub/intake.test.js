@@ -1,7 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { loadKnowledge } = require('./rag/knowledge');
-const { extractReportFields, findLocation, findAgeGroup, findEta, findPatientCount } = require('./intake');
+const { extractReportFields, findLocation, findAgeGroup, findEta, findSymptomDuration, findPatientCount } = require('./intake');
 const { validateReport } = require('./sync');
 const { riskForRow } = require('./risk');
 
@@ -20,7 +20,7 @@ test('fills the fields from a bare English report', () => {
 
 test('fills every field from a Taglish rescuer report', () => {
   const { fields, evidence } = extract('Dalawang bata, nalunod at walang malay, sa Barangay Arnaldo, sampung minuto papunta sa ospital.');
-  assert.deepEqual(fields, { location: 'Barangay Arnaldo', patientCount: 2, ageGroup: 'Child', etaMinutes: 10, injuries: 'Drowning' });
+  assert.deepEqual(fields, { location: 'Barangay Arnaldo', patientCount: 2, ageGroup: 'Child', etaMinutes: 10, symptomDuration: null, injuries: 'Drowning' });
   assert.equal(evidence.etaMinutes, 'sampung minuto');
   assert.equal(extract('Motorcycle crash, male, in Brgy. San Roque, ETA 15 minutes').fields.location, 'Barangay San Roque');
   assert.equal(extract('taga-Sitio Mabini, buntis, 20 minutes away').fields.location, 'Sitio Mabini');
@@ -29,7 +29,7 @@ test('fills every field from a Taglish rescuer report', () => {
 
 test('an unrelated sentence fills nothing', () => {
   const { fields } = extract('Si Juan ay nasa bahay po namin at kumakain ng kanin.');
-  assert.deepEqual(fields, { location: null, patientCount: null, ageGroup: 'Unspecified', etaMinutes: null, injuries: 'Unspecified' });
+  assert.deepEqual(fields, { location: null, patientCount: null, ageGroup: 'Unspecified', etaMinutes: null, symptomDuration: null, injuries: 'Unspecified' });
 });
 
 test('minutes count as an ETA only next to an arrival cue', () => {
@@ -39,6 +39,20 @@ test('minutes count as an ETA only next to an arrival cue', () => {
   assert.equal(findEta('12 mins out').value, 12);
   assert.equal(findEta('limang minuto na lang darating').value, 5);
   assert.equal(findEta('arriving in 900 minutes'), null, 'outside the 1-720 minute limit the hub accepts');
+});
+
+test('symptom duration is separate from arrival ETA and carries transcript evidence', () => {
+  const duration = findSymptomDuration('nahihirapan siyang huminga mga 30 minutes na');
+  assert.deepEqual(duration, { value: 30, unit: 'minutes', evidence: '30 minutes na' });
+  assert.deepEqual(findSymptomDuration('chest pain for 2 hours'), { value: 2, unit: 'hours', evidence: 'for 2 hours' });
+  assert.deepEqual(findSymptomDuration('pain for 2 weeks'), { value: 2, unit: 'weeks', evidence: 'for 2 weeks' });
+  assert.deepEqual(findSymptomDuration('pain for 2 months'), { value: 2, unit: 'months', evidence: 'for 2 months' });
+  assert.equal(findSymptomDuration('arriving in 30 minutes'), null);
+  const report = extract('hinga for 30 minutes');
+  assert.deepEqual(report.fields.symptomDuration, { value: 30, unit: 'minutes' });
+  assert.equal(report.evidence.symptomDuration, 'for 30 minutes');
+  const findings = extract('Nahihirapan siyang huminga at masakit ang dibdib niya.').findings;
+  assert.ok(findings.some((finding) => finding.name === 'Chest pain' && finding.excerpt === 'masakit ang dibdib'));
 });
 
 test('age group comes from stated words or ages, and stays unspecified when ambiguous or mixed', () => {
@@ -81,6 +95,8 @@ test('injury terms come from the pack, skip denied ones and keep the validated f
   const plain = extract('Buntis na babae, may sipon, sa Barangay Uno').fields.injuries;
   assert.doesNotMatch(plain, /Pregnant|Female|Barangay/);
   assert.equal(extract('nahihilo nahihilo nahihilo').fields.injuries, 'Dizziness');
+  assert.equal(extract('nahihirapan siyang huminga at nakakalakad', ['Difficulty breathing', 'Ambulatory']).fields.injuries,
+    'Difficulty breathing, Ambulatory', 'glossary synonyms do not duplicate validated observations');
   // Always fits the hub's 300 character limit.
   const crowded = extract('nahihilo nilalagnat nasusuka nagsusuka nanghihina sumasakit ang ulo sumasakit ang tiyan', Array(40).fill('Severe bleeding').map((s, i) => `${s} ${i}`)).fields.injuries;
   assert.ok(crowded.length <= 300);
