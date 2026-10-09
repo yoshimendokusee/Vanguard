@@ -400,6 +400,7 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 | `HUB_URL` | `--dart-define` (watch) | `http://192.168.8.10:3000` | Where the watch sends reports. **Compile-time**, so rebuild to change it. |
 | `VOSK_MODEL` | `--dart-define` (watch) | `assets/models/vosk-model-small-en-us-0.15.zip` | Which bundled Vosk model zip to load. |
 | `PORT` | env (hub) | `3000` | Listen port. |
+| `HOST` | env (hub) | `0.0.0.0` | Listen address; use `127.0.0.1` for local-only access. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
 
@@ -425,7 +426,8 @@ the hub (`better-sqlite3` 13 requires it); Docker optional.
 cd hub
 npm ci
 npm test                                  # 9 tests, synthetic in-memory/temporary SQLite and loopback HTTP
-npm start                                 # http://localhost:3000, prints LAN URLs
+HOST=127.0.0.1 npm start                  # local-only at http://localhost:3000
+npm start                                 # all interfaces; prints LAN URLs
 HOSPITAL_NAME="St. Luke's ED" PORT=4000 npm start
 docker compose up --build                 # build once while online; image runs offline
 ```

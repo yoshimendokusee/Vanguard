@@ -92,13 +92,18 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
 
 if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
+  const host = process.env.HOST || '0.0.0.0';
   const app = createApp(openDb());
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Vanguard hospital hub listening on :${port}`);
-    for (const addrs of Object.values(os.networkInterfaces())) {
-      for (const a of addrs || []) {
-        if (a.family === 'IPv4' && !a.internal) console.log(`  LAN: http://${a.address}:${port}`);
+  app.listen(port, host, () => {
+    if (host === '0.0.0.0') {
+      console.log(`Vanguard hospital hub listening on :${port}`);
+      for (const addrs of Object.values(os.networkInterfaces())) {
+        for (const a of addrs || []) {
+          if (a.family === 'IPv4' && !a.internal) console.log(`  LAN: http://${a.address}:${port}`);
+        }
       }
+    } else {
+      console.log(`Vanguard hospital hub listening on http://${host}:${port}`);
     }
   });
 }
