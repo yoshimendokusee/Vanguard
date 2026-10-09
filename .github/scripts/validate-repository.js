@@ -9,7 +9,9 @@ function validateRepository(root) {
     'watch/lib/main.dart', 'watch/lib/db/triage_db.dart',
     'hub/package.json', 'hub/package-lock.json', 'hub/server.js', 'hub/sync.js',
     'hub/db.js', 'hub/public/index.html', 'hub/sync.test.js', 'hub/contract.test.js',
-    'hub/Dockerfile', 'hub/docker-compose.yml', 'compose.yaml', '.env.example',
+    'hub/Dockerfile', 'hub/docker-compose.yml', 'hub/compose.dev.yaml',
+    'hub/vite.config.mjs', 'hub/public/dashboard.js', 'hub/public/dashboard.css',
+    'compose.yaml', '.env.example',
     'docs/architecture.md', 'docs/api-contract.md', 'docs/GITHUB_WORKFLOW.md',
     'database/migrations/README.md', '.github/PULL_REQUEST_TEMPLATE.md',
     '.github/branch-policy.md', '.github/rulesets/main.json', '.github/workflows/pr-ci.yml',
@@ -21,6 +23,7 @@ function validateRepository(root) {
   const lock = JSON.parse(read('hub/package-lock.json'));
   assert.equal(lock.lockfileVersion, 3, 'Use the existing npm lockfile format');
   assert.deepEqual(lock.packages[''].dependencies, pkg.dependencies, 'Hub dependencies differ from lockfile');
+  assert.deepEqual(lock.packages[''].devDependencies, pkg.devDependencies, 'Hub dev dependencies differ from lockfile');
   assert.equal(lock.packages[''].engines.node, pkg.engines.node, 'Node engine differs from lockfile');
   assert.equal(pkg.scripts.test, 'node --test', 'Update CI when changing the hub test runner');
   assert.ok(!fs.existsSync(path.join(root, '.github/workflows/ci.yml')), 'Remove duplicate legacy CI workflow');
@@ -52,13 +55,14 @@ function validateRepository(root) {
   const appFiles = [
     'hub/server.js', 'hub/db.js', 'watch/lib/services/sync_service.dart',
     'watch/lib/services/speech_service.dart', 'hub/docker-compose.yml',
+    'hub/compose.dev.yaml', 'hub/vite.config.mjs',
   ];
   for (const file of appFiles) {
     const text = read(file);
     const used = [
       ...[...text.matchAll(/process\.env\.([A-Z][A-Z0-9_]*)/g)].map((m) => m[1]),
       ...[...text.matchAll(/String\.fromEnvironment\(\s*'([A-Z][A-Z0-9_]*)'/g)].map((m) => m[1]),
-      ...(file.endsWith('.yml') ? [...text.matchAll(/\$\{([A-Z][A-Z0-9_]*)(?=[:}])/g)].map((m) => m[1]) : []),
+      ...(/\.ya?ml$/.test(file) ? [...text.matchAll(/\$\{([A-Z][A-Z0-9_]*)(?=[:}])/g)].map((m) => m[1]) : []),
     ];
     for (const name of used) assert.ok(defined.has(name), `${file}: document ${name} in .env.example`);
   }

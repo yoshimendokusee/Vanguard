@@ -1,10 +1,11 @@
 const express = require('express');
 const os = require('os');
 const path = require('path');
+const { existsSync } = require('node:fs');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
 const { riskForRow } = require('./risk');
-const { aiConfig, aiStatus, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
+const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
 const { createCloudSync } = require('./cloud');
@@ -101,6 +102,11 @@ function createApp(db, {
   });
 
   // --- local AI (Qwen via Ollama): extraction assistant, never the triage authority ---
+  app.get('/api/ai/health', async (_req, res) => {
+    const health = await aiHealth();
+    res.status(health.status === 'ready' ? 200 : 503).json(health);
+  });
+
   app.get('/api/ai/status', async (_req, res) => {
     try {
       res.json(await aiStatus());
@@ -155,6 +161,35 @@ function createApp(db, {
       aiFailure(res, err, parsed.transcript.length);
     }
   });
+  app.post('/api/triage/:id/ai-extract', async (req, res, next) => {
+    let transcript = '';
+    try {
+      const input = req.body;
+      if (!input || !isId(input.requestId) || !Number.isSafeInteger(input.baseRevision)
+        || input.baseRevision < 0 || Object.keys(input).some((key) => !['requestId', 'baseRevision'].includes(key))) {
+        fail(400, 'Expected requestId and baseRevision');
+      }
+      const before = reportView(db, req.params.id, true);
+      const replay = before.history.find((revision) => revision.request_id === input.requestId.toLowerCase());
+      if (replay) {
+        if (replay.kind !== 'extraction' || replay.actor !== 'Qwen/ollama'
+          || replay.payload.baseRevision !== input.baseRevision) fail(409, 'Request ID conflict');
+        return res.json({ ok: true, report: before, replay: true });
+      }
+      if (before.revision !== input.baseRevision) fail(409, 'Stale base revision');
+      transcript = before.current_transcript;
+      const checked = validateTranscriptInput({ transcript }, aiConfig().maxTranscript);
+      if (checked.error) fail(400, checked.error.message);
+      const result = await extractEmergency(transcript, { device: 'hospital-browser', sttEngine: 'preserved-report', sttRuntime: 'hub-v2' });
+      const report = reviseReport(db, req.params.id, { ...input, kind: 'extraction', actor: 'Qwen/ollama',
+        reason: 'Automatic provisional extraction; qualified verification required', processing: result.processing });
+      broadcast('triage', { updated: report.id });
+      res.json({ ok: true, ...result, report });
+    } catch (error) {
+      if (error instanceof AiError) aiFailure(res, error, transcript.length);
+      else next(error);
+    }
+  });
   app.get('/api/triage/:id', (req, res) => res.json(reportView(db, req.params.id, true)));
   app.post('/api/triage/:id/revisions', (req, res) => {
     const result = reviseReport(db, req.params.id, req.body);
@@ -174,7 +209,8 @@ function createApp(db, {
     app.post(`/api/${plural}/:id/revisions`, (req, res) => res.json(saveRecord(db, kind, req.params.id, req.body)));
   }
 
-  app.use(express.static(path.join(__dirname, 'public')));
+  const dashboard = existsSync(path.join(__dirname, 'dist/index.html')) ? 'dist' : 'public';
+  app.use(express.static(path.join(__dirname, dashboard)));
   app.use((error, _req, res, _next) => {
     const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : error.status || 503;
     const message = error.type === 'entity.too.large' ? 'JSON body exceeds 1 MB'

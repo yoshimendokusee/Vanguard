@@ -1,11 +1,8 @@
 import Foundation
 
-/// Shared local-AI contract for the Apple companion.
-///
-/// The watch and phone never talk to Ollama directly. They POST `AiRequest` JSON
-/// to the hospital hub (`/api/ai/extract`, `/api/ai/triage-assist`) and decode
-/// `AiExtractionResult`. When the hub is unreachable the caller keeps the capture
-/// in local storage — capture never waits on AI. See `docs/ai-contract.md`.
+/// Shared device identity and optional hospital preview contract.
+/// Native capture uses QwenEngine and NativeWorkflow; hospital previews use these
+/// request/response types. Capture never waits on hospital AI. See docs/ai-contract.md.
 public enum AiDevice: String, Codable, Sendable, CaseIterable {
     case hospitalBrowser = "hospital-browser"
     case iphone

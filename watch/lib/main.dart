@@ -3,12 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vibration/vibration.dart';
 
+import 'cloud_button.dart';
 import 'db/triage_db.dart';
 import 'nlp/triage_parser.dart';
+import 'reports_screen.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/speech_service.dart';
 import 'services/sync_service.dart';
 import 'theme.dart';
+import 'watch_layout.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +57,7 @@ class _TriageScreenState extends State<TriageScreen>
   String _status = 'LOADING MODEL…';
   TriageRow? _lastSaved;
   int _pending = 0;
+  int _total = 0; // every report saved on this watch
   bool _syncing = false;
   int _cloudPending = 0;
   bool _cloudSyncing = false;
@@ -91,6 +95,7 @@ class _TriageScreenState extends State<TriageScreen>
       );
       _sync!.start(_syncFinished);
       _pending = await db.pendingCount();
+      _total = await db.totalCount();
       try {
         _cloud = await CloudSyncService.initialize();
         _cloudPending = await _loadCloudPending(db);
@@ -183,6 +188,7 @@ class _TriageScreenState extends State<TriageScreen>
     );
     final pending = await _db!.pendingCount();
     final cloudPending = await _loadCloudPending(_db!);
+    final total = await _db!.totalCount();
     await _buzz(
       !result.isRecognized
           ? _Buzz.unrecognized
@@ -196,6 +202,7 @@ class _TriageScreenState extends State<TriageScreen>
       _lastSaved = row;
       _pending = pending;
       _cloudPending = cloudPending;
+      _total = total;
       _status = result.isRecognized ? 'SAVED' : 'SAVED – CHECK';
     });
     unawaited(_sync!.sync());
@@ -245,6 +252,21 @@ class _TriageScreenState extends State<TriageScreen>
             : 'HUB ACKNOWLEDGED';
       }
     });
+  }
+
+  /// The patients triaged on this watch. The list re-reads while it is open;
+  /// on return the pending count is refreshed in case the hub acknowledged some.
+  Future<void> _openReports() async {
+    final db = _db;
+    if (db == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportsScreen(load: () => db.recent()),
+      ),
+    );
+    final pending = await db.pendingCount();
+    if (!mounted) return;
+    setState(() => _pending = pending);
   }
 
   Future<void> _doSync() async {
@@ -518,157 +540,144 @@ class _TriageScreenState extends State<TriageScreen>
     return Scaffold(
       backgroundColor: c.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-          child: Column(
-            children: [
-              Row(
+        // Round, square and rectangular watches share one set of parts; the
+        // frame decides where they sit so nothing is cut off by the bezel.
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final m = WatchMetrics.of(box.biggest);
+            final u = m.unit;
+            return AdaptiveWatchFrame(
+              metrics: m,
+              compactMic: _lastSaved != null && !listening,
+              leadingAction: CloudAccountButton(
+                signedIn: _cloud?.currentUser != null,
+                email: _cloud?.currentUser?.email,
+                pending: _cloudPending,
+                syncing: _cloudSyncing,
+                error: _cloudError,
+                unit: u,
+                onPressed: _manageCloudAccount,
+              ),
+              sideAction: ReportsButton(
+                count: _total,
+                unit: u,
+                onPressed: _db != null && !listening ? _openReports : null,
+              ),
+              header: GestureDetector(
+                onLongPress: _demoPhrase,
+                child: Text(
+                  '${_db?.watchId ?? '…'}  ·  $_pending HOSPITAL',
+                  style: TextStyle(
+                    color: c.dim,
+                    fontSize: 11 * u,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              mic: Semantics(
+                button: true,
+                label: listening
+                    ? 'Stop and save report'
+                    : 'Start dictating a patient report',
+                child: GestureDetector(
+                  onTap: _toggle,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      // Idle is teal on purpose: red/amber/green mean
+                      // triage categories on this screen.
+                      color: listening
+                          ? c.listening
+                          : _phase == _Phase.idle
+                          ? c.accent
+                          : c.panel,
+                      border: Border.all(color: c.text, width: 4 * u),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, mic) => Icon(
+                        listening ? Icons.stop_rounded : Icons.mic_rounded,
+                        size: mic.biggest.shortestSide * 0.45,
+                        color: listening
+                            ? c.onListening
+                            : _phase == _Phase.idle
+                            ? c.onAccent
+                            : c.dim,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              status: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onLongPress: _demoPhrase,
+                  Text(
+                    _status,
+                    style: TextStyle(
+                      fontSize: 13 * u,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1,
+                    ),
+                  ),
+                  // While a result is showing there is no spare line on a round, square
+                  // or tall screen; the cloud button still reports the problem.
+                  if (_cloudError != null &&
+                      !(m.wide == false && _lastSaved != null && !listening))
+                    SizedBox(
+                      width: m.statusMaxWidth,
                       child: Text(
-                        '${_db?.watchId ?? '…'}  ·  $_pending HOSPITAL',
+                        _cloudError!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: c.dim,
-                          fontSize: 11,
-                          letterSpacing: 1,
+                          color: Colors.orangeAccent,
+                          fontSize: 9 * u,
                         ),
                       ),
                     ),
-                  ),
-                  IconButton(
-                    tooltip:
-                        _cloud?.currentUser?.email ??
-                        _cloudError ??
-                        'Cloud account',
-                    onPressed: _manageCloudAccount,
-                    icon: Icon(
-                      _cloud?.currentUser == null
-                          ? Icons.cloud_off_outlined
-                          : Icons.cloud_done_outlined,
-                      color: _cloud?.currentUser == null ? c.dim : c.accent,
-                    ),
-                  ),
                 ],
               ),
-              Text(
-                '$_cloudPending CLOUD PENDING'
-                '${_cloudSyncing ? ' · SYNCING' : ''}',
-                style: const TextStyle(
-                  color: Colors.white54,
-                  fontSize: 9,
-                  letterSpacing: 1,
-                ),
-              ),
-              if (_cloudError != null)
-                Text(
-                  _cloudError!,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.orangeAccent,
-                    fontSize: 9,
-                  ),
-                ),
-              const SizedBox(height: 4),
-              Expanded(
-                flex: 5,
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Semantics(
-                      button: true,
-                      label: listening
-                          ? 'Stop and save report'
-                          : 'Start dictating a patient report',
-                      child: GestureDetector(
-                        onTap: _toggle,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            // Idle is teal on purpose: red/amber/green mean
-                            // triage categories on this screen.
-                            color: listening
-                                ? c.listening
-                                : _phase == _Phase.idle
-                                ? c.accent
-                                : c.panel,
-                            border: Border.all(color: c.text, width: 4),
-                          ),
-                          child: Icon(
-                            listening ? Icons.stop_rounded : Icons.mic_rounded,
-                            size: 64,
-                            color: listening
-                                ? c.onListening
-                                : _phase == _Phase.idle
-                                ? c.onAccent
-                                : c.dim,
-                          ),
-                        ),
+              content: _lastSaved != null && !listening
+                  ? SavedCard(row: _lastSaved!, unit: u)
+                  : SingleChildScrollView(
+                      controller: _scroll,
+                      child: Text(
+                        _transcript,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14 * u, height: 1.25),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                _status,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                  letterSpacing: 1,
-                ),
-              ),
-              Expanded(
-                flex: 3,
-                child: _lastSaved != null && !listening
-                    ? _SavedCard(row: _lastSaved!)
-                    : SingleChildScrollView(
-                        controller: _scroll,
-                        child: Text(
-                          _transcript,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 14, height: 1.25),
-                        ),
-                      ),
-              ),
-              Row(
+              action: Row(
                 children: [
                   Expanded(
-                    child: SizedBox(
-                      height: 36,
-                      child: FilledButton.icon(
-                        onPressed: _syncing || listening ? null : _doSync,
-                        icon: const Icon(Icons.local_hospital, size: 15),
-                        label: const Text(
-                          'RETRY NOW',
-                          style: TextStyle(fontSize: 10),
-                        ),
-                      ),
+                    child: WatchActionButton(
+                      metrics: m,
+                      compact: true,
+                      label: m.shape == WatchShape.round
+                          ? 'RETRY'
+                          : 'RETRY NOW',
+                      semanticLabel: 'Retry now',
+                      icon: Icons.local_hospital,
+                      onPressed: _syncing || listening ? null : _doSync,
                     ),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6 * u),
                   Expanded(
-                    child: SizedBox(
-                      height: 36,
-                      child: FilledButton.icon(
-                        onPressed: _cloudSyncing || listening
-                            ? null
-                            : () => _syncCloud(confirmUnassigned: true),
-                        icon: const Icon(Icons.cloud_upload_outlined, size: 15),
-                        label: const Text(
-                          'ONLINE',
-                          style: TextStyle(fontSize: 10),
-                        ),
-                      ),
+                    child: WatchActionButton(
+                      metrics: m,
+                      compact: true,
+                      label: 'ONLINE',
+                      icon: Icons.cloud_upload_outlined,
+                      onPressed: _cloudSyncing || listening
+                          ? null
+                          : () => _syncCloud(confirmUnassigned: true),
                     ),
                   ),
                 ],
               ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -694,9 +703,12 @@ class _TriageScreenState extends State<TriageScreen>
 /// saved = 2 short · immediate = 3 long · unrecognized = 4 rapid · nothing = 1 long
 enum _Buzz { saved, immediate, unrecognized, nothing }
 
-class _SavedCard extends StatelessWidget {
-  const _SavedCard({required this.row});
+/// The report that was just saved. The category chip and pickup line stay on
+/// one line (they shrink on small screens) so nothing important wraps or hides.
+class SavedCard extends StatelessWidget {
+  const SavedCard({super.key, required this.row, this.unit = 1});
   final TriageRow row;
+  final double unit;
 
   @override
   Widget build(BuildContext context) {
@@ -710,32 +722,41 @@ class _SavedCard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            padding: EdgeInsets.symmetric(
+              horizontal: 10 * unit,
+              vertical: 3 * unit,
+            ),
             decoration: BoxDecoration(
               color: style.background,
               borderRadius: BorderRadius.circular(8),
               border: unassessed ? Border.all(color: style.accent) : null,
             ),
-            child: Text(
-              '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
-              style: TextStyle(
-                color: style.foreground,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
+                style: TextStyle(
+                  color: style.foreground,
+                  fontSize: 17 * unit,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             row.injuries,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: 14 * unit),
           ),
-          Text(
-            '${row.location}'
-            '${row.etaMinutes != null ? ' · ETA ${row.etaMinutes} min' : ''}',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: c.dim),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '${row.location}'
+              '${row.etaMinutes != null ? ' · ETA ${row.etaMinutes} min' : ''}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12 * unit, color: c.dim),
+            ),
           ),
         ],
       ),

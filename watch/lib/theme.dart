@@ -120,7 +120,7 @@ TriageStyle triageStyle(String triage, Brightness brightness) {
               Color(0xFF334155),
               Color(0xFF64748B),
             ),
-    // Unassessed ("Not sure" on the board): plain surface with a dashed look.
+    // Unassessed (shown as "Unassessed" on the board): plain surface with a dashed look.
     _ =>
       dark
           ? const TriageStyle(

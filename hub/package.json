@@ -5,11 +5,18 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test"
+    "test": "node --test",
+    "dev": "vite",
+    "build": "vite build"
   },
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22.12"
+  },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
     "express": "^4.21.0"
+  },
+  "devDependencies": {
+    "vite": "8.3.4"
   }
 }
