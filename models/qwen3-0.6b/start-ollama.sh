@@ -2,7 +2,8 @@
 set -eu
 cd /models
 # Check artifact integrity on every restart before importing the local file.
-sha256sum --check checksums.sha256
+tr -d '\r' < checksums.sha256 | sha256sum --check -
+tr -d '\r' < Modelfile | sed 's#^FROM \./#FROM /models/#' > /tmp/Modelfile
 ollama serve &
 runtime_pid=$!
 trap 'kill "$runtime_pid" 2>/dev/null || true' EXIT INT TERM
@@ -13,5 +14,5 @@ for attempt in $(seq 1 60); do
   sleep 1
 done
 [ "$ready" = 1 ] || { echo 'Ollama startup timed out' >&2; exit 1; }
-ollama create qwen3:0.6b -f Modelfile
+ollama create qwen3:0.6b -f /tmp/Modelfile
 wait "$runtime_pid"

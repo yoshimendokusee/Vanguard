@@ -28,7 +28,8 @@ services:
     volumes:
       - ollama-models:/root/.ollama
       - ../models/qwen3-0.6b:/models:ro
-    entrypoint: ["/bin/sh", "/models/start-ollama.sh"]
+    # Strip CRs so Windows (core.autocrlf) checkouts of the read-only mount still run.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /models/start-ollama.sh > /tmp/start-ollama.sh && exec /bin/sh /tmp/start-ollama.sh"]
     # Internal-only access, with no internet route or host Ollama port.
     networks: [inference]
     healthcheck:
