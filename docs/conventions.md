@@ -2,9 +2,11 @@
 
 - Read `architecture.md` and `api-contract.md`; inspect callers before changing
   shared behavior. Preserve `watch/` and `hub/` and unrelated work.
-- Work in `feat/<short-name>`, `fix/<short-name>` or `docs/<short-name>` branches.
+- Work in `feature/<short-name>`, `fix/<short-name>` or `hotfix/<short-name>` branches.
+  Existing `feat/`, `docs/` and `codex/` branches use the same PR gate.
   Use the PR template, review and required CI checks. Do not push directly to
-  `main`. Repository administrators configure branch protection separately.
+  `main`. See `GITHUB_WORKFLOW.md` and `../.github/branch-policy.md` for CI,
+  review requirements and the administrator's GitHub ruleset procedure.
 - Keep changes scoped. Reuse helpers and installed dependencies; do not add a
   framework, service or empty future module merely to match the target diagram.
 - New feature code belongs with that feature inside its existing app. The current

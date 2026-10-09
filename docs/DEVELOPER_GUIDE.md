@@ -185,13 +185,14 @@ Unassessed white.
 |---|---|---|
 | **Bulk sync endpoint** | `POST /api/sync-triage` takes up to 500 reports; validates each; inserts atomically in one transaction. | `server.js`, `sync.js` |
 | **Duplicate protection** | `UNIQUE(watch_id, created_at)` plus `INSERT OR IGNORE`. Duplicates are skipped *and* acknowledged. Timestamps are normalised to canonical ISO first, so `…00.1Z` and `…00.100Z` collide. | `sync.js`, `db.js` |
-| **Pre-arrival board** | Live-updating ED view: surge tiles, a "Prepare for" panel, and per-patient cards with ETA countdowns. | `public/index.html` |
+| **Pre-arrival board** | Live-updating ED view in a teal dashboard layout: a rail with the status tabs (On the way, Arrived, Cancelled, All reports); a left column with the "Next to arrive" card (countdown, readiness checklist, **Mark arrived**), "Due within 30 minutes" and "Teams to alert"; and a main panel with search, a category filter, a summary line, three "Coming up" cards, an arrivals curve (15 min / 30 min / 1 h / 3 h) and the patient list. Tab, category and search are kept in the URL. Stacks under 1180 px. Light, dark and auto themes, Poppins if installed, no external assets. | `public/index.html` |
 | **Acuity ordering** | Still-inbound first; then Immediate → Unassessed → Delayed → Minor → Deceased; then soonest expected arrival (reports with no ETA last within a category). | `server.js` `GET /api/triage` |
-| **Surge tiles** | Patients (not reports) inbound per category, plus total. Counts sum `patient_count`. | `index.html` `summarize` |
-| **Prepare-for list** | Maps each finding to resources (e.g. Severe bleeding → Blood/OR) and totals patients per resource. Adds Paediatrics for Child/Infant. Deceased reports are excluded. | `index.html` `PREP` |
+| **Category counts** | Patients (not reports) per category for the current tab, shown on the category filter chips and in the summary line. Counts sum `patient_count`. "Not sure" is the plain-language label for `Unassessed`. | `index.html` `renderCats`, `renderSummary` |
+| **Teams to alert** | Maps each finding to resources (e.g. Severe bleeding → Blood/OR) and totals patients per resource. Adds Paediatrics for Child/Infant. Deceased reports are excluded. The same mapping drives the readiness checklist on the "Next to arrive" card (ticks are saved in that browser only, not on the hub). | `index.html` `PREP`, `renderPrep`, `readyItems` |
 | **"Due within 30 min"** | Count of non-deceased patients whose ETA is ≤ 30 min away (including overdue). | `index.html` |
-| **ETA countdown** | `created_at + eta_minutes` vs the browser clock: `N min` → `DUE NOW` → `+N min` (past ETA). Re-rendered every 15 s. | `index.html` `etaBlock` |
-| **Status actions** | Inbound → Arrived / Cancelled, and Reopen. Arrived/cancelled cards sink and dim. | `PATCH /api/triage/:id` |
+| **ETA countdown** | `created_at + eta_minutes` vs the browser clock: `N min`, then "arriving soon", then `+N min past ETA`. If the watch clock is badly wrong (more than 7 days before or 2 hours after receipt) the countdown runs from the hub receipt time and says so. Re-rendered every 15 s. | `index.html` `timeBlock`, `badClock` |
+| **Arrivals curve** | Expected arrivals over a chosen window, solid for everyone and dashed for Immediate. Patients already past their ETA are counted at "Now"; later or no-ETA patients are listed under the chart. Has a spoken summary and redraws on resize. Approximate, because it depends on watch clocks. | `index.html` `renderCurve` |
+| **Status actions** | Inbound → Arrived / Cancelled, and Reopen, through the card. The pressed button shows a spinner and is disabled until the hub answers; a failure shows a toast. Arrived and cancelled reports move to their own tabs. | `PATCH /api/triage/:id` |
 | **Live push** | `GET /api/events` (SSE) emits `triage` events on insert/update; the board reloads. 10 s poll as a safety net; "LIVE / reconnecting" indicator. | `server.js` |
 | **Hospital name** | `HOSPITAL_NAME` env var, served at `/api/config`. | `server.js` |
 | **XSS-safe rendering** | Transcripts are untrusted text; the board only uses `textContent`, never `innerHTML`. Keep it that way. | `index.html` `el()` |
@@ -449,7 +450,7 @@ these are unset; cloud sync is disabled.
 ```bash
 cd hub
 npm ci
-npm test                                  # 7 tests, in-memory SQLite, real HTTP server on an ephemeral port
+npm test                                  # 9 tests, synthetic in-memory/temporary SQLite and loopback HTTP
 npm start                                 # http://localhost:3000, prints LAN URLs
 HOSPITAL_NAME="St. Luke's ED" PORT=4000 npm start
 docker compose up --build                 # build once while online; image runs offline
@@ -484,6 +485,7 @@ The app unpacks it to app storage on first launch, so the first start is slow.
 | `watch/test/cloud_sync_service_test.dart` | Supabase payload field mapping and stable report UUID. | Live Auth, network retries, remote RLS policies. |
 | `hub/db.test.js` | Fresh schema migration, idempotent reopen, populated legacy DB adoption, incompatible-schema rejection, and transactional rollback. | Production hub database backup/restore procedures. |
 | `hub/sync.test.js` | Ingest, ack semantics, duplicate and cross-watch handling, timestamp normalisation, validation/rejection, defaults, ordering, status endpoint. | SSE, static board, Docker, concurrency, the browser UI. |
+| `hub/contract.test.js` | Documented API request/response, sender fields, served dashboard JS syntax, SSE headers, populated hub reopen/deduplication. | Browser rendering, speech/native hardware, future schema upgrades. |
 
 **Conventions:** keep `triage_parser.dart` free of Flutter imports; add a test with every
 vocabulary change; hub tests open `openDb(':memory:')` and call `createApp(db)`, so no files or

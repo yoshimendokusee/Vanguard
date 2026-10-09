@@ -1,0 +1,176 @@
+name: PR CI
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  repository:
+    name: Repository validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+      - name: Structure, configuration and policy self-checks
+        run: |
+          node --test .github/scripts/validate-repository.test.js
+          node .github/scripts/validate-repository.js
+          git show --format= --check --diff-merges=first-parent HEAD
+          bash -n fake-watch.sh
+      - name: Workflow syntax and expression validation
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/actionlint.tar.gz"
+          echo "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan fetched Git history with redacted findings
+        run: |
+          curl --fail --silent --show-error --location --retry 3 \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            --output "$RUNNER_TEMP/gitleaks.tar.gz"
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
+          "$RUNNER_TEMP/gitleaks" git --redact=100 --no-banner --log-opts=--all .
+
+  hub:
+    name: Hub tests
+    needs: repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: hub
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: hub/package-lock.json
+      - name: Locked dependency install
+        run: npm ci
+      - name: JavaScript syntax
+        run: |
+          while IFS= read -r -d '' file; do
+            node --check "$file"
+          done < <(find . -path ./node_modules -prune -o -name '*.js' -print0)
+      - name: Unit, HTTP contract, dashboard and persistence tests
+        run: npm test
+
+  watch:
+    name: Watch analysis and parser tests
+    needs: repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: watch
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          flutter-version: '3.47.5'
+          cache: true
+      - name: Locked dependency install
+        run: flutter pub get --enforce-lockfile
+      - name: Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Static analysis and type checks
+        run: flutter analyze --no-pub
+      - name: Parser tests
+        run: flutter test --no-pub
+      # Existing Dart regression checks only. No watchOS/iOS targets exist yet.
+
+  docker:
+    name: Compose and container tests
+    needs: repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Validate both Compose entry points
+        run: |
+          docker compose config --quiet
+          docker compose -f hub/docker-compose.yml config --quiet
+      - name: Build the API and dashboard image once
+        run: docker build --tag vanguard-ci:local hub
+      - name: In-image tests without the persistent data mount
+        run: |
+          docker run --rm --network none --env DB_PATH=:memory: \
+            --mount "type=bind,source=$PWD/docs,target=/docs,readonly" \
+            --mount "type=bind,source=$PWD/watch/lib,target=/watch/lib,readonly" \
+            vanguard-ci:local npm test
+
+  gate:
+    name: PR acceptance gate
+    if: ${{ always() }}
+    needs: [repository, secrets, hub, watch, docker]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Summarize and require every validation job to succeed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          node <<'JS'
+          const fs = require('node:fs');
+          const results = JSON.parse(process.env.RESULTS);
+          const names = {
+            repository: 'Repository validation',
+            secrets: 'Secret scan',
+            hub: 'Hub tests',
+            watch: 'Watch analysis and parser tests',
+            docker: 'Compose and container tests',
+          };
+          let failed = false;
+          const lines = ['## PR validation', '', '| Check | Result |', '| --- | --- |'];
+          for (const [id, name] of Object.entries(names)) {
+            const result = results[id]?.result;
+            const passed = result === 'success';
+            failed ||= !passed;
+            lines.push(`| ${name} | ${passed ? 'PASS' : `FAIL (${result || 'missing'})`} |`);
+          }
+          lines.push('', 'Passing CI does not approve or merge a PR. GitHub must also enforce teammate review, resolved conversations and an up-to-date branch.');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n') + '\n');
+          process.exitCode = failed ? 1 : 0;
+          JS

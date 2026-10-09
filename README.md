@@ -94,9 +94,10 @@ for your area.
 - `POST /api/sync-triage` accepts `{ watchId, reports: [...] }`.
 - **Duplicate protection:** unique on `(watch_id, created_at)`. A re-sent batch is skipped
   but still acknowledged, so a double sync can't make the ED prepare for patients who don't exist.
-- Board: live updates (SSE), sorted Immediate → Unassessed → Delayed → Minor → Deceased,
-  then soonest ETA; countdowns per patient; "Arrived" / "Cancel" actions; surge tiles; no
-  CDN dependencies.
+- Board (teal dashboard): a rail with status tabs (On the way, Arrived, Cancelled, All reports); the "Next to arrive" card with a countdown,
+  a readiness checklist and **Mark arrived**; "Due within 30 minutes" and "Teams to alert"; a category filter, "Coming up" cards and an
+  arrivals curve; the patient list sorted Immediate → Unassessed → Delayed → Minor → Deceased, then soonest ETA. Live updates (SSE),
+  light/dark/auto theme, no CDN dependencies.
 - Set the hospital name: `HOSPITAL_NAME="Santiago District Hospital · ED"` (env var).
 
 ```bash
@@ -111,7 +112,7 @@ docker compose up --build        # build while online; runtime needs no internet
 # Or native Node, from the repository root:
 cd hub
 npm ci
-npm test                         # 7 tests, in-memory databases
+npm test                         # 9 tests, synthetic in-memory/temporary databases
 node --env-file=../.env server.js # .env must exist; npm start uses defaults/shell env
 # Separate terminal, repository root, against a disposable synthetic demo database:
 ./fake-watch.sh http://localhost:3000
@@ -208,8 +209,12 @@ watch. A companion phone is a target fallback requiring implementation/testing.
 - Air-gapped devices have no NTP: ETA countdowns depend on the watch clock and are approximate.
 - This is a hackathon prototype, not a validated clinical triage tool.
 
-CI runs hub tests, watch analysis/tests, shell/JS syntax checks and Compose
-build/container tests. Native builds and device acceptance are not CI checks yet.
-Use feature branches and reviewed PRs; repository administrators must separately
-configure branch protection for the named checks. `AGENTS.md` is guidance, not a
-technical enforcement mechanism.
+The supported product targets are Apple Watch, iPhone and the hospital web app.
+The current watch code is a legacy Wear OS prototype; Apple targets do not exist
+yet. CI runs hub/API/dashboard tests, existing Dart analysis/parser regressions,
+formatting, secret scanning, workflow/configuration validation and Docker tests.
+There is no Android build or Apple native/hardware validation in this workflow.
+See [the team workflow](docs/GITHUB_WORKFLOW.md) and
+[the main protection policy](.github/branch-policy.md) for the six required checks,
+review requirements and verified GitHub settings. The new workflow still needs
+to be committed, pushed and integrated. `AGENTS.md` is guidance, not enforcement.

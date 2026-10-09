@@ -178,14 +178,18 @@ class TriageDb {
     );
   }
 
-  Future<List<TriageRow>> pending() async => (await _db.query('triage_logs',
-          where: 'sync_status = 0', orderBy: 'id ASC'))
-      .map(TriageRow.fromMap)
-      .toList();
+  Future<List<TriageRow>> pending() async => (await _db.query(
+    'triage_logs',
+    where: 'sync_status = 0',
+    orderBy: 'id ASC',
+  )).map(TriageRow.fromMap).toList();
 
   Future<int> pendingCount() async =>
-      Sqflite.firstIntValue(await _db.rawQuery(
-          'SELECT COUNT(*) FROM triage_logs WHERE sync_status = 0')) ??
+      Sqflite.firstIntValue(
+        await _db.rawQuery(
+          'SELECT COUNT(*) FROM triage_logs WHERE sync_status = 0',
+        ),
+      ) ??
       0;
 
   Future<List<TriageRow>> pendingCloud(String userId) async =>
@@ -237,7 +241,8 @@ class TriageDb {
     if (ids.isEmpty) return;
     final marks = List.filled(ids.length, '?').join(',');
     await _db.rawUpdate(
-        'UPDATE triage_logs SET sync_status = 1 WHERE id IN ($marks)',
-        ids.toList());
+      'UPDATE triage_logs SET sync_status = 1 WHERE id IN ($marks)',
+      ids.toList(),
+    );
   }
 }

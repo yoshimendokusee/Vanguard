@@ -61,16 +61,23 @@ void main() {
       'nakuryente',
       'buntis',
     ]) {
-      expect(parser.parse('may $phrase dito').triage, TriageParser.immediate,
-          reason: phrase);
+      expect(
+        parser.parse('may $phrase dito').triage,
+        TriageParser.immediate,
+        reason: phrase,
+      );
     }
   });
 
   test('worst finding wins; deceased never hides a live patient', () {
-    expect(parser.parse('walang malay at may gasgas').triage,
-        TriageParser.immediate);
-    expect(parser.parse('isang patay at isang sugatan').triage,
-        TriageParser.delayed);
+    expect(
+      parser.parse('walang malay at may gasgas').triage,
+      TriageParser.immediate,
+    );
+    expect(
+      parser.parse('isang patay at isang sugatan').triage,
+      TriageParser.delayed,
+    );
   });
 
   test('deceased only when nothing else is found', () {
