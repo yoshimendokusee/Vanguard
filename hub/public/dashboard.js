@@ -137,15 +137,24 @@
     }
   }
 
-  // ---------- theme ----------
+  let navPos = 'side';
+  try {
+    soundOn = localStorage.getItem('sound') === '1';
+    show = localStorage.getItem('show') === 'urgent' ? 'urgent' : 'all';
+    themePref = localStorage.getItem('theme') || 'auto';
+    navPos = localStorage.getItem('navPos') || 'side';
+    ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
+  } catch (_) {}
+
+  // ---------- theme & layout ----------
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   function applyTheme() {
     const dark = themePref === 'dark' || (themePref === 'auto' && mq.matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#061419' : '#DCEDF1');
-    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === themePref)));
+    document.querySelectorAll('.seg button[data-t]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === themePref)));
   }
-  document.querySelectorAll('.seg button').forEach((b) => {
+  document.querySelectorAll('.seg button[data-t]').forEach((b) => {
     b.onclick = () => {
       themePref = b.dataset.t;
       try { localStorage.setItem('theme', themePref); } catch (_) {}
@@ -154,6 +163,31 @@
   });
   mq.addEventListener('change', applyTheme); // follow the OS while on Auto
   applyTheme();
+
+  function applyNavPos() {
+    const app = document.querySelector('.app');
+    if (app) app.setAttribute('data-navpos', navPos);
+    const posBtn = document.getElementById('rail-pos-btn');
+    if (posBtn) {
+      const isTop = navPos === 'top';
+      posBtn.setAttribute('title', isTop ? 'Switch to Side Taskbar' : 'Switch to Top Taskbar');
+      posBtn.setAttribute('aria-label', isTop ? 'Switch to Side Taskbar' : 'Switch to Top Taskbar');
+      const labelSpan = posBtn.querySelector('.nav-pos-text');
+      if (labelSpan) labelSpan.textContent = isTop ? 'Side Bar' : 'Top Bar';
+      const iconPath = posBtn.querySelector('path');
+      if (iconPath) iconPath.setAttribute('d', isTop ? 'M9 3v18' : 'M3 9h18');
+    }
+  }
+
+  const posBtn = document.getElementById('rail-pos-btn');
+  if (posBtn) {
+    posBtn.onclick = () => {
+      navPos = navPos === 'top' ? 'side' : 'top';
+      try { localStorage.setItem('navPos', navPos); } catch (_) {}
+      applyNavPos();
+    };
+  }
+  applyNavPos();
 
   // ---------- alerts ----------
   function toast(title, sub, category) {
@@ -785,6 +819,8 @@
     }
     return urgent.length ? list.filter((r) => !urgent.includes(r)) : list;
   }
+
+
   // One patient row: a button that opens that patient's needs; history rows show when the hub received the report.
   function entryEl(r, opts = {}) {
     const isNew = !firstLoad && !seen.has(r.id);
