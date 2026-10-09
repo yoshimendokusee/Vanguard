@@ -8,6 +8,10 @@ build/
 .env
 .env.*
 !.env.example
+# Flutter --dart-define-from-file values; commit only env.json.example.
+env.json
+# Xcode per-machine build settings; commit only Secrets.xcconfig.example.
+Secrets.xcconfig
 *.db
 *.db-*
 *.sqlite
@@ -29,6 +33,15 @@ coverage/
 # Downloaded speech/LLM model weights; retain the asset directory placeholder.
 watch/assets/models/*
 !watch/assets/models/.gitkeep
+*.gguf
+*.safetensors
+*.onnx
+*.onnx_data
+*.bin
+*.pt
+*.pth
+*.mlpackage/
+*.mlmodelc/
 
 # Native Apple build output and local QA records.
 .build/
@@ -42,3 +55,13 @@ watch/apple/DerivedData/
 
 # Vite production output.
 hub/dist/
+# Initial provisioning progress is runtime state, never part of the artifact.
+models/**/provisioning.json*
+models/**/*.partial
+models/**/.verify-*/
+!models/whisper-tiny-q5_1/
+!models/whisper-tiny-q5_1/*.bin
+!models/whisper-tiny-q5_1/*.json
+!models/whisper-tiny-q5_1/*.sha256
+!models/whisper-tiny-q5_1/README.md
+!models/whisper-tiny-q5_1/LICENSE

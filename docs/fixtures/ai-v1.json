@@ -1,0 +1,68 @@
+{
+  "ok": true,
+  "processing": {
+    "version": 1,
+    "originalTranscript": "Synthetic patient is awake, breathing normally, no severe bleeding, can walk.",
+    "observations": {
+      "breathing": "normal",
+      "consciousness": "alert",
+      "severeBleeding": "absent",
+      "walking": "able"
+    },
+    "uncertainties": [
+      "Extracted observations require qualified verification"
+    ],
+    "provenance": {
+      "device": "hospital-browser",
+      "sttEngine": "typed/hub-form",
+      "sttRuntime": "hub-ai-v1",
+      "extraction": {
+        "model": "Qwen3-0.6B",
+        "revision": "50968a4468ef4233ed78cd7c3de230dd1d61a56b",
+        "runtime": "ollama",
+        "artifactSha256": "ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a",
+        "execution": "local"
+      }
+    },
+    "evidence": {
+      "breathing": {
+        "source": "model-inferred",
+        "excerpt": "breathing normally",
+        "contradictory": false
+      },
+      "consciousness": {
+        "source": "model-inferred",
+        "excerpt": "awake",
+        "contradictory": false
+      },
+      "severeBleeding": {
+        "source": "model-inferred",
+        "excerpt": "no severe bleeding",
+        "contradictory": false
+      },
+      "walking": {
+        "source": "model-inferred",
+        "excerpt": "can walk",
+        "contradictory": false
+      }
+    }
+  },
+  "evidence": {
+    "breathing": "breathing normally",
+    "consciousness": "awake",
+    "severeBleeding": "no severe bleeding",
+    "walking": "can walk"
+  },
+  "warnings": [],
+  "provisional": {
+    "triage": "Minor",
+    "reason": "Walking, alert, normal breathing, no severe bleeding reported",
+    "version": "provisional-v1",
+    "requiresVerification": true,
+    "advisoryOnly": true
+  },
+  "model": "qwen3:0.6b",
+  "promptVersion": "vanguard-extract-v1",
+  "contractVersion": 1,
+  "requestId": "12345678-1234-4234-8234-123456789abc"
+}

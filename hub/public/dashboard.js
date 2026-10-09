@@ -1,3 +1,6 @@
+import './hub-client.js';
+
+  const VanguardApi = window.VanguardApi;
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
   // Keys must match the canonical finding names in watch/lib/nlp/triage_parser.dart.
   const PREP = {
@@ -23,7 +26,7 @@
   const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
   // Display names follow START mass-casualty triage; the stored values (the keys) never change.
   const LABEL = { Immediate: 'Immediate', Unassessed: 'Unassessed', Delayed: 'Delayed', Minor: 'Minor', Deceased: 'Deceased' };
-  const VIEW_TITLE = { inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports', settings: 'Settings' };
+  const VIEW_TITLE = { dashboard: 'Dashboard', inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports', settings: 'Settings' };
 
   let rows = [];
   let view = 'inbound';
@@ -36,8 +39,8 @@
   let bsel = null; // board column the user picked (0-5, 'later' or 'noeta'); null follows the soonest column with patients
   let loadState = 'loading'; // loading | ok | error
   let retrying = false;
-  const PAGE = 50;
-  let limit = PAGE;
+  let pageSize = 10;
+  let currentPage = 1;
   const seen = new Set();
   let firstLoad = true;
   let soundOn = false;
@@ -48,10 +51,13 @@
     show = localStorage.getItem('show') === 'urgent' ? 'urgent' : 'all';
     themePref = localStorage.getItem('theme') || 'auto';
     ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
+    const savedSize = parseInt(localStorage.getItem('pageSize'), 10);
+    if ([5, 10, 20, 50, 1000].includes(savedSize)) pageSize = savedSize;
   } catch (_) {}
   const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
   const $ = (id) => document.getElementById(id);
+  $('hub-token-save').onclick = () => VanguardApi.setToken($('hub-token').value).catch(error => toast(error.message));
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const num = (n) => new Intl.NumberFormat().format(n);
   const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
@@ -82,7 +88,27 @@
   const baseIso = (r) => (badClock(r) ? r.received_at : r.created_at);
   const etaAt = (r) => (r.eta_minutes ? Date.parse(baseIso(r)) + r.eta_minutes * 60000 : null);
   const minsLeft = (r) => { const t = etaAt(r); return t === null ? null : Math.round((t - Date.now()) / 60000); };
-  const needsOf = (r) => [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
+  // Draft setups for terms the hospital's own table above does not cover (public/setups.json).
+  // The hospital's mappings always win; the draft is unreviewed and labelled as such.
+  const PREP_DRAFT = {};
+  const prepFor = (label) => (PREP[label] ? [PREP[label]] : (PREP_DRAFT[label] || []));
+  const labelsOf = (r) => r.injuries.split(',').map((s) => s.trim());
+  const usesDraft = (r) => labelsOf(r).some((s) => !PREP[s] && PREP_DRAFT[s]);
+  const needsOf = (r) => [...new Set(labelsOf(r).flatMap(prepFor))];
+  // For a report saved from the AI panel (findings superseded by AI processing, transcript not
+  // corrected since), list setups for its saved terms as a read-only suggestion, each with the
+  // saved term that caused it so a reviewer can check the link. They are never part of
+  // readyItems, the readiness count or the board totals, which keep the safety rule.
+  const suggestedOf = (r) => {
+    if (!(r.source_findings_current === false && r.processing && r.current_transcript === r.raw_text)) return [];
+    const why = new Map();
+    for (const label of labelsOf(r)) {
+      for (const setup of prepFor(label)) why.set(setup, [...(why.get(setup) || []), label]);
+    }
+    // Same age rule the board's checklist already applies.
+    if ((r.age_group === 'Child' || r.age_group === 'Infant') && !why.has('Paediatrics')) why.set('Paediatrics', [`age group ${r.age_group}`]);
+    return [...why].map(([setup, because]) => ({ setup, because }));
+  };
   const readyItems = (r) => {
     if (r.source_findings_current === false) return [];
     const set = new Set(needsOf(r));
@@ -100,7 +126,7 @@
   // ---------- data ----------
   async function load() {
     try {
-      const res = await fetch('/api/triage');
+      const res = await VanguardApi.request('/api/triage');
       if (!res.ok) throw new Error('bad status');
       const next = await res.json();
       const fresh = firstLoad ? [] : next.filter((r) => !seen.has(r.id));
@@ -122,7 +148,7 @@
     btn.classList.add('loading');
     btn.setAttribute('aria-busy', 'true');
     try {
-      const res = await fetch(`/api/triage/${r.id}`, {
+      const res = await VanguardApi.request(`/api/triage/${r.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -137,15 +163,24 @@
     }
   }
 
-  // ---------- theme ----------
+  let navPos = 'side';
+  try {
+    soundOn = localStorage.getItem('sound') === '1';
+    show = localStorage.getItem('show') === 'urgent' ? 'urgent' : 'all';
+    themePref = localStorage.getItem('theme') || 'auto';
+    navPos = localStorage.getItem('navPos') || 'side';
+    ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
+  } catch (_) {}
+
+  // ---------- theme & layout ----------
   const mq = window.matchMedia('(prefers-color-scheme: dark)');
   function applyTheme() {
     const dark = themePref === 'dark' || (themePref === 'auto' && mq.matches);
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#061419' : '#DCEDF1');
-    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === themePref)));
+    document.querySelectorAll('.seg button[data-t]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === themePref)));
   }
-  document.querySelectorAll('.seg button').forEach((b) => {
+  document.querySelectorAll('.seg button[data-t]').forEach((b) => {
     b.onclick = () => {
       themePref = b.dataset.t;
       try { localStorage.setItem('theme', themePref); } catch (_) {}
@@ -154,6 +189,31 @@
   });
   mq.addEventListener('change', applyTheme); // follow the OS while on Auto
   applyTheme();
+
+  function applyNavPos() {
+    const app = document.querySelector('.app');
+    if (app) app.setAttribute('data-navpos', navPos);
+    const posBtn = document.getElementById('rail-pos-btn');
+    if (posBtn) {
+      const isTop = navPos === 'top';
+      posBtn.setAttribute('title', isTop ? 'Switch to Side Taskbar' : 'Switch to Top Taskbar');
+      posBtn.setAttribute('aria-label', isTop ? 'Switch to Side Taskbar' : 'Switch to Top Taskbar');
+      const labelSpan = posBtn.querySelector('.nav-pos-text');
+      if (labelSpan) labelSpan.textContent = isTop ? 'Side Bar' : 'Top Bar';
+      const iconPath = posBtn.querySelector('path');
+      if (iconPath) iconPath.setAttribute('d', isTop ? 'M9 3v18' : 'M3 9h18');
+    }
+  }
+
+  const posBtn = document.getElementById('rail-pos-btn');
+  if (posBtn) {
+    posBtn.onclick = () => {
+      navPos = navPos === 'top' ? 'side' : 'top';
+      try { localStorage.setItem('navPos', navPos); } catch (_) {}
+      applyNavPos();
+    };
+  }
+  applyNavPos();
 
   // ---------- alerts ----------
   function toast(title, sub, category) {
@@ -191,7 +251,7 @@
   }
 
   // ---------- derived data ----------
-  const inView = () => rows.filter((r) => view === 'all' || r.status === view);
+  const inView = () => rows.filter((r) => view === 'all' || view === 'dashboard' || r.status === view);
   const matches = (r, q) => !q || [r.injuries, r.location, r.watch_id, r.raw_text, r.current_transcript, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q);
   function visible() {
     const q = query.trim().toLowerCase();
@@ -237,23 +297,28 @@
   }
 
   function render() {
-    const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
-    const inbound = rows.filter((r) => r.status === 'inbound');
-    announceStatus(inbound);
-    renderNav();
-    const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : isHistory() ? historyRows() : visible();
-    renderSummary(inbound, list);
-    renderCats();
-    renderFilters();
-    renderAlert();
-    autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
-    const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
-    const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
-    renderList(board || hist || list);
-    renderPrep(inbound);
-    for (const r of rows) seen.add(r.id);
-    if (loadState === 'ok') firstLoad = false;
-    if (focusKey) restoreFocus(focusKey);
+    try {
+      const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
+      const inbound = rows.filter((r) => r.status === 'inbound');
+      announceStatus(inbound);
+      renderNav();
+      const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : isHistory() ? historyRows() : visible();
+      renderSummary(inbound, list);
+      renderCats();
+      renderFilters();
+      renderAlert();
+      autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
+      const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
+      const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
+      renderDashboard();
+      renderList(board || hist || list);
+      renderPrep(inbound);
+      for (const r of rows) seen.add(r.id);
+      if (loadState === 'ok') firstLoad = false;
+      if (focusKey) restoreFocus(focusKey);
+    } catch (err) {
+      console.error('Render error:', err);
+    }
   }
 
   function renderNav() {
@@ -378,6 +443,8 @@
   // Everything one patient needs, opened from their row: counts, readiness checklist, notes and actions.
   function renderDetail(r) {
     const box = el('div', 'detail');
+    const extractedFindings = (r.processing?.findings || []).filter((finding) =>
+      finding.source === 'model-inferred' && (finding.excerpt || finding.contradictory));
     const stats = el('div', 'stats');
     const stat = (k, v) => { const d = el('div', 'stat'); d.append(el('small', '', k), el('b', '', v)); return d; };
     stats.append(stat('Patients', r.patient_count_known === false ? 'Unknown' : '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[category(r)]));
@@ -387,6 +454,18 @@
     if (r.clinician_override) box.append(el('p', 'note', `Operator override: ${r.clinician_override} · computed: ${r.computed_triage} · identity unverified`));
     for (const uncertainty of r.uncertainties || []) box.append(el('p', 'warn', uncertainty));
     if (r.current_transcript !== r.raw_text) box.append(el('p', 'r-raw', 'Current corrected transcript: ' + r.current_transcript));
+    if (extractedFindings.length) {
+      const extracted = el('details', 'rnote');
+      extracted.append(el('summary', '', 'Extracted findings · unverified'));
+      const labels = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
+      for (const finding of extractedFindings) {
+        const label = labels[finding.name] || finding.name;
+        const value = finding.contradictory ? ': conflicting; verification required'
+          : finding.value === 'reported' ? '' : `: ${finding.value}${finding.unit ? ' ' + finding.unit : ''}`;
+        extracted.append(el('p', '', `${label}${value}${finding.excerpt ? ` — “${finding.excerpt}”` : ''}`));
+      }
+      box.append(extracted);
+    }
 
     // readiness checklist (kept in this browser only)
     const items = r.status === 'inbound' && category(r) !== 'Deceased' ? readyItems(r) : [];
@@ -396,6 +475,7 @@
       const cnt = el('span', '');
       head.append(cnt);
       prep.append(head);
+      if (usesDraft(r)) prep.append(el('p', 'note', 'Some setups are an unreviewed draft, not clinician-approved. Check them against your protocols.'));
       const done = new Set(ready[r.id] || []);
       const note = el('p', 'note');
       note.setAttribute('aria-live', 'polite');
@@ -422,11 +502,21 @@
       upd();
       box.append(prep);
     }
-    const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && !PREP[x]);
+    const suggested = r.status === 'inbound' && category(r) !== 'Deceased' ? suggestedOf(r) : [];
+    if (suggested.length) {
+      const sug = el('div', 'prep');
+      sug.append(el('p', 'prep-h', 'Suggested setups (draft)'),
+        el('p', 'note', 'From the saved terms only. Not part of the readiness count. Unreviewed: check against your protocols.'),
+        ...suggested.map((s) => el('p', '', `${s.setup} \u2014 because: ${s.because.join(', ')}`)));
+      box.append(sug);
+    }
+    const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && (r.source_findings_current === false ? !PREP[x] : !prepFor(x).length));
     if (category(r) !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
       box.append(el('p', 'warn', r.injuries === 'Unspecified'
-        ? 'No findings were understood. Read the note first.'
-        : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
+        ? extractedFindings.length ? 'Machine-extracted findings are listed above for review; none are clinician-verified.' : 'No findings were understood. Read the note first.'
+        : suggested.length
+          ? `No hospital-approved preparation is mapped for ${unmapped.join(', ')}; see the draft suggestion above. Read the note.`
+          : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
     }
     if (r.raw_text) {
       const d = el('details', 'rnote');
@@ -464,7 +554,7 @@
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog); dialog.showModal();
     try {
-      const response = await fetch(`/api/triage/${r.id}`);
+      const response = await VanguardApi.request(`/api/triage/${r.id}`);
       if (!response.ok) throw new Error('Could not load evidence');
       const detail = await response.json();
       content.replaceChildren(el('h2', '', 'Original evidence'), el('pre', '', detail.raw_text));
@@ -475,7 +565,7 @@
       extract.onclick = async () => {
         extract.disabled = true; aiState.textContent = 'Extracting locally; original report is already stored…';
         try {
-          const response = await fetch(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, baseRevision: detail.revision }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.message || data.error || 'Inference failed');
@@ -526,7 +616,7 @@
         }
         save.disabled = true;
         try {
-          const response = await fetch(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...change, requestId: attempt.requestId }) });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Could not save revision');
@@ -712,7 +802,7 @@
     b.onclick = () => setShow('all');
     fold.append(b);
   }
-  function setShow(v) { show = v; try { localStorage.setItem('show', v); } catch (_) {} limit = PAGE; render(); }
+  function setShow(v) { show = v; try { localStorage.setItem('show', v); } catch (_) {} currentPage = 1; render(); }
   // Arrow keys move between time blocks without leaving the row you are on.
   $('board').addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) || !e.target.dataset.row) return;
@@ -785,6 +875,330 @@
     }
     return urgent.length ? list.filter((r) => !urgent.includes(r)) : list;
   }
+
+  // ---------- Emergency Operations & Analytics Dashboard ----------
+  function renderDashboard() {
+    const sec = $('dash-sec');
+    if (!sec) return;
+    sec.hidden = view !== 'dashboard';
+    if (sec.hidden) return;
+
+    const box = $('dash-container');
+    box.replaceChildren();
+
+    if (loadState === 'loading') {
+      box.append(el('div', 'skel'));
+      return;
+    }
+
+    const all = rows;
+    const totPatients = patients(all);
+    const immPatients = patients(all.filter((r) => category(r) === 'Immediate'));
+    const unaPatients = patients(all.filter((r) => category(r) === 'Unassessed'));
+    const delPatients = patients(all.filter((r) => category(r) === 'Delayed'));
+    const minPatients = patients(all.filter((r) => category(r) === 'Minor'));
+    const decPatients = patients(all.filter((r) => category(r) === 'Deceased'));
+
+    const inbRows = all.filter((r) => r.status === 'inbound');
+    const arrRows = all.filter((r) => r.status === 'arrived');
+    const inbPatients = patients(inbRows);
+    const arrPatients = patients(arrRows);
+
+    // 1. Dashboard Subheader with Action Buttons
+    const dHead = el('div', 'dash-header');
+    const dHeadTitle = el('div', 'dash-header-title');
+    dHeadTitle.append(
+      el('h3', '', 'Emergency Operations Dashboard'),
+      el('p', 'sub', 'Real-time pre-arrival triage telemetry, watch dispatches, and emergency department volume.')
+    );
+    const dHeadActions = el('div', 'dash-header-actions');
+    const addBtn = el('button', 'dash-btn primary', '+ View Active Dispatches');
+    addBtn.onclick = () => setView('inbound');
+    const impBtn = el('button', 'dash-btn outline', 'Refresh Telemetry');
+    impBtn.onclick = () => { load(); toast('Emergency hub telemetry refreshed.'); };
+    dHeadActions.append(addBtn, impBtn);
+    dHead.append(dHeadTitle, dHeadActions);
+    box.append(dHead);
+
+    // 2. Top Row: 4 Stat KPI Cards Grid (Powered by Real System Data)
+    const kpiGrid = el('div', 'dash-kpi-grid');
+
+    // Card 1 (Featured active teal card)
+    const card1 = el('div', 'dash-kpi-card featured');
+    card1.onclick = () => setView('all');
+    card1.style.cursor = 'pointer';
+    const c1Head = el('div', 'dash-kpi-head');
+    c1Head.append(el('span', 'dash-kpi-label', 'Total Reports'), el('span', 'dash-kpi-arrow', '↗'));
+    card1.append(c1Head, el('b', 'dash-kpi-val', num(all.length)), el('span', 'dash-kpi-badge', `${plural(totPatients, 'patient')} recorded in hub`));
+
+    // Card 2 (Immediate Care)
+    const card2 = el('div', 'dash-kpi-card');
+    card2.onclick = () => { setView('inbound'); setCat('Immediate'); };
+    card2.style.cursor = 'pointer';
+    const c2Head = el('div', 'dash-kpi-head');
+    c2Head.append(el('span', 'dash-kpi-label', 'Immediate Care'), el('span', 'dash-kpi-arrow', '↗'));
+    card2.append(c2Head, el('b', 'dash-kpi-val', num(immPatients)), el('span', 'dash-kpi-badge sub', `${totPatients ? Math.round((immPatients / totPatients) * 100) : 0}% of total acuity`));
+
+    // Card 3 (On The Way)
+    const card3 = el('div', 'dash-kpi-card');
+    card3.onclick = () => setView('inbound');
+    card3.style.cursor = 'pointer';
+    const c3Head = el('div', 'dash-kpi-head');
+    c3Head.append(el('span', 'dash-kpi-label', 'On The Way'), el('span', 'dash-kpi-arrow', '↗'));
+    card3.append(c3Head, el('b', 'dash-kpi-val', num(inbPatients)), el('span', 'dash-kpi-badge sub', `${num(inbRows.length)} active rescue watch dispatches`));
+
+    // Card 4 (Arrived ED)
+    const card4 = el('div', 'dash-kpi-card');
+    card4.onclick = () => setView('arrived');
+    card4.style.cursor = 'pointer';
+    const c4Head = el('div', 'dash-kpi-head');
+    c4Head.append(el('span', 'dash-kpi-label', 'Arrived ED'), el('span', 'dash-kpi-arrow', '↗'));
+    card4.append(c4Head, el('b', 'dash-kpi-val', num(arrPatients)), el('span', 'dash-kpi-badge sub', `${num(arrRows.length)} ED intake completed`));
+
+    kpiGrid.append(card1, card2, card3, card4);
+    box.append(kpiGrid);
+
+    // 3. Middle Row: Real Triage Acuity Bar Chart + Urgent Notice Card
+    const midRow = el('div', 'dash-mid-row');
+
+    // Triage Acuity Distribution Bar Chart Card
+    const chartCard = el('div', 'dash-card analytics-card');
+    chartCard.append(el('h4', 'dash-card-title', 'Triage Acuity Distribution'));
+    chartCard.append(el('p', 'hint', 'Total patient count dynamically categorized by START triage urgency'));
+
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 540 220');
+    svg.setAttribute('class', 'project-analytics-svg');
+
+    const defs = document.createElementNS(svgNS, 'defs');
+    const pat = document.createElementNS(svgNS, 'pattern');
+    pat.setAttribute('id', 'stripe-pattern');
+    pat.setAttribute('width', '8');
+    pat.setAttribute('height', '8');
+    pat.setAttribute('patternUnits', 'userSpaceOnUse');
+    pat.setAttribute('patternTransform', 'rotate(45)');
+    const patLine = document.createElementNS(svgNS, 'line');
+    patLine.setAttribute('x1', '0'); patLine.setAttribute('y1', '0');
+    patLine.setAttribute('x2', '0'); patLine.setAttribute('y2', '8');
+    patLine.setAttribute('stroke', '#DC2626'); patLine.setAttribute('stroke-width', '3');
+    pat.append(patLine);
+    defs.append(pat);
+    svg.append(defs);
+
+    const triageStats = [
+      { label: 'Immediate', count: immPatients, color: '#DC2626', type: 'stripe' },
+      { label: 'Unassessed', count: unaPatients, color: '#64748B', type: 'solid' },
+      { label: 'Delayed', count: delPatients, color: '#F59E0B', type: 'solid' },
+      { label: 'Minor', count: minPatients, color: '#10B981', type: 'solid' },
+      { label: 'Deceased', count: decPatients, color: '#334155', type: 'solid' }
+    ];
+
+    const maxCount = Math.max(...triageStats.map((s) => s.count), 1);
+
+    triageStats.forEach((b, idx) => {
+      const x = 35 + idx * 98;
+      const bw = 54;
+      const baseY = 180;
+      const h = Math.max(12, (b.count / maxCount) * 140);
+      const y = baseY - h;
+
+      // Track bg
+      const track = document.createElementNS(svgNS, 'rect');
+      track.setAttribute('x', String(x)); track.setAttribute('y', '20');
+      track.setAttribute('width', String(bw)); track.setAttribute('height', '160');
+      track.setAttribute('rx', '14'); track.setAttribute('fill', 'var(--panel-2)');
+      svg.append(track);
+
+      // Pill Bar
+      const bar = document.createElementNS(svgNS, 'rect');
+      bar.setAttribute('x', String(x)); bar.setAttribute('y', String(y));
+      bar.setAttribute('width', String(bw)); bar.setAttribute('height', String(h));
+      bar.setAttribute('rx', '14');
+      if (b.type === 'stripe' && b.count > 0) {
+        bar.setAttribute('fill', 'url(#stripe-pattern)');
+      } else {
+        bar.setAttribute('fill', b.color);
+      }
+      svg.append(bar);
+
+      // Value badge above bar
+      if (b.count > 0) {
+        const txt = document.createElementNS(svgNS, 'text');
+        txt.setAttribute('x', String(x + bw / 2)); txt.setAttribute('y', String(y - 8));
+        txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--text)');
+        txt.setAttribute('font-size', '12'); txt.setAttribute('font-weight', '800');
+        txt.textContent = num(b.count);
+        svg.append(txt);
+      }
+
+      // X Axis Label
+      const dayTxt = document.createElementNS(svgNS, 'text');
+      dayTxt.setAttribute('x', String(x + bw / 2)); dayTxt.setAttribute('y', '205');
+      dayTxt.setAttribute('text-anchor', 'middle'); dayTxt.setAttribute('fill', 'var(--dim)');
+      dayTxt.setAttribute('font-size', '11'); dayTxt.setAttribute('font-weight', '600');
+      dayTxt.textContent = b.label;
+      svg.append(dayTxt);
+    });
+
+    chartCard.append(svg);
+    midRow.append(chartCard);
+
+    // Urgent Pre-Arrival Notice Card (Dynamic based on real Immediate inbound reports)
+    const urgentInbound = inbRows.filter((r) => category(r) === 'Immediate');
+    const remCard = el('div', 'dash-card rem-card');
+    remCard.append(el('span', 'dash-card-tag', 'Emergency Alert'));
+
+    if (urgentInbound.length > 0) {
+      const topReport = urgentInbound[0];
+      const m = minsLeft(topReport);
+      const titleWrap = el('div', 'rem-title-wrap');
+      titleWrap.style.display = 'flex';
+      titleWrap.style.alignItems = 'center';
+      titleWrap.style.gap = '8px';
+      const sirenIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      sirenIcon.setAttribute('viewBox', '0 0 24 24');
+      sirenIcon.setAttribute('width', '22');
+      sirenIcon.setAttribute('height', '22');
+      sirenIcon.setAttribute('fill', 'none');
+      sirenIcon.setAttribute('stroke', '#DC2626');
+      sirenIcon.setAttribute('stroke-width', '2.2');
+      sirenIcon.setAttribute('stroke-linecap', 'round');
+      sirenIcon.setAttribute('stroke-linejoin', 'round');
+      sirenIcon.innerHTML = '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>';
+      const titleEl = el('h3', 'rem-title', topReport.injuries);
+      titleWrap.append(sirenIcon, titleEl);
+      remCard.append(titleWrap);
+      remCard.append(el('p', 'rem-time', `Pickup: ${topReport.location} · ${noun(topReport)}${m !== null ? ` · ETA ${fmtDur(m)}` : ''}`));
+      const actionBtn = el('button', 'dash-btn primary block');
+      actionBtn.style.display = 'inline-flex';
+      actionBtn.style.alignItems = 'center';
+      actionBtn.style.justifyContent = 'center';
+      actionBtn.style.gap = '8px';
+      const btnIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      btnIcon.setAttribute('viewBox', '0 0 24 24');
+      btnIcon.setAttribute('width', '18');
+      btnIcon.setAttribute('height', '18');
+      btnIcon.setAttribute('fill', 'none');
+      btnIcon.setAttribute('stroke', 'currentColor');
+      btnIcon.setAttribute('stroke-width', '2.2');
+      btnIcon.setAttribute('stroke-linecap', 'round');
+      btnIcon.setAttribute('stroke-linejoin', 'round');
+      btnIcon.innerHTML = '<path d="M12 2v20M2 12h20"/>';
+      actionBtn.append(btnIcon, document.createTextNode('Prepare Resuscitation Bay'));
+      actionBtn.onclick = () => setView('inbound');
+      remCard.append(actionBtn);
+    } else {
+      remCard.append(el('h3', 'rem-title', 'No Urgent Critical Alerts'));
+      remCard.append(el('p', 'rem-time', 'All inbound rescue watches are currently stable or clear.'));
+      const actionBtn = el('button', 'dash-btn outline block', 'View All Dispatches');
+      actionBtn.onclick = () => setView('inbound');
+      remCard.append(actionBtn);
+    }
+    midRow.append(remCard);
+
+    box.append(midRow);
+
+    // 4. Bottom Row: Real Active Watch Dispatches & ED Triage Capacity Gauge
+    const botRow = el('div', 'dash-bot-row');
+
+    // Active Rescue Dispatches Card (Real watch reports from system data)
+    const teamCard = el('div', 'dash-card team-card');
+    const teamHead = el('div', 'dash-card-head');
+    teamHead.append(el('h4', 'dash-card-title', 'Active Rescue Watch Dispatches'), el('button', 'dash-btn outline sm', 'View All'));
+    teamHead.querySelector('button').onclick = () => setView('inbound');
+    teamCard.append(teamHead);
+
+    const activeReports = inbRows.slice(0, 4);
+    if (activeReports.length > 0) {
+      const teamList = el('div', 'team-list');
+      for (const r of activeReports) {
+        const row = el('div', 'team-row');
+        row.style.cursor = 'pointer';
+        row.onclick = () => setView('inbound');
+        const avatar = el('div', 't-avatar', r.watch_id ? r.watch_id.slice(-2) : 'W');
+        const info = el('div', 't-info');
+        info.append(el('b', 't-name', `Location: ${r.location}`), el('span', 't-role', `${r.injuries} (${noun(r)})`));
+        const catName = category(r);
+        let chipCls = 'st-completed';
+        if (catName === 'Immediate') chipCls = 'st-pending';
+        else if (catName === 'Delayed' || catName === 'Unassessed') chipCls = 'st-progress';
+        const stChip = el('span', `st-chip ${chipCls}`, LABEL[catName]);
+        row.append(avatar, info, stChip);
+        teamList.append(row);
+      }
+      teamCard.append(teamList);
+    } else {
+      const emptyMsg = el('p', 'hint', 'No active watch dispatches currently en-route. Standing by for rescue watch signals.');
+      emptyMsg.style.padding = '12px 0';
+      teamCard.append(emptyMsg);
+    }
+    botRow.append(teamCard);
+
+    // ED Triage Ratio Donut Gauge Card
+    const progCard = el('div', 'dash-card prog-card');
+    progCard.append(el('h4', 'dash-card-title', 'Emergency Triage Ratio'));
+
+    const criticalRatio = totPatients ? Math.round(((immPatients + unaPatients) / totPatients) * 100) : 0;
+
+    const gaugeBox = el('div', 'gauge-box');
+    const gSvg = document.createElementNS(svgNS, 'svg');
+    gSvg.setAttribute('viewBox', '0 0 200 130');
+    gSvg.setAttribute('class', 'gauge-svg');
+
+    // Background arc
+    const bgArc = document.createElementNS(svgNS, 'path');
+    bgArc.setAttribute('d', 'M 20 110 A 80 80 0 0 1 180 110');
+    bgArc.setAttribute('fill', 'none');
+    bgArc.setAttribute('stroke', 'var(--panel-2)');
+    bgArc.setAttribute('stroke-width', '22');
+    bgArc.setAttribute('stroke-linecap', 'round');
+
+    // Progress arc
+    const sweepAngle = (criticalRatio / 100) * 180;
+    const rad = (180 - sweepAngle) * (Math.PI / 180);
+    const endX = 100 + 80 * Math.cos(rad);
+    const endY = 110 - 80 * Math.sin(rad);
+
+    const prArc = document.createElementNS(svgNS, 'path');
+    prArc.setAttribute('d', `M 20 110 A 80 80 0 0 1 ${endX.toFixed(1)} ${endY.toFixed(1)}`);
+    prArc.setAttribute('fill', 'none');
+    prArc.setAttribute('stroke', criticalRatio > 40 ? '#DC2626' : '#087F90');
+    prArc.setAttribute('stroke-width', '22');
+    prArc.setAttribute('stroke-linecap', 'round');
+
+    gSvg.append(bgArc, prArc);
+
+    const gTxt = document.createElementNS(svgNS, 'text');
+    gTxt.setAttribute('x', '100'); gTxt.setAttribute('y', '85');
+    gTxt.setAttribute('text-anchor', 'middle'); gTxt.setAttribute('fill', 'var(--text)');
+    gTxt.setAttribute('font-size', '26'); gTxt.setAttribute('font-weight', '800');
+    gTxt.textContent = `${criticalRatio}%`;
+
+    const gSub = document.createElementNS(svgNS, 'text');
+    gSub.setAttribute('x', '100'); gSub.setAttribute('y', '105');
+    gSub.setAttribute('text-anchor', 'middle'); gSub.setAttribute('fill', 'var(--dim)');
+    gSub.setAttribute('font-size', '11'); gSub.setAttribute('font-weight', '600');
+    gSub.textContent = 'Critical Ratio';
+
+    gSvg.append(gTxt, gSub);
+    gaugeBox.append(gSvg);
+    progCard.append(gaugeBox);
+
+    // Dynamic Legend
+    const legend = el('div', 'gauge-legend');
+    legend.append(
+      el('span', 'g-leg comp', `● Immediate (${num(immPatients)})`),
+      el('span', 'g-leg prog', `● Delayed (${num(delPatients)})`),
+      el('span', 'g-leg pend', `● Minor (${num(minPatients)})`)
+    );
+    progCard.append(legend);
+    botRow.append(progCard);
+
+    box.append(botRow);
+  }
+
+
   // One patient row: a button that opens that patient's needs; history rows show when the hub received the report.
   function entryEl(r, opts = {}) {
     const isNew = !firstLoad && !seen.has(r.id);
@@ -814,7 +1228,14 @@
 
   function renderList(list) {
     const out = $('list');
+    const pagerNav = $('pager-nav');
     out.replaceChildren();
+    if (pagerNav) pagerNav.replaceChildren();
+
+    const perPageSel = $('per-page-select');
+    if (perPageSel && parseInt(perPageSel.value, 10) !== pageSize) {
+      perPageSel.value = String(pageSize);
+    }
 
     if (loadState === 'loading') {
       for (let i = 0; i < 3; i++) {
@@ -844,8 +1265,14 @@
       return;
     }
 
-    const rest = list;
-    const page = rest.slice(0, limit);
+    const totalItems = list.length;
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const page = list.slice(startIdx, startIdx + pageSize);
+
     const groups = view === 'inbound'
       ? [[boardTitle || 'Patients', () => true]]
       : [[isHistory() ? histTitle : VIEW_TITLE[view], () => true]];
@@ -854,17 +1281,63 @@
       const part = page.filter(test);
       if (!part.length) continue;
       const head = el('div', 'grp');
-      head.append(el('b', '', name), el('span', '', plural(patients(part), 'patient')));
+      head.append(el('b', '', name), el('span', '', `${plural(patients(part), 'patient')}`));
       out.append(head);
       for (const r of part) out.append(entryEl(r));
     }
-    if (rest.length > limit) {
-      const more = el('button', 'btn more', `Show ${Math.min(PAGE, rest.length - limit)} more (${num(rest.length - limit)} not shown)`);
-      more.type = 'button';
-      more.dataset.fk = 'more';
-      more.onclick = () => { limit += PAGE; render(); };
-      out.append(more);
+
+    if (pagerNav && totalItems > 0) {
+      renderPagerControls(pagerNav, totalItems, totalPages);
     }
+  }
+
+  function renderPagerControls(container, totalItems, totalPages) {
+    const startNum = (currentPage - 1) * pageSize + 1;
+    const endNum = Math.min(currentPage * pageSize, totalItems);
+
+    const info = el('div', 'pager-info', `Showing ${num(startNum)}–${num(endNum)} of ${plural(totalItems, 'report')}`);
+
+    const btns = el('div', 'pager-buttons');
+
+    // First
+    const firstBtn = el('button', 'pager-btn', '«');
+    firstBtn.title = 'First Page';
+    firstBtn.disabled = currentPage === 1;
+    firstBtn.onclick = () => { currentPage = 1; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(firstBtn);
+
+    // Prev
+    const prevBtn = el('button', 'pager-btn', '‹ Prev');
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => { currentPage = Math.max(1, currentPage - 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(prevBtn);
+
+    // Page Numbers
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let p = startPage; p <= endPage; p++) {
+      const pageBtn = el('button', `pager-num${p === currentPage ? ' active' : ''}`, String(p));
+      pageBtn.setAttribute('aria-current', p === currentPage ? 'page' : 'false');
+      pageBtn.onclick = () => { currentPage = p; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+      btns.append(pageBtn);
+    }
+
+    // Next
+    const nextBtn = el('button', 'pager-btn', 'Next ›');
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => { currentPage = Math.min(totalPages, currentPage + 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(nextBtn);
+
+    // Last
+    const lastBtn = el('button', 'pager-btn', '»');
+    lastBtn.title = 'Last Page';
+    lastBtn.disabled = currentPage === totalPages;
+    lastBtn.onclick = () => { currentPage = totalPages; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(lastBtn);
+
+    container.append(info, btns);
   }
 
   function renderPrep(inbound) {
@@ -894,11 +1367,11 @@
 
   // ---------- controls ----------
   // Where you are (status tab, category, search) lives in the URL, so refresh and the Back button keep it.
-  const VIEWS = ['inbound', 'arrived', 'cancelled', 'all', 'settings'];
+  const VIEWS = ['dashboard', 'inbound', 'arrived', 'cancelled', 'all', 'settings'];
   const qInput = $('q');
   function readUrl() {
     const p = new URLSearchParams(location.search);
-    view = VIEWS.includes(p.get('view')) ? p.get('view') : 'inbound';
+    view = VIEWS.includes(p.get('view')) ? p.get('view') : 'dashboard';
     cat = TRIAGE.includes(p.get('cat')) ? p.get('cat') : null;
     query = p.get('q') || '';
     qInput.value = query;
@@ -913,9 +1386,64 @@
       try { history[push ? 'pushState' : 'replaceState'](null, '', url); } catch (_) {}
     }
   }
-  function setView(v) { view = v; limit = PAGE; writeUrl(true); render(); }
-  function setCat(c) { cat = c; limit = PAGE; writeUrl(true); render(); }
-  window.addEventListener('popstate', () => { readUrl(); limit = PAGE; render(); });
+  function setView(v) {
+    view = v;
+    if (v === 'dashboard') cat = null;
+    currentPage = 1;
+    writeUrl(true);
+    render();
+  }
+  function setCat(c) { cat = c; currentPage = 1; writeUrl(true); render(); }
+  window.addEventListener('popstate', () => { readUrl(); currentPage = 1; render(); });
+
+  const perPageSel = $('per-page-select');
+  if (perPageSel) {
+    perPageSel.value = String(pageSize);
+    perPageSel.onchange = () => {
+      pageSize = parseInt(perPageSel.value, 10) || 10;
+      try { localStorage.setItem('pageSize', String(pageSize)); } catch (_) {}
+      currentPage = 1;
+      render();
+    };
+  }
+
+  const profileBtn = $('rail-profile-btn');
+  if (profileBtn) {
+    profileBtn.onclick = () => {
+      toast('Operator Profile Active', 'Alex Hunter (alexhunter112@gmail.com) · Active On Duty');
+    };
+  }
+
+  const infoToggleBtn = $('info-toggle-btn');
+  const infoDialog = $('info-dialog');
+  const infoCloseBtn = $('info-dialog-close');
+  if (infoToggleBtn && infoDialog) {
+    infoToggleBtn.onclick = () => {
+      if (typeof infoDialog.showModal === 'function') {
+        infoDialog.showModal();
+      } else {
+        infoDialog.setAttribute('open', '');
+      }
+    };
+  }
+  if (infoCloseBtn && infoDialog) {
+    infoCloseBtn.onclick = () => {
+      if (typeof infoDialog.close === 'function') {
+        infoDialog.close();
+      } else {
+        infoDialog.removeAttribute('open');
+      }
+    };
+  }
+  if (infoDialog) {
+    infoDialog.addEventListener('click', (e) => {
+      const rect = infoDialog.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        if (typeof infoDialog.close === 'function') infoDialog.close();
+        else infoDialog.removeAttribute('open');
+      }
+    });
+  }
 
   document.querySelectorAll('.vtab').forEach((b, i, all) => {
     b.onclick = () => setView(b.dataset.f);
@@ -935,8 +1463,8 @@
   document.querySelectorAll('.rb[data-r]').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); bsel = null; render(); }; });
   document.querySelectorAll('.rb[data-s]').forEach((b) => { b.onclick = () => setShow(b.dataset.s); });
 
-  function setQuery(v) { query = v; qInput.value = v; limit = PAGE; writeUrl(false); render(); }
-  qInput.addEventListener('input', () => { query = qInput.value; limit = PAGE; writeUrl(false); render(); });
+  function setQuery(v) { query = v; qInput.value = v; currentPage = 1; writeUrl(false); render(); }
+  qInput.addEventListener('input', () => { query = qInput.value; currentPage = 1; writeUrl(false); render(); });
   $('qx').onclick = () => { setQuery(''); qInput.focus(); };
 
   const soundBtn = $('sound');
@@ -965,23 +1493,59 @@
   tick();
   setInterval(tick, 10000);
 
-  fetch('/api/config').then((r) => r.json()).then((c) => {
+  VanguardApi.request('/api/config').then((r) => r.json()).then((c) => {
     $('hospital').textContent = c.hospital;
     document.title = c.hospital + ' · Pre-Arrival Board';
   }).catch(() => {});
 
   // Live push; the poll is a safety net if the stream drops.
   function connect() {
-    const es = new EventSource('/api/events');
-    es.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; };
-    es.addEventListener('triage', () => load());
-    es.onerror = () => { $('conn').textContent = 'Reconnecting'; $('conn').className = 'conn down'; };
+    VanguardApi.events(
+      () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; },
+      () => load(),
+      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; },
+      renderCloud);
   }
+  // Supabase backup status from the hub; the board never talks to Supabase directly.
+  function cloudLabel(s) {
+    if (!s.configured) return 'Cloud off';
+    if (s.state === 'syncing') return 'Cloud syncing';
+    const queued = (s.pending ? ` · ${s.pending} queued` : '') + (s.rejected ? ` · ${s.rejected} rejected` : '');
+    if (s.state === 'error') return `Cloud offline${queued}`;
+    return queued ? `Cloud${queued}` : 'Cloud synced';
+  }
+  function renderCloud(s) {
+    const el = $('cloud-conn'), btn = $('cloud-sync');
+    el.textContent = cloudLabel(s);
+    el.className = 'conn ' + (s.configured && s.state !== 'error' && !s.rejected ? 'live' : 'down');
+    el.title = s.message || (s.lastSuccessAt ? `Last cloud sync ${new Date(s.lastSuccessAt).toLocaleTimeString()}` : 'Supabase cloud backup');
+    btn.hidden = !s.configured;
+    btn.disabled = s.state === 'syncing';
+  }
+  function loadCloud() {
+    VanguardApi.request('/api/cloud/status').then((r) => r.json()).then(renderCloud)
+      .catch(() => { $('cloud-conn').textContent = 'Cloud: unknown'; $('cloud-conn').className = 'conn down'; });
+  }
+  $('cloud-sync').addEventListener('click', () => {
+    $('cloud-sync').disabled = true;
+    VanguardApi.request('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
+      .then((r) => r.json()).then(renderCloud).catch(loadCloud);
+  });
+
   readUrl();
   render();
-  load();
+  // Draft setups are optional: the board works without them.
+  fetch('/setups.json').then((res) => (res.ok ? res.json() : null))
+    .then((data) => { if (data && data.setups) Object.assign(PREP_DRAFT, data.setups); })
+    .catch(() => {}).finally(load);
+  loadCloud();
   connect();
   setInterval(load, 10000);
+  const retryOutbox = () => VanguardApi.flush().catch(() => {});
+  retryOutbox();
+  window.addEventListener('online', retryOutbox);
+  setInterval(retryOutbox, 30000);
+  setInterval(loadCloud, 30000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 
   // Local AI triage assistant: talks to the hub's Qwen endpoints, never to Ollama directly.
@@ -994,19 +1558,18 @@
     var textEl = $('ai-text'), stateEl = $('ai-state'), resultEl = $('ai-result'), reviewEl = $('ai-review');
     var extractBtn = $('ai-extract'), assistBtn = $('ai-assist'), saveBtn = $('ai-save');
     var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
-    var busy = false, lastExtraction = null, saveAttempt = null;
+    var busy = false, lastExtraction = null, saveAttempt = null, lastApplied = null;
     var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
     function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
     async function refreshStatus() {
       try {
-        var s = await (await fetch('/api/ai/health')).json();
-        if (s && s.inference_available) { setConn(true, 'AI ready'); return; }
-        setConn(false, 'AI unavailable');
-        stateEl.textContent = (s && s.error === 'model-missing')
-          ? 'Qwen model is missing on the hospital computer. The board still works.'
-          : 'Local AI is unreachable. The board still works without it.';
+        var s = await (await VanguardApi.request('/api/ai/health')).json();
+        if (s && s.state === 'READY' && s.inference_available) { setConn(true, 'AI Live'); connEl.title = 'Pinned local Qwen generated completed tokens'; return; }
+        setConn(false, 'AI: ' + (s.state || 'UNAVAILABLE').toLowerCase().replaceAll('_', ' '));
+        connEl.title = 'Docker AI: ' + (s.state || 'UNAVAILABLE') + (s.error ? ' (' + s.error + ')' : '') + '. Inspect model-init/Ollama logs; reports remain local until acknowledged.';
       } catch (e) { setConn(false, 'AI unavailable'); }
     }
+    setInterval(refreshStatus, 30000);
     function errText(data, res) {
       var map = {
         'ollama-unreachable': 'Local AI is unreachable; is Ollama running on the hospital computer?',
@@ -1032,11 +1595,13 @@
       var t = document.createElement('div'); t.className = 'ai-table';
       var obs = data.processing.observations;
       Object.keys(OBS_LABEL).forEach(function (k) { rowOf(t, OBS_LABEL[k], obs[k]); });
+      if (data.fields.symptomDuration) rowOf(t, 'Symptom duration', data.fields.symptomDuration.value + ' ' + data.fields.symptomDuration.unit);
       resultEl.append(t);
       var ev = document.createElement('p'); ev.className = 'ai-ev';
       var quotes = Object.keys(OBS_LABEL).map(function (k) {
         return OBS_LABEL[k] + ': ' + (data.evidence && data.evidence[k] ? '\u201C' + data.evidence[k] + '\u201D' : 'not stated');
       }).join(' · ');
+      if (data.fields.symptomDuration && data.fieldEvidence.symptomDuration) quotes += ' · Symptom duration: “' + data.fieldEvidence.symptomDuration + '”';
       ev.textContent = 'Evidence — ' + quotes;
       resultEl.append(ev);
       (data.processing.uncertainties || []).forEach(function (u) {
@@ -1045,6 +1610,24 @@
       (data.warnings || []).forEach(function (w) {
         var p = document.createElement('p'); p.className = 'ai-warn'; p.textContent = 'Warning: ' + w; resultEl.append(p);
       });
+      var terms = (data.retrieval && data.retrieval.matches) || [];
+      if (terms.length) {
+        var tp = document.createElement('p'); tp.className = 'ai-ev';
+        tp.textContent = 'Reference terms (' + data.retrieval.reviewStatus + ' glossary, meanings only) — ' +
+          terms.map(function (m) { return m.matched + ' = ' + m.english + (m.negated ? ' (denied in report)' : ''); }).join(' · ');
+        resultEl.append(tp);
+      }
+      // The rules score only four findings. When none fired, say which reported
+      // terms were therefore left unscored, so they are not mistaken for "understood".
+      var unscored = terms.filter(function (m) {
+        return !m.negated && ['injury', 'condition', 'mechanism', 'symptom'].indexOf(m.category) !== -1;
+      });
+      if (unscored.length && data.provisional.triage === 'Unassessed') {
+        var up = document.createElement('p'); up.className = 'ai-warn';
+        up.textContent = 'Reported but not scored: ' + unscored.map(function (m) { return m.english; }).join(', ') +
+          '. The rules score only breathing, consciousness, severe bleeding and walking, so a qualified clinician must assess these.';
+        resultEl.append(up);
+      }
       var pr = document.createElement('p');
       pr.textContent = 'Provisional (deterministic rules, advisory only): ' + data.provisional.triage + ' — ' + data.provisional.reason + '. Verify clinically.';
       resultEl.append(pr);
@@ -1058,63 +1641,90 @@
       $('ai-obs-consciousness').value = obs.consciousness;
       $('ai-obs-bleeding').value = obs.severeBleeding;
       $('ai-obs-walking').value = obs.walking;
+      fillFields(data);
       reviewEl.hidden = false;
+    }
+    // Only blank fields are filled, from what the transcript states; anything the person typed wins.
+    // A guessed location and the injury terms are shown as suggestions and never saved automatically.
+    function applyExtractedFields(report, data) {
+      var f = data.fields || {}, out = Object.assign({}, report), changed = [];
+      if ((!report.location || report.location === 'Unspecified') && f.location && data.locationBasis === 'explicit') { out.location = f.location; changed.push('location'); }
+      if (report.patientCount === null && Number.isInteger(f.patientCount)) { out.patientCount = f.patientCount; changed.push('patientCount'); }
+      if (report.ageGroup === 'Unspecified' && f.ageGroup && f.ageGroup !== 'Unspecified') { out.ageGroup = f.ageGroup; changed.push('ageGroup'); }
+      if (report.etaMinutes === null && Number.isInteger(f.etaMinutes)) { out.etaMinutes = f.etaMinutes; changed.push('etaMinutes'); }
+      return { report: out, changed: changed };
+    }
+    function fillFields(data) {
+      var f = data.fields || {}, ev = data.fieldEvidence || {}, r = saveAttempt && saveAttempt.report;
+      var applied = (lastApplied && lastApplied.changed) || [], notes = [], suggestions = [];
+      if (r) {
+        $('ai-location').value = r.location === 'Unspecified' ? '' : r.location;
+        $('ai-count').value = r.patientCount == null ? '' : r.patientCount;
+        $('ai-age').value = r.ageGroup;
+        $('ai-eta').value = r.etaMinutes == null ? '' : r.etaMinutes;
+      }
+      if (applied.indexOf('location') !== -1) notes.push('Location \u201C' + f.location + '\u201D from \u201C' + ev.location + '\u201D');
+      if (applied.indexOf('patientCount') !== -1) notes.push('Patients ' + f.patientCount + ' from \u201C' + ev.patientCount + '\u201D');
+      if (applied.indexOf('ageGroup') !== -1) notes.push('Age group ' + f.ageGroup + ' from \u201C' + ev.ageGroup + '\u201D');
+      if (applied.indexOf('etaMinutes') !== -1) notes.push('ETA ' + f.etaMinutes + ' min from \u201C' + ev.etaMinutes + '\u201D');
+      (data.fieldNotes || []).forEach(function (n) { suggestions.push(n); });
+      if (f.location && applied.indexOf('location') === -1 && (!r || r.location === 'Unspecified')) {
+        suggestions.push('Location \u201C' + f.location + '\u201D was only guessed from \u201C' + ev.location + '\u201D, so it was not saved. Enter it yourself if correct.');
+      }
+      if (f.injuries && f.injuries !== 'Unspecified' && (!r || r.injuries === 'Unspecified')) {
+        suggestions.push('Injury terms found (not saved automatically): ' + f.injuries +
+          (data.legacy && data.legacy.triage !== 'Unassessed' ? '. If saved, the hospital finding rules would rate these ' + data.legacy.triage + ' (' + data.legacy.reason + ')' : ''));
+      }
+      $('ai-fields-note').textContent = (notes.length ? 'Filled from the transcript and saved with the report: ' + notes.join(' \u00B7 ') + '. ' : '') + suggestions.join(' \u00B7 ');
     }
     async function run(kind) {
       if (busy) return;
       var transcript = textEl.value;
       if (!transcript.trim()) { stateEl.textContent = 'Type a transcript first.'; return; }
-      lastExtraction = null; saveAttempt = null; reviewEl.hidden = true;
+      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
+      var eta = $('ai-eta').value === '' ? null : Number($('ai-eta').value);
+      if ((pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) || (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720))) { stateEl.textContent = 'Check patient count (1–99) and ETA (1–720 minutes), or leave unknown.'; return; }
+      lastExtraction = null; saveAttempt = null; lastApplied = null; reviewEl.hidden = false;
       busy = true; extractBtn.disabled = true; assistBtn.disabled = true;
-      stateEl.textContent = 'Working — asking local Qwen…';
+      stateEl.textContent = 'Saving original locally…';
       try {
-        var res = await fetch('/api/ai/' + kind, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: transcript, device: 'hospital-browser', sttEngine: 'typed/hub-form', sttRuntime: 'hub-ai-v1' })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { stateEl.textContent = errText(data, res); return; }
+        saveAttempt = { report: { localId: Date.now(), createdAt: new Date().toISOString(), reportId: VanguardApi.uuid(), encounterId: VanguardApi.uuid(),
+          rawText: transcript, location: $('ai-location').value.trim() || 'Unspecified', injuries: $('ai-injuries').value.trim() || 'Unspecified', triage: 'Unassessed', patientCount: pc, ageGroup: $('ai-age').value, etaMinutes: eta } };
+        stateEl.textContent = 'Original will be saved locally before Qwen runs…';
+        var data = await VanguardApi.prepare(saveAttempt.report, kind);
         lastExtraction = data;
-        setConn(true, 'AI ready');
-        stateEl.textContent = 'Ready — review the extraction below before saving.';
+        setConn(true, 'AI Live');
+        lastApplied = applyExtractedFields(saveAttempt.report, data);
+        saveAttempt.report = lastApplied.report;
         renderResult(data);
-      } catch (e) { stateEl.textContent = 'Could not reach the hub; the board still works.'; }
+        saveAttempt.report.processing = data.processing;
+        // Blank fields were filled from the transcript: store that version before sending.
+        if (lastApplied.changed.length) await VanguardApi.retain(Object.assign({}, saveAttempt.report, { readyToSend: true }));
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === saveAttempt.report.reportId; })) throw Error('Hospital receipt pending');
+        stateEl.textContent = 'Saved and transmitted automatically; provisional Unassessed. Verify clinically.';
+        saveBtn.disabled = true;
+        load();
+      } catch (e) { stateEl.textContent = e.code === 'local-storage-unavailable' ? e.message : 'Processing or receipt unavailable; original saved locally and queued for automatic delivery.'; saveBtn.disabled = false; retryOutbox(); }
       finally { busy = false; extractBtn.disabled = false; assistBtn.disabled = false; }
     }
     extractBtn.onclick = function () { run('extract'); };
     assistBtn.onclick = function () { run('triage-assist'); };
     saveBtn.onclick = async function () {
       if (!lastExtraction || lastExtraction.processing.originalTranscript !== textEl.value) { saveStateEl.textContent = 'Transcript changed; extract it again before saving.'; return; }
-      var loc = $('ai-location').value.trim();
-      if (!loc) { saveStateEl.textContent = 'Enter a pickup location first.'; return; }
-      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
-      if (pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) { saveStateEl.textContent = 'Patients must be 1–99 or unknown.'; return; }
-      var ages = ['Infant', 'Child', 'Adult', 'Elderly', 'Unspecified'];
-      var ag = $('ai-age').value; if (ages.indexOf(ag) === -1) ag = 'Unspecified';
-      var etaRaw = $('ai-eta').value.trim();
-      var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
-      if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
-      var prov = { triage: 'Unassessed' };
-      var report = { location: loc, injuries: 'Unspecified', triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
-        rawText: lastExtraction.processing.originalTranscript, processing: lastExtraction.processing };
-      var signature = JSON.stringify(report);
-      if (!saveAttempt || saveAttempt.signature !== signature) saveAttempt = { signature: signature, report: Object.assign(report, { localId: Date.now(), createdAt: new Date().toISOString(), reportId: newUUID(), encounterId: newUUID() }) };
+      if (!saveAttempt) return;
+      var report = saveAttempt.report;
       saveBtn.disabled = true; saveStateEl.textContent = 'Saving…';
       try {
-        var res = await fetch('/api/sync-triage', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ watchId: 'HUB-AI', reports: [saveAttempt.report] })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { saveStateEl.textContent = 'Save failed; nothing was stored.'; return; }
-        if (data.rejected && data.rejected.length) { saveStateEl.textContent = 'Hub refused the report: ' + data.rejected[0].reason; return; }
-        saveStateEl.textContent = 'Saved as inbound (' + prov.triage + ', provisional) — verify clinically.';
-        if (!data.ackLocalIds || data.ackLocalIds.indexOf(saveAttempt.report.localId) === -1) throw new Error('No explicit receipt');
-        if (typeof toast === 'function') toast('AI report saved', prov.triage + ' · verify clinically', prov.triage);
+        await VanguardApi.retain(report);
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === report.reportId; })) throw Error('Hospital receipt pending');
+        saveStateEl.textContent = 'Hospital receipt acknowledged; verify clinically.';
+        if (typeof toast === 'function') toast('AI report saved', 'Unassessed · verify clinically', 'Unassessed');
         if (typeof load === 'function') load();
       } catch (e) { saveStateEl.textContent = 'Receipt unavailable; retain this form and retry the same report.'; }
       finally { saveBtn.disabled = false; }
     };
-    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; });
+    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; $(id).value = 'unknown'; });
     refreshStatus();
   })();

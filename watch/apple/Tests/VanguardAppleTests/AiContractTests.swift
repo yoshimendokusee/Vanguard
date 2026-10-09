@@ -40,4 +40,19 @@ final class AiContractTests: XCTestCase {
             from: Data("{\"ok\":false,\"error\":\"ollama-timeout\",\"message\":\"Local AI timed out\"}".utf8))
         XCTAssertEqual(failure.error, "ollama-timeout")
     }
+
+    func testSharedVersionedFixturePreservesNativeAndWebProvenance() throws {
+        let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().appendingPathComponent("../../../../docs/fixtures/ai-v1.json")
+        let data = try Data(contentsOf: file)
+        let result = try JSONDecoder().decode(AiExtractionResult.self, from: data)
+        XCTAssertEqual(result.contractVersion, 1)
+        XCTAssertNotNil(UUID(uuidString: result.requestId!))
+        XCTAssertEqual(result.processing.provenance.extraction?.execution, "local")
+        XCTAssertEqual(result.processing.evidence?["walking"]?.source, "model-inferred")
+        let raw = try JSONSerialization.jsonObject(with: data) as! [String: Any]
+        let native = try JSONDecoder().decode(NativeProcessing.self, from: JSONSerialization.data(withJSONObject: raw["processing"]!))
+        XCTAssertTrue(native.isValid)
+        XCTAssertEqual(native.originalTranscript, result.processing.originalTranscript)
+        XCTAssertThrowsError(try AiRequest(transcript: String(repeating: "😀", count: 2001), device: .iphone))
+    }
 }

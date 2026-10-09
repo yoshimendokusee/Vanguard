@@ -1,5 +1,9 @@
 # Qwen3-0.6B integration — 2026-10-09
 
+Historical integration evidence. For current provisioning, credentials, readiness,
+validation and remaining blockers see [the 2026-10-10 connectivity report](global-ai-connectivity.md).
+The setup instructions below describe the earlier manual import workflow.
+
 Qwen performs real local text generation. It extracts **unverified claims**, never
 clinical urgency, diagnosis or death. Existing deterministic provisional rules and
 qualified verification remain authoritative. Saving or relaying a report has no
@@ -31,13 +35,14 @@ flowchart TD
   History --> Board[Hospital dashboard + deterministic provisional rules]
 ```
 
-Typed Watch reports attempt Watch inference first. Memory/loading/context/timeout
-errors retain captures; paired-iPhone transfer is optional and retried on activation.
-Watch audio is recorded locally and transferred to iPhone: **offline Watch speech
-recognition is not implemented**. The watchOS SDK has no Speech.framework. iPhone
-uses the existing `OnDeviceTranscriber` with `requiresOnDeviceRecognition = true`;
-it refuses unavailable locales and retains audio. Physical speech and connectivity
-execution are unverified. Qwen is a text LLM, not speech recognition.
+Typed Watch reports attempt Watch inference first. Recorded audio is saved locally,
+transcribed with the bundled multilingual Whisper tiny model, and processed on the
+Watch before Watch Connectivity is considered. Failed runs retain captures and can
+use the optional paired-iPhone fallback. The watchOS SDK has no Speech.framework;
+the CPU-only `whisper.cpp` build and model checksum are documented in
+`apple-watch-voice-workflow.md`. iPhone retains its existing on-device
+`OnDeviceTranscriber`; physical Watch accuracy, memory, thermals and latency remain
+unverified. Qwen remains a text LLM, not speech recognition.
 
 ## Model and runtime pins
 
@@ -128,6 +133,7 @@ Machine claims remain unverified in the hospital rules even when excerpts match.
 
 ```sh
 ./scripts/qwen-native-build.sh
+./scripts/whisper-watch-build.sh
 open watch/apple/Vanguard.xcodeproj
 # Xcode schemes: VanguardPhone and VanguardWatch
 # Choose a signing team in Xcode for physical installations.

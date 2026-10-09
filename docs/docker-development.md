@@ -1,3 +1,8 @@
+> Historical verification from 2026-10-09. For the current provisioning, access,
+> HMR port resolution and native client changes, see [global connectivity](global-ai-connectivity.md).
+> The former requirement for pre-existing Git LFS weights no longer applies to
+> Docker startup; the initializer handles pointer-only clones.
+
 # Docker development verification — 2026-10-09
 
 Root `docker compose up -d --build` now builds the existing hub and a Vite

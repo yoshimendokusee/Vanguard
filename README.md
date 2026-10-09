@@ -106,8 +106,9 @@ for your area.
 ## Docker development with live updates
 
 Install Git and Docker Desktop (or Docker Engine with Compose **2.20.3+**).
-Clone with the repository's Git LFS model weights available; a pointer-only clone
-still runs the board/API but cannot start Qwen. See the model checkout steps below.
+Clone normally. A one-shot model initializer copies verified checkout weights or
+downloads the pinned GGUF when the checkout contains only an LFS pointer. No host
+Ollama or Git LFS installation is required for Docker startup.
 No host Node.js, npm, Vite or backend libraries are needed. From the repository root:
 
 ```sh
@@ -116,7 +117,7 @@ docker compose up -d --build   # first run; installs locked dependencies in Dock
 docker compose up -d           # subsequent runs; no rebuild
 
 docker compose ps
-docker compose logs -f frontend hub ollama
+docker compose logs -f model-init frontend hub ollama
 docker compose down           # preserves hub/data and model volumes
 ```
 
@@ -152,7 +153,7 @@ docker compose down
 docker compose -f hub/docker-compose.yml up -d --build
 # Open http://localhost:3000/
 docker compose -f hub/docker-compose.yml down
-# Equivalent legacy entry point: cd hub && docker compose up -d --build
+# Equivalent legacy entry point: cd hub &&docker compose up -d --build
 ```
 
 The multi-stage Dockerfile runs `npm ci` and `npm run build`, then keeps production
@@ -172,16 +173,36 @@ Common fixes:
   A dependency change needs a rebuild; ordinary source changes do not.
 - **API unavailable:** check hub health/logs and the configured data-directory
   permissions. Retain data and fix the cause; don't replace the database.
-- **AI unavailable:** ensure the actual pinned GGUF is checked out, not a Git LFS
-  pointer, and check Ollama logs. The board/intake remain usable without AI.
+- **AI unavailable:** inspect `model-init` and Ollama logs; first-time provisioning
+  needs internet and disk space. Retry Compose after correcting a download failure.
+  `AI Live` requires real completed tokens, not just a model tag. The board/intake
+  remain usable without AI.
 
-For synthetic physical Apple Watch/iPhone testing, set `HUB_BIND_ADDRESS` to the
-computer's isolated LAN IP in `.env` and recreate the hub. Configure the native
-client with `http://<computer-lan-ip>:3000` (or `HUB_PORT`); device localhost points
-to the device itself. Keep Vite bound to host localhost. API routes/ACK semantics
-and native clients are unchanged. HTTP/storage remain unauthenticated/unencrypted;
-use synthetic data on isolated networks. Native Apple apps still require Xcode
-outside Docker. See [performed Docker checks and limits](docs/docker-development.md).
+For synthetic LAN testing, configure per-user/device `HUB_USERS` credentials and
+set `HUB_BIND_ADDRESS` to the host's LAN interface in `.env`, then recreate the hub.
+The native app accepts a saved hospital URL such as `http://<hub-hostname>.local:3000`
+and an assigned token stored in Keychain. It rejects device localhost and malformed
+origins. Local AI readiness is independent of LAN status. There is no reliable Docker
+multicast discovery here; use the host's LAN hostname/address or a DHCP reservation
+and update the saved URL when the network changes. Legacy Flutter uses explicit
+`HUB_URL` and `HUB_TOKEN` build settings; its former fixed private-IP default is removed.
+Use Settings in the web board to connect with an operator token. LAN credentials do
+not encrypt HTTP or storage: use synthetic data on isolated networks until protected
+transport/storage and clinical validation exist. See [global connectivity setup and
+verification](docs/global-ai-connectivity.md).
+
+To build the hub address into the Apple apps instead of typing it on each device,
+copy `watch/apple/Config/Secrets.xcconfig.example` to `Secrets.xcconfig` (git-ignored)
+and set `HUB_URL = http:/$()/<computer-lan-ip>:3000`. The `$()` is needed because
+`//` starts an xcconfig comment. The project's base configuration is
+`Config/Vanguard.xcconfig`, and `Config/Info.plist` passes the value to
+`AppConfiguration.load()`. A saved in-app URL still takes precedence. Optional
+`SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` stay empty when the hub uploads to Supabase.
+Info.plist is readable from the installed app, so it holds public values only:
+never the hub password, `sb_secret_*` or service-role keys. Values are fixed at build
+time; rebuild after changing them. See [Apple hub URL verification](docs/apple-hub-url-verification.md)
+for the earlier unsigned simulator checks. [Shared hub setup](docs/shared-hub-setup.md)
+records the current Wi-Fi hostname, per-device enrollment and signed simulator checks.
 
 Optional native hub development (Node 22.12+):
 
@@ -239,31 +260,60 @@ watch build settings. Inside Docker the API uses port 3000 and `/data/vanguard.d
 Watch build-time settings are independent; root `.env` does not configure Flutter
 or Apple devices automatically. Do not run `fake-watch.sh` against existing reports.
 
+### Supabase cloud backup (hub)
+
+The hub is the only component that needs Supabase settings. Watch, iPhone and
+dashboard clients talk to the hub over the LAN. The hub uploads to Supabase
+whenever it has internet. `.env` is git-ignored, but the hub reads it from disk on
+the hospital computer, so it connects without the file being in Git.
+
+1. In Supabase: apply `supabase/migrations/` (see its README), then go to
+   **Authentication → Users → Add user** and create a dedicated hub account
+   (email + password, auto-confirm).
+2. In the root `.env` (copy `.env.example`): set `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY` (publishable key), `SUPABASE_HUB_EMAIL` and
+   `SUPABASE_HUB_PASSWORD`. Never use a secret/service-role key. Quote values
+   that contain `$` or `#` in single quotes.
+3. Start the hub: `docker compose up --build` from the root, or natively
+   `cd hub && node --env-file=../.env server.js`. The board header shows
+   `Cloud synced`, `Cloud · N queued`, `Cloud offline` or `Cloud off`, plus a
+   **Sync to cloud** button.
+
+Reports always save to hub SQLite first. Offline, they stay queued and upload
+automatically once online. Leaving any value empty keeps the hub LAN-only. Use
+synthetic data only: the LAN API and SQLite are unauthenticated and unencrypted.
+
 ## Local Qwen inference
 
-Actual pinned Q4_K_M weights live at
-`models/qwen3-0.6b/qwen3-0.6b-q4_k_m.gguf` through Git LFS. Complete model setup
-while online; no model download or cloud inference occurs during normal startup.
+Pinned Q4_K_M weights are defined by `models/qwen3-0.6b/manifest.json`. Docker's
+first run provisions these weights into `qwen-weights`, verifies their checksum and
+imports them into the separate persistent `ollama-models` volume. Initial setup needs
+internet when weights/images are missing. Later runtime container recreation uses
+these volumes; Ollama has no external network route. Never delete model volumes as
+a recovery step.
 
 ```sh
-git lfs install --local
-git lfs pull --include='models/**/*.gguf'
-ollama serve                 # separate terminal, Ollama 0.11.4
-./scripts/qwen-setup.sh
-./scripts/qwen-echo.sh
-# Apple: Xcode with iOS/watchOS SDKs plus CMake
+# Web: no host Ollama required
+docker compose up -d --build
+# Apple: model packaging needs Node 22+, Xcode SDKs and CMake; no Docker/Ollama
+./scripts/qwen-setup.sh --model-only
 ./scripts/qwen-native-build.sh
 open watch/apple/Vanguard.xcodeproj
+# Optional host Ollama development only: start Ollama 0.11.4 separately
+./scripts/qwen-setup.sh host
+./scripts/qwen-echo.sh
+# Synthetic fresh-clone, real inference and recovery acceptance
+node scripts/connectivity-check.cjs
 ```
 
-For Docker, prepare the pinned Ollama image and build the hub while online, then
-start with `docker compose up -d --no-build --pull never`. Both existing Compose
-entry points preserve `hub/data`; Ollama imports the mounted GGUF on its internal
-network. The hospital dashboard executes Qwen on the local server. Open a report's
-**Evidence and corrections** dialog and choose **Extract this report with Qwen**:
-the original is already in SQLite, and generated claims append an immutable revision
-without a manual storage approval gate. `GET /api/ai/health` verifies artifact identity
-and fresh generated tokens; a listed tag alone does not prove readiness.
+Both Compose entry points preserve `hub/data`. The browser's central client uses
+same-origin `/api/*`, saves each original to an account-scoped local outbox before
+inference and automatically transmits provisional reports. Failed extraction can
+transmit an Unassessed original. Only a scoped hospital ACK removes a local outbox
+item. Persisted **Evidence and corrections** extraction appends an immutable revision
+without overwriting the original. `/api/ai/health` and `/api/ai/status` require actual
+generation; model presence alone is insufficient. `AI_NUM_THREADS` defaults to two,
+with a bounded Ollama queue; capacity and inference latency depend on the host.
 
 Qwen does not recognize speech or independently assign urgency. Machine claims
 remain unverified; unknown data never means normal. Apple typed capture uses native

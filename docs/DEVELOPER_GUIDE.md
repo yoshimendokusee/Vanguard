@@ -417,15 +417,18 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 
 | Setting | Where | Default | Purpose |
 |---|---|---|---|
-| `HUB_URL` | `--dart-define` (watch) | `http://192.168.8.10:3000` | Where the watch sends reports. **Compile-time**, so rebuild to change it. |
+| `HUB_URL` | `--dart-define` / `watch/env.json` (watch) | `http://192.168.8.10:3000` | Where the watch sends reports. **Compile-time**, so rebuild to change it. |
 | `VOSK_MODEL` | `--dart-define` (watch) | `assets/models/vosk-model-small-en-us-0.15.zip` | Which bundled Vosk model zip to load. |
-| `SUPABASE_URL` | `--dart-define` (watch) | unset | Supabase project URL; must use HTTPS. |
-| `SUPABASE_ANON_KEY` | `--dart-define` (watch) | unset | Supabase publishable/anon key. Never use a service-role key in a client. |
+| `SUPABASE_URL` | `--dart-define` / `watch/env.json` (watch) | unset | Supabase project URL; must use HTTPS. Missing or non-HTTPS values disable cloud sync only. |
+| `SUPABASE_ANON_KEY` | `--dart-define` / `watch/env.json` (watch) | unset | Supabase publishable/anon key. The app refuses `sb_secret_*` and `service_role` JWTs, but they would still be inside the build, so never supply them. |
 | `WATCH_SHAPE` | `--dart-define` (watch) | `auto` | `round` or `square` forces the screen layout. `auto` treats a 1:1 screen as round (the round layout is safe on a square display too) and any other proportion as a box. Flutter has no portable round-screen flag, so a square watch that should use the full area needs `square`. |
 | `PORT` | env (hub) | `3000` | Listen port. |
 | `HOST` | env (hub) | `0.0.0.0` | Listen address; use `127.0.0.1` for local-only access. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | env (hub) | unset | Hub cloud backup target and publishable key (the same names are separate watch build defines). |
+| `SUPABASE_HUB_EMAIL`, `SUPABASE_HUB_PASSWORD` | env (hub) | unset | Dedicated Supabase Auth user the hub signs in as; RLS applies. Server-side only. Any missing value keeps cloud backup off. |
+| `CLOUD_SYNC_INTERVAL_MS` | env (hub) | `30000` | Online retry interval (min 5000); failures back off up to 10 minutes. |
 
 Android (`watch/android/app/src/main/AndroidManifest.xml`, `build.gradle.kts`):
 
@@ -467,7 +470,8 @@ docker compose up --build                 # build once while online; image runs 
 cd watch
 flutter pub get
 flutter analyze
-flutter test                              # parser, migration and cloud payload tests
+flutter test                              # parser, migration, sync, AI client and cloud tests
+flutter run --dart-define-from-file=env.json   # see "Installing on a device" (§11)
 flutter run --dart-define=HUB_URL=http://<hub-ip>:3000 \
   --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
   --dart-define=SUPABASE_ANON_KEY=<publishable-or-anon-key>
@@ -487,7 +491,8 @@ The app unpacks it to app storage on first launch, so the first start is slow.
 |---|---|---|
 | `watch/test/triage_parser_test.dart` | Every extractor, tier precedence, supersession, fuzzy-match guard, empty/garbage input. | UI, DB, speech, sync client. |
 | `watch/test/triage_db_migration_test.dart` | Upgrading/reopening a populated v1 SQLite database, preserving watch ID/report fields/hub sync state, generating UUIDs/default cloud state, and rollback on migration DDL failure. | Android SQLite behavior and real storage-device failures. |
-| `watch/test/cloud_sync_service_test.dart` | Supabase payload field mapping and stable report UUID. | Live Auth, network retries, remote RLS policies. |
+| `watch/test/cloud_sync_service_test.dart` | Supabase payload field mapping, stable report UUID, and missing/non-HTTPS/secret-key configuration disabling cloud sync. | Live Auth, network retries, remote RLS policies. |
+| `watch/test/ai_service_test.dart` | Hub AI client: fail-fast on hub/AI failure, rejection of out-of-schema observations, non-deterministic or non-advisory urgency, altered transcripts and non-local/unpinned extraction provenance; missing observations stay unknown. | Any real Qwen inference (hub Ollama or on-device). |
 | `hub/db.test.js` | Fresh schema migration, idempotent reopen, populated legacy DB adoption, incompatible-schema rejection, and transactional rollback. | Production hub database backup/restore procedures. |
 | `hub/sync.test.js` | Ingest, ack semantics, duplicate and cross-watch handling, timestamp normalisation, validation/rejection, defaults, ordering, status endpoint. | SSE, static board, Docker, concurrency, the browser UI. |
 | `hub/contract.test.js` | Documented API request/response, sender fields, served dashboard JS syntax, SSE headers, populated hub reopen/deduplication. | Browser rendering, speech/native hardware, future schema upgrades. |
@@ -566,6 +571,69 @@ network is available; they sync later.
 **Demo checklist:** model unpacked once beforehand (first launch is slow) · microphone
 permission granted · hub started · `HUB_URL` points at the laptop's router IP ·
 long-press demo phrase tested as a fallback · `./fake-watch.sh` ready as a backup.
+
+### Installing on a device
+
+> **Security warning (see `AGENTS.md`).** The LAN hub API is plain HTTP with no
+> authentication, and both the watch and hub SQLite databases are unencrypted.
+> Use synthetic data on an isolated network only. This build is **not** for real
+> patient data or shared/public networks. Supabase RLS protects only the cloud
+> copy; it does not protect the device database or the LAN.
+
+1. **Supabase project (optional).** Use your own project. Enable email Auth, then
+   apply every file in `supabase/migrations/` in filename order with
+   `supabase link --project-ref <your-project-ref>` and `supabase db push`
+   (see `supabase/migrations/README.md`). This creates the owner-scoped,
+   RLS-protected `triage_reports` table. Skip this step for LAN-only use.
+2. **Per-build values in a git-ignored file.** Copy the placeholder file and fill it in:
+
+   ```bash
+   cd watch
+   cp env.json.example env.json      # env.json is git-ignored; never commit it
+   ```
+
+   `env.json` holds only `HUB_URL`, `SUPABASE_URL` (HTTPS) and `SUPABASE_ANON_KEY`
+   (the project's **publishable/anon** key). Never put a service-role or
+   `sb_secret_*` key in it. Anything compiled into an APK can be extracted from it.
+   Leave the Supabase values empty to build a LAN-only app.
+3. **Build and install.**
+
+   ```bash
+   flutter build apk --dart-define-from-file=env.json
+   adb install -r build/app/outputs/flutter-apk/app-release.apk
+   ```
+
+   Flutter has no runtime `.env` loading. Values are fixed when the app is
+   compiled, so **changing any value requires a rebuild and reinstall**.
+   `--dart-define-from-file=env.json` also works with `flutter run`. The release
+   build is currently signed with the debug key (`android/app/build.gradle.kts`),
+   so it is for development installs only. Keep any real signing keys out of Git.
+   An APK build/install has not been verified on Wear OS hardware (§13).
+4. **First sign-in needs internet.** Supabase sign-in/sign-up happens online.
+   After that the session is stored on the device. Signing in is only needed for
+   cloud sync; capture never requires it.
+5. **Offline behavior.** Every report is saved to local SQLite first, before any
+   transport. LAN sync to `HUB_URL` and Supabase sync are independent. Each retries
+   later and leaves rows queued until it is explicitly acknowledged. Supabase upload
+   needs internet **and** a signed-in user. Otherwise rows stay queued, and rows
+   captured while signed out need explicit confirmation before they are assigned
+   to an account. If the Supabase values are missing or not HTTPS, cloud sync is
+   disabled and capture plus deterministic triage still work. Capture needs the
+   provisioned Vosk speech model (see §9) but no internet, hub, Supabase or LLM.
+6. **Qwen model (owned by the Qwen runtime teammate; not implemented here).**
+   No Qwen weights or on-device runtime ship in this repository, and the Wear OS
+   capture path does not call any LLM. Today Qwen3-0.6B runs only on the hub
+   computer through Ollama (`ollama pull qwen3:0.6b`; see `docs/ai-contract.md`),
+   reached over the LAN. That Ollama tag is not a pinned revision/checksum, so hub
+   extraction reports `provenance.extraction: null`. The on-device storage path,
+   provisioning step and verification are **to be defined by the runtime owner**
+   under `docs/qwen-agent-handoff.md`. That covers native code under `watch/apple`,
+   browser assets under `hub/public`, and weights kept out of Git (weight file
+   types are git-ignored). The handoff requires pinning the upstream model
+   **revision**, verifying the artifact **SHA-256** before loading, and recording
+   `{model, revision, runtime, artifactSha256, execution: "local"}` as extraction
+   provenance. There is no cloud fallback. Qwen3-0.6B extracts text only. It is
+   not the speech-to-text engine, and it never assigns urgency.
 
 ---
 

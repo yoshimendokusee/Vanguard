@@ -1,0 +1,11 @@
+{
+  "model": "OpenAI Whisper tiny multilingual",
+  "format": "ggml",
+  "quantization": "q5_1",
+  "languages": ["en", "fil"],
+  "source": "https://huggingface.co/ggerganov/whisper.cpp",
+  "sourceRevision": "5359861c739e955e79d9a303bcbc70fb988958b1",
+  "file": "ggml-tiny-q5_1.bin",
+  "sha256": "818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7",
+  "license": "MIT"
+}

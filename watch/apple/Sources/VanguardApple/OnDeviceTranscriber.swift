@@ -2,17 +2,6 @@
 import Foundation
 import Speech
 
-public struct LocalTranscript: Sendable {
-    public let originalText: String
-    public let segmentConfidences: [Float]
-    public let engine: String
-    public let runtime: String
-}
-
-public enum TranscriptionFailure: Error {
-    case permissionRequired, onDeviceUnavailable, busy, empty, timeout
-}
-
 /// iPhone fallback only. Speech.framework is absent from the watchOS 27 SDK.
 @MainActor
 public final class OnDeviceTranscriber {
@@ -80,6 +69,39 @@ public final class OnDeviceTranscriber {
         task?.cancel()
         task = nil
         continuation.resume(with: result)
+    }
+}
+#endif
+
+#if os(iOS) || os(macOS)
+/// Picks the best on-device transcript across locales. Emergency reports mix English and Filipino (Taglish) and a
+/// single recognizer handles only one language, so each locale that supports on-device recognition is tried and the
+/// one the recognizer is most confident about wins. Cloud recognition is never used. Code-switching inside one
+/// sentence can still be transcribed imperfectly: the person reviews the transcript, which stays correctable.
+public enum LocaleSelection {
+    public static let defaultLocales = [Locale(identifier: "en-US"), Locale(identifier: "fil-PH")]
+
+    public static func meanConfidence(_ transcript: LocalTranscript) -> Float {
+        let scores = transcript.segmentConfidences.filter { $0 > 0 }   // 0 means "not provided" for partial segments
+        return scores.isEmpty ? 0 : scores.reduce(0, +) / Float(scores.count)
+    }
+
+    /// `transcribe` runs one on-device pass. Locales that are unavailable or return nothing are skipped.
+    /// Throws the last failure only when no locale produced text.
+    public static func best(locales: [Locale], transcribe: (Locale) async throws -> LocalTranscript) async throws -> (transcript: LocalTranscript, locale: Locale) {
+        var best: (LocalTranscript, Locale, Float)?
+        var lastError: Error = TranscriptionFailure.onDeviceUnavailable
+        for locale in locales {
+            try Task.checkCancellation()
+            do {
+                let result = try await transcribe(locale)
+                let score = meanConfidence(result)
+                if best == nil || score > best!.2 { best = (result, locale, score) }
+            } catch is CancellationError { throw CancellationError() }
+            catch { lastError = error }
+        }
+        guard let best else { throw lastError }
+        return (best.0, best.1)
     }
 }
 #endif

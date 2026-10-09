@@ -14,7 +14,7 @@ public struct NativeCapture: Codable, Sendable {
     }
 }
 
-public enum NativeStoreFailure: Error { case unavailable, invalidCapture, identityConflict, transcriptConflict }
+public enum NativeStoreFailure: Error { case unavailable, invalidCapture, identityConflict, transcriptConflict, invalidDetails }
 
 /// Separate native SQLite file; no existing Flutter/hospital database is opened.
 public actor NativeStore: FallbackRepository {
@@ -36,16 +36,24 @@ public actor NativeStore: FallbackRepository {
         guard sqlite3_prepare_v2(handle, "PRAGMA user_version", -1, &query, nil) == SQLITE_OK,
             sqlite3_step(query) == SQLITE_ROW else { sqlite3_finalize(query); throw NativeStoreFailure.unavailable }
         let version = sqlite3_column_int(query, 0); sqlite3_finalize(query)
-        guard version <= 1 else { throw NativeStoreFailure.unavailable }
-        let sql = version == 0 ? try String(contentsOf: Bundle.module.url(forResource: "0001_native", withExtension: "sql")!, encoding: .utf8) : "SELECT 1"
-        guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else { throw NativeStoreFailure.unavailable }
+        guard version <= 2 else { throw NativeStoreFailure.unavailable }
+        // Numbered, additive migrations run in order; each commits atomically and sets user_version.
+        // A failure in 0002 leaves a valid version-1 database that the next launch upgrades again.
+        for (number, name) in [(1, "0001_native"), (2, "0002_voice_workflow")] where version < number {
+            guard let url = Bundle.module.url(forResource: name, withExtension: "sql") else { throw NativeStoreFailure.unavailable }
+            let sql = try String(contentsOf: url, encoding: .utf8)
+            guard sqlite3_exec(handle, sql, nil, nil, nil) == SQLITE_OK else {
+                _ = sqlite3_exec(handle, "ROLLBACK", nil, nil, nil)
+                throw NativeStoreFailure.unavailable
+            }
+        }
         db = handle
         initialized = true
     }
     deinit { sqlite3_close(db) }
 
     @discardableResult
-    private func rows(_ sql: String, _ values: [String?] = []) throws -> [[String: String]] {
+    func rows(_ sql: String, _ values: [String?] = []) throws -> [[String: String]] {
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK, let statement else { throw NativeStoreFailure.unavailable }
         defer { sqlite3_finalize(statement) }
@@ -148,6 +156,10 @@ public actor NativeStore: FallbackRepository {
     public func acknowledge(ids: [String]) throws {
         for id in ids {
             try rows("INSERT OR IGNORE INTO native_receipts (capture_id, acknowledged_at) SELECT id, ? FROM native_captures WHERE id = ? AND EXISTS (SELECT 1 FROM native_extractions e WHERE e.capture_id = id)", [ISO8601DateFormatter().string(from: Date()), id])
+            // The receipt just stored is the only thing that may mark a report DELIVERED.
+            if try rows("SELECT 1 FROM native_receipts WHERE capture_id = ?", [id]).first != nil {
+                try setDelivery(captureID: id, .delivered)
+            }
         }
     }
 }
