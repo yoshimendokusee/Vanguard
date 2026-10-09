@@ -39,3 +39,6 @@ qa/windows-results.txt
 .runtime/
 watch/apple/.native/
 watch/apple/DerivedData/
+
+# Vite production output.
+hub/dist/

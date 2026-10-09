@@ -1,6 +1,7 @@
 const express = require('express');
 const os = require('os');
 const path = require('path');
+const { existsSync } = require('node:fs');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
 const { riskForRow } = require('./risk');
@@ -192,7 +193,8 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
     app.post(`/api/${plural}/:id/revisions`, (req, res) => res.json(saveRecord(db, kind, req.params.id, req.body)));
   }
 
-  app.use(express.static(path.join(__dirname, 'public')));
+  const dashboard = existsSync(path.join(__dirname, 'dist/index.html')) ? 'dist' : 'public';
+  app.use(express.static(path.join(__dirname, dashboard)));
   app.use((error, _req, res, _next) => {
     const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : error.status || 503;
     const message = error.type === 'entity.too.large' ? 'JSON body exceeds 1 MB'

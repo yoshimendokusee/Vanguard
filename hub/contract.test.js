@@ -44,13 +44,20 @@ test('documented LAN example works end to end with the shipped dashboard', async
     const page = await fetch(base);
     assert.equal(page.status, 200);
     const html = await page.text();
-    assert.equal(html, fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8'));
+    const dashboard = fs.existsSync(path.join(__dirname, 'dist/index.html')) ? 'dist' : 'public';
+    assert.equal(html, fs.readFileSync(path.join(__dirname, dashboard, 'index.html'), 'utf8'));
+    assert.ok(!html.includes('/@vite/client'), 'Express must serve the production page without Vite');
+    const assets = [...html.matchAll(/(?:src|href)="(\/[^"]+\.(?:js|css))"/g)];
+    assert.ok(assets.length >= 2, 'Dashboard must load JavaScript and CSS');
+    for (const asset of assets) assert.equal((await fetch(base + asset[1])).status, 200);
+    const source = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
+    new vm.Script(source, { filename: 'dashboard.js' });
     const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)];
     assert.ok(scripts.length > 0);
     for (const [index, script] of scripts.entries()) new vm.Script(script[1], { filename: `dashboard-${index}.js` });
     const parser = fs.readFileSync(path.join(__dirname, '../watch/lib/nlp/triage_parser.dart'), 'utf8');
     const categories = [...parser.matchAll(/static const (?:immediate|delayed|minor|deceased|unassessed) = '([^']+)'/g)].map((m) => m[1]);
-    for (const category of categories) assert.ok(html.includes(`'${category}'`), `Dashboard missing ${category}`);
+    for (const category of categories) assert.ok(source.includes(`'${category}'`), `Dashboard missing ${category}`);
     const sender = fs.readFileSync(path.join(__dirname, '../watch/lib/services/sync_service.dart'), 'utf8');
     assert.ok(sender.includes('/api/sync-triage'));
     for (const field of Object.keys(request.reports[0])) assert.ok(sender.includes(`'${field}'`), `Watch sender missing ${field}`);
@@ -85,7 +92,7 @@ test('reopening a populated hub database preserves reports, status and deduplica
 });
 
 test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor report', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
   const category = html.match(/  const category = .*;/)[0];
   const rank = html.match(/  const RANK = .*;/)[0];
   const select = html.match(/  function priorityPatient\(list\) \{[\s\S]*?\n  \}/)[0];
@@ -99,7 +106,7 @@ test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor rep
 });
 
 test('dashboard excludes unknown counts and invalidated findings from readiness suggestions', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
   const count = html.match(/  const countOf = .*;/)[0];
   const sum = html.match(/  const patients = .*;/)[0];
   const checkCounts = vm.runInNewContext(`${count}\n${sum}\npatients`, {});
@@ -111,7 +118,7 @@ test('dashboard excludes unknown counts and invalidated findings from readiness 
 });
 
 test('dashboard board puts every inbound report in exactly one time column and never hides Unassessed', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
   const place = html.match(/  function colOf\(r\) \{[\s\S]*?\n  \}/)[0];
   const sandbox = { range: 60, minsLeft: (row) => row.m };
   const colOf = vm.runInNewContext(`${place}\ncolOf`, sandbox);
