@@ -2,8 +2,9 @@
 <html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#DCEDF1">
+<meta name="color-scheme" content="light dark">
 <title>Vanguard ED Pre-Arrival Board</title>
 <script>
   // Runs before first paint so there is no light/dark flash.
@@ -22,18 +23,49 @@
 
 <div class="app">
   <div class="rail">
+    <div class="brand">
+      <svg class="brand-logo" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 2L3 6v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V6l-9-4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 7v10M8 11h8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+      </svg>
+      <div class="brand-text">
+        <span class="brand-title">VANGUARD</span>
+        <span class="brand-sub">EMERGENCY BOARD</span>
+      </div>
+    </div>
+
     <h1 class="sr-only">Vanguard ED pre-arrival board</h1>
+    <div class="rail-sec-label">MENU</div>
     <div class="vtabs" role="tablist" aria-label="Report status" aria-orientation="vertical">
-      <button class="railbtn vtab" role="tab" id="tab-inbound" data-f="inbound" type="button">
+      <button class="railbtn vtab" role="tab" id="tab-dashboard" data-f="dashboard" type="button" title="Dashboard">
+        <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22"><rect x="3" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="14" y="3" width="7" height="7" rx="2" fill="currentColor"/><rect x="14" y="14" width="7" height="7" rx="2" fill="currentColor"/><rect x="3" y="14" width="7" height="7" rx="2" fill="currentColor"/></svg>
+        <span>Dashboard</span>
+      </button>
+      <button class="railbtn vtab" role="tab" id="tab-inbound" data-f="inbound" type="button" title="On the way">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h13M12.5 5.5l6.5 6.5-6.5 6.5"/></svg><span>On the way</span><span class="n" id="t-inbound">0</span></button>
-      <button class="railbtn vtab" role="tab" id="tab-arrived" data-f="arrived" type="button">
+      <button class="railbtn vtab" role="tab" id="tab-arrived" data-f="arrived" type="button" title="Arrived">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>Arrived</span><span class="n" id="t-arrived">0</span></button>
-      <button class="railbtn vtab" role="tab" id="tab-cancelled" data-f="cancelled" type="button">
+      <button class="railbtn vtab" role="tab" id="tab-cancelled" data-f="cancelled" type="button" title="Cancelled">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>Cancelled</span><span class="n" id="t-cancelled">0</span></button>
-      <button class="railbtn vtab" role="tab" id="tab-all" data-f="all" type="button">
+      <button class="railbtn vtab" role="tab" id="tab-all" data-f="all" type="button" title="All reports">
         <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor"/></svg><span>All reports</span><span class="n" id="t-all">0</span></button>
-      <button class="railbtn vtab" role="tab" id="tab-settings" data-f="settings" type="button">
+      <button class="railbtn vtab" role="tab" id="tab-settings" data-f="settings" type="button" title="Settings">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.8" fill="currentColor"/><circle cx="15" cy="16" r="2.8" fill="currentColor"/></svg><span>Settings</span></button>
+    </div>
+
+    <div class="rail-footer">
+      <button class="railbtn rail-profile-btn" id="rail-profile-btn" type="button" title="Operator Profile: Alex Hunter (alexhunter112@gmail.com)" aria-label="Operator Profile">
+        <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 4c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm0 14c-2.03 0-3.8-1.03-4.83-2.6.03-1.6 3.22-2.47 4.83-2.47s4.8 1.87 4.83 2.47C15.8 18.97 14.03 20 12 20z" fill="currentColor"/>
+        </svg>
+      </button>
+      <button class="railbtn rail-pos-btn" id="rail-pos-btn" type="button" title="Switch taskbar position (Side / Top)" aria-label="Switch taskbar position">
+        <svg viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+          <rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="2"/>
+          <path d="M9 3v18" stroke="currentColor" stroke-width="2"/>
+        </svg>
+        <span class="nav-pos-text">Top Bar</span>
+      </button>
     </div>
   </div>
 
@@ -43,37 +75,46 @@
 
   <main class="panel-main" id="main" tabindex="-1">
     <header class="mhead">
-      <div>
+      <div class="mhead-title">
         <h2 class="sec-title" id="view-title">On the way</h2>
         <span class="sub" id="hospital">ED pre-arrival board</span>
       </div>
       <div class="mtools">
         <label class="search">
           <span class="sr-only">Search reports</span>
-          <input id="q" type="search" placeholder="Search reports" autocomplete="off">
+          <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><path d="M16 16l4.5 4.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <input id="q" type="search" placeholder="Search reports..." autocomplete="off">
           <button class="x" id="qx" type="button" aria-label="Clear search" hidden>×</button>
         </label>
-        <span class="conn down" id="conn" role="status">Connecting</span>
-        <span class="conn down" id="ai-conn" role="status" title="Local Qwen extraction model">AI: checking</span>
-        <span class="conn down" id="cloud-conn" role="status" title="Supabase cloud backup (optional)">Cloud: checking</span>
-        <button class="link" id="cloud-sync" type="button" hidden>Sync to cloud</button>
-        <span class="clock" id="clock" aria-label="Current time"></span>
+        <div class="status-badges">
+          <span class="conn down" id="conn" role="status">Connecting</span>
+          <span class="conn down" id="ai-conn" role="status" title="Local Qwen extraction model">AI: checking</span>
+        </div>
+        <div class="clock-badge">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="14" height="14"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+          <span class="clock" id="clock" aria-label="Current time"></span>
+        </div>
+
       </div>
     </header>
 
     <section class="settings" id="settings" role="tabpanel" aria-labelledby="tab-settings">
-      <label for="hub-token">Hospital access token</label>
-      <input id="hub-token" type="password" autocomplete="off">
-      <button id="hub-token-save" type="button">Connect to hospital</button>
-      <div>
-        <span class="foot-label" id="theme-label">Theme</span>
+      <div class="setting-card">
+        <span class="foot-label" id="theme-label">Theme Mode</span>
         <div class="seg" role="group" aria-labelledby="theme-label">
           <button type="button" data-t="auto" aria-pressed="false">Auto</button>
           <button type="button" data-t="light" aria-pressed="false">Light</button>
           <button type="button" data-t="dark" aria-pressed="false">Dark</button>
         </div>
       </div>
-      <button class="switch" id="sound" type="button" role="switch" aria-checked="false">Sound alerts <span class="state">Off</span></button>
+      <div class="setting-card">
+        <span class="foot-label">Audio Alerts</span>
+        <button class="switch" id="sound" type="button" role="switch" aria-checked="false">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path d="M11 5L6 9H2v6h4l5 4V5zM15.54 8.46a5 5 0 010 7.07" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Sound alerts</span>
+          <span class="state">Off</span>
+        </button>
+      </div>
     </section>
 
     <div class="catbar">
@@ -83,14 +124,30 @@
     <p class="sline" id="sline" role="status">Loading reports</p>
     <div class="filters" id="filters"></div>
     <div id="alert"></div>
-    <section class="card" id="ai-panel" aria-labelledby="ai-h">
-      <h2 id="ai-h">Local AI triage assistant</h2>
+
+    <section class="card ai-card" id="ai-panel" aria-labelledby="ai-h">
+      <div class="ai-header">
+        <div class="ai-title-wrap">
+          <svg class="ai-icon" viewBox="0 0 24 24" aria-hidden="true" width="22" height="22">
+            <path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 4a6 6 0 110 12 6 6 0 010-12z" fill="none" stroke="currentColor" stroke-width="2"/>
+            <path d="M12 8v4l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <h2 id="ai-h">Local AI Triage Assistant</h2>
+        </div>
+        <span class="ai-tag">Qwen 0.6B Engine</span>
+      </div>
       <p class="hint">Qwen runs on the hospital computer and only extracts what the transcript states. Deterministic rules plus your review decide triage — the AI never assigns urgency by itself. Synthetic test data only.</p>
       <label class="ai-label" for="ai-text">Emergency transcript</label>
-      <textarea id="ai-text" rows="3" maxlength="4000" placeholder="Type or paste what the rescuer reported"></textarea>
+      <textarea id="ai-text" rows="3" maxlength="4000" placeholder="Type or paste what the rescuer reported..."></textarea>
       <div class="ai-row">
-        <button type="button" class="ai-btn" id="ai-extract">Extract with Qwen</button>
-        <button type="button" class="ai-btn ghost" id="ai-assist">Triage assist</button>
+        <button type="button" class="ai-btn primary-ai" id="ai-extract">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" fill="currentColor"/></svg>
+          Extract with Qwen
+        </button>
+        <button type="button" class="ai-btn ghost" id="ai-assist">
+          <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 8v4m0 4h.01" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+          Triage assist
+        </button>
       </div>
       <p class="hint" id="ai-state" role="status"></p>
       <div id="ai-result" hidden></div>
@@ -114,13 +171,17 @@
         </div>
         <p class="hint" id="ai-fields-note" role="status"></p>
         <div class="ai-row">
-          <button type="button" class="ai-btn" id="ai-save">Retry hospital receipt</button>
+          <button type="button" class="ai-btn primary-ai" id="ai-save">Save provisional report</button>
         </div>
         <p class="hint" id="ai-save-state" role="status"></p>
       </div>
     </section>
 
-    <div id="view-panel" role="tabpanel" aria-labelledby="tab-inbound">
+    <div id="view-panel" role="tabpanel" aria-labelledby="tab-dashboard">
+      <section id="dash-sec" aria-labelledby="dash-h" hidden>
+        <h2 class="sr-only" id="dash-h">Emergency Operations &amp; Analytics Dashboard</h2>
+        <div class="dash-container" id="dash-container"></div>
+      </section>
       <section id="board-sec" aria-labelledby="board-h" hidden>
         <h2 class="sr-only" id="board-h">Arrivals by level and time</h2>
         <button class="insight" id="insight" type="button"></button>
@@ -146,18 +207,48 @@
         <div class="check" id="check" hidden></div>
       </section>
       <section aria-labelledby="list-h">
-        <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
+        <div class="list-header-bar">
+          <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
+          <div class="per-page-wrap">
+            <label for="per-page-select" class="per-page-label">Per page:</label>
+            <select id="per-page-select" class="per-page-select" title="Number of reports per page">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="1000">All</option>
+            </select>
+          </div>
+        </div>
         <div id="list" aria-live="off"></div>
+        <div class="pager-nav" id="pager-nav"></div>
       </section>
     </div>
 
-    <p class="note">
-      Provisional priority uses exact structured findings and preserves higher source urgency. Verify clinically.
-      "Unassessed" includes unknown findings and unconfirmed death; the hub never declares death automatically.
-      Original categories and notes remain visible. Evidence and corrections preserves original notes, assessment history and provisional operator overrides.
-      Readiness ticks are saved in this browser only.
-      ETAs use the watch clock, so treat countdowns and the curve as approximate.
-    </p>
+    <div class="info-toggle-wrap">
+      <button class="info-toggle-btn" id="info-toggle-btn" type="button" title="System Guidance &amp; Information" aria-label="System Guidance &amp; Information">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="16" x2="12" y2="12"/>
+          <line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <span>System Guidance &amp; Information</span>
+      </button>
+    </div>
+
+    <dialog class="info-dialog card" id="info-dialog">
+      <div class="info-dialog-head">
+        <h3>System Guidance &amp; Information</h3>
+        <button type="button" class="x" id="info-dialog-close" aria-label="Close information">×</button>
+      </div>
+      <p class="note">
+        Provisional priority uses exact structured findings and preserves higher source urgency. Verify clinically.
+        "Unassessed" includes unknown findings and unconfirmed death; the hub never declares death automatically.
+        Original categories and notes remain visible. Evidence and corrections preserves original notes, assessment history and provisional operator overrides.
+        Readiness ticks are saved in this browser only.
+        ETAs use the watch clock, so treat countdowns and the curve as approximate.
+      </p>
+    </dialog>
   </main>
 </div>
 
