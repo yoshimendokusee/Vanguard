@@ -16,6 +16,7 @@ async function check(base = 'http://localhost:3301') {
   }
   assert.match(await get('/'), /\/@vite\/client/);
   await get('/dashboard.js');
+  assert.match(await get('/hub-client.js'), /window.VanguardApi/);
   await get('/dashboard.css?direct');
   const socket = new WebSocket(base.replace(/^http/, 'ws') + '/', 'vite-hmr');
   const messages = [];

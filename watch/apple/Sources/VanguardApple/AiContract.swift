@@ -1,5 +1,10 @@
 import Foundation
 
+public enum AiReadiness: String, Codable, Sendable {
+    case initializing = "INITIALIZING", modelMissing = "MODEL_MISSING", modelDownloading = "MODEL_DOWNLOADING"
+    case modelLoading = "MODEL_LOADING", ready = "READY", unavailable = "UNAVAILABLE", error = "ERROR"
+}
+
 /// Shared device identity and optional hospital preview contract.
 /// Native capture uses QwenEngine and NativeWorkflow; hospital previews use these
 /// request/response types. Capture never waits on hospital AI. See docs/ai-contract.md.
@@ -18,6 +23,7 @@ public enum AiDevice: String, Codable, Sendable, CaseIterable {
 public enum AiContractError: Error, Sendable {
     case emptyTranscript
     case transcriptTooLong(max: Int)
+    case invalidProvenance
 }
 
 public struct AiRequest: Codable, Sendable {
@@ -38,9 +44,10 @@ public struct AiRequest: Codable, Sendable {
     public init(transcript: String, device: AiDevice, sttEngine: String? = nil, sttRuntime: String? = nil) throws {
         let trimmed = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { throw AiContractError.emptyTranscript }
-        guard transcript.count <= Self.maxTranscript else {
+        guard transcript.utf16.count <= Self.maxTranscript else {
             throw AiContractError.transcriptTooLong(max: Self.maxTranscript)
         }
+        guard [sttEngine, sttRuntime].allSatisfy({ $0 == nil || $0!.utf16.count <= 100 }) else { throw AiContractError.invalidProvenance }
         self.transcript = transcript
         self.device = device.rawValue
         self.sttEngine = sttEngine
@@ -50,14 +57,16 @@ public struct AiRequest: Codable, Sendable {
     /// Lenient decode: unknown device strings keep working via the hub fallback.
     public init(from decoder: Decoder) throws {
         let box = try decoder.container(keyedBy: CodingKeys.self)
-        transcript = try box.decode(String.self, forKey: .transcript)
-        device = AiDevice(safe: (try? box.decode(String.self, forKey: .device)) ?? "").rawValue
-        sttEngine = try? box.decode(String.self, forKey: .sttEngine)
-        sttRuntime = try? box.decode(String.self, forKey: .sttRuntime)
+        try self.init(transcript: box.decode(String.self, forKey: .transcript),
+            device: AiDevice(safe: (try? box.decode(String.self, forKey: .device)) ?? ""),
+            sttEngine: try? box.decode(String.self, forKey: .sttEngine),
+            sttRuntime: try? box.decode(String.self, forKey: .sttRuntime))
     }
 }
 
 public struct AiStatus: Codable, Sendable {
+    public let contractVersion: Int?
+    public let state: AiReadiness?
     public let ok: Bool
     public let available: Bool
     public let model: String
@@ -80,10 +89,14 @@ public struct AiObservations: Codable, Sendable {
     /// Missing keys decode as unknown so a newer hub never breaks this client.
     public init(from decoder: Decoder) throws {
         let box = try decoder.container(keyedBy: CodingKeys.self)
-        breathing = (try? box.decode(String.self, forKey: .breathing)) ?? "unknown"
-        consciousness = (try? box.decode(String.self, forKey: .consciousness)) ?? "unknown"
-        severeBleeding = (try? box.decode(String.self, forKey: .severeBleeding)) ?? "unknown"
-        walking = (try? box.decode(String.self, forKey: .walking)) ?? "unknown"
+        func safe(_ key: CodingKeys, _ allowed: [String]) -> String {
+            let value = (try? box.decode(String.self, forKey: key)) ?? "unknown"
+            return allowed.contains(value) ? value : "unknown"
+        }
+        breathing = safe(.breathing, ["normal", "abnormal", "absent", "unknown"])
+        consciousness = safe(.consciousness, ["alert", "unresponsive", "unknown"])
+        severeBleeding = safe(.severeBleeding, ["present", "absent", "unknown"])
+        walking = safe(.walking, ["able", "unable", "unknown"])
     }
 }
 
@@ -91,12 +104,14 @@ public struct AiProvenance: Codable, Sendable {
     public let device: String
     public let sttEngine: String
     public let sttRuntime: String
+    public let extraction: NativeProcessing.Extraction?
 }
 
 public struct AiProcessing: Codable, Sendable {
     public let version: Int
     public let originalTranscript: String
     public let observations: AiObservations
+    public let evidence: [String: NativeProcessing.Evidence]?
     public let uncertainties: [String]
     public let provenance: AiProvenance
 }
@@ -115,6 +130,8 @@ public struct AiDraft: Codable, Sendable {
 }
 
 public struct AiExtractionResult: Codable, Sendable {
+    public let contractVersion: Int?
+    public let requestId: String?
     public let ok: Bool
     public let processing: AiProcessing
     public let evidence: [String: String?]

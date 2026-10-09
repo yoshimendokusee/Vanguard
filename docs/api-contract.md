@@ -3,8 +3,10 @@
 Source: `hub/server.js`, `hub/sync.js`, `hub/db.js` and the callers in
 `watch/lib/services/sync_service.dart`, `hub/public/index.html`, `fake-watch.sh`.
 This is the existing unversioned HTTP API, not a proposed cloud or BLE API.
-There is no authentication, TLS, authorization or pagination. Use synthetic
-data in isolated development networks only.
+Anonymous localhost demos remain compatible. Configured LAN mode requires bearer
+credentials (`HUB_USERS`); devices can submit only assigned watch IDs and cannot read
+hospital records. Operators share authorized hospital records. There is no TLS,
+storage encryption or pagination. Use synthetic data on isolated networks only.
 
 ## Endpoints
 
@@ -256,3 +258,15 @@ promptVersion, report}`. Processing carries exact originals, source excerpts lab
 machine claims remain excluded until qualified non-model reassessment. Original
 source triage/encounter linkage/correction history remain intact; no approval gate
 is required for saving or relaying the generated extraction.
+
+
+## Connectivity additions — 2026-10-10
+
+All API requests return `X-Request-ID`; a valid incoming UUID is preserved, otherwise
+a new UUID is assigned. AI responses add `contractVersion: 1` and `requestId` without
+changing processing v1 or legacy sync fields. `/api/config` adds the authenticated
+principal's ID/role (never credentials) and contract version. Bearer authentication
+also applies to SSE; the browser central client uses fetch streaming with three
+reconnection attempts, then authenticated polling. The health liveness route remains
+public and contains no records. Read the AI contract and `global-ai-connectivity.md`
+for readiness states, independent native inference and pairing instructions.

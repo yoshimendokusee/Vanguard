@@ -8,6 +8,8 @@ const { riskForRow } = require('./risk');
 const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
+const { randomUUID } = require('node:crypto');
+const { hubAccess, validateLanAccess } = require('./access');
 const { createCloudSync } = require('./cloud');
 
 const STATUSES = new Set(['inbound', 'arrived', 'cancelled']);
@@ -17,7 +19,15 @@ function createApp(db, {
   cloud = createCloudSync(db),
 } = {}) {
   const app = express();
+  app.use('/api', (req, res, next) => {
+    const id = req.get('X-Request-ID');
+    req.requestId = isId(id) ? id.toLowerCase() : randomUUID();
+    res.set('X-Request-ID', req.requestId);
+    res.set('Cache-Control', 'no-store');
+    next();
+  });
   app.use(express.json({ limit: '1mb' }));
+  app.use('/api', hubAccess());
   app.locals.cloud = cloud;
 
   // --- live updates (Server-Sent Events) -----------------------------------
@@ -46,7 +56,8 @@ function createApp(db, {
 
   // --- watch -> hospital -----------------------------------------------------
   app.get('/api/health', (_req, res) => res.json({ ok: true, time: new Date().toISOString() }));
-  app.get('/api/config', (_req, res) => res.json({ hospital }));
+  app.get('/api/config', (req, res) => res.json({ hospital, contractVersion: 1,
+    user: req.user ? { id: req.user.id, role: req.user.role } : null }));
 
   app.post('/api/sync-triage', (req, res) => {
     const { watchId, reports } = req.body || {};
@@ -88,7 +99,7 @@ function createApp(db, {
       if (row.status === status) return;
       db.prepare('UPDATE triage_reports SET status = ? WHERE id = ?').run(status, req.params.id);
       db.prepare("INSERT INTO report_events (report_id, event, detail, created_at) VALUES (?, 'status', ?, ?)")
-        .run(req.params.id, `${row.status} -> ${status}; dashboard operator (unauthenticated)`, new Date().toISOString());
+        .run(req.params.id, `${row.status} -> ${status}; ${req.user?.id || 'dashboard operator (unauthenticated)'}`, new Date().toISOString());
     }).immediate();
     broadcast('triage', { updated: Number(req.params.id) });
     res.json({ ok: true });
@@ -102,9 +113,11 @@ function createApp(db, {
   });
 
   // --- local AI (Qwen via Ollama): extraction assistant, never the triage authority ---
-  app.get('/api/ai/health', async (_req, res) => {
-    const health = await aiHealth();
-    res.status(health.status === 'ready' ? 200 : 503).json(health);
+  let healthRequest;
+  app.get('/api/ai/health', async (req, res) => {
+    // Concurrent status polls share a probe, never user transcripts or chat context.
+    const health = await (healthRequest ||= aiHealth().finally(() => { healthRequest = undefined; }));
+    res.status(health.status === 'ready' ? 200 : 503).json({ ...health, requestId: req.requestId });
   });
 
   app.get('/api/ai/status', async (_req, res) => {
@@ -117,9 +130,10 @@ function createApp(db, {
   });
 
   const parseAiBody = (req) => {
-    const cfg = aiConfig();
+    let cfg;
+    try { cfg = aiConfig(); } catch (error) { return { httpStatus: 503, errorRes: { ok: false, contractVersion: 1, requestId: req.requestId, error: error.code, message: error.message } }; }
     const checked = validateTranscriptInput(req.body, cfg.maxTranscript);
-    if (checked.error) return { errorRes: { ok: false, ...checked.error }, cfg };
+    if (checked.error) return { errorRes: { ok: false, contractVersion: 1, requestId: req.requestId, error: checked.error.code, message: checked.error.message }, cfg };
     return {
       transcript: checked.transcript,
       provenance: {
@@ -134,18 +148,18 @@ function createApp(db, {
   const aiFailure = (res, err, transcriptLen) => {
     if (err instanceof AiError) {
       console.log(`[ai] ${err.code} (transcript ${transcriptLen} chars)`);
-      return res.status(err.httpStatus).json({ ok: false, error: err.code, message: err.message });
+      return res.status(err.httpStatus).json({ ok: false, contractVersion: 1, requestId: res.get('X-Request-ID'), error: err.code, message: err.message });
     }
     console.log(`[ai] inference-failed (transcript ${transcriptLen} chars)`);
-    return res.status(502).json({ ok: false, error: 'inference-failed', message: 'Local AI inference failed' });
+    return res.status(502).json({ ok: false, contractVersion: 1, requestId: res.get('X-Request-ID'), error: 'inference-failed', message: 'Local AI inference failed' });
   };
 
   app.post('/api/ai/extract', async (req, res) => {
     const parsed = parseAiBody(req);
-    if (parsed.errorRes) return res.status(400).json(parsed.errorRes);
+    if (parsed.errorRes) return res.status(parsed.httpStatus || 400).json(parsed.errorRes);
     try {
       const result = await extractEmergency(parsed.transcript, parsed.provenance);
-      res.json({ ok: true, ...result });
+      res.json({ ok: true, contractVersion: 1, requestId: req.requestId, ...result });
     } catch (err) {
       aiFailure(res, err, parsed.transcript.length);
     }
@@ -153,10 +167,10 @@ function createApp(db, {
 
   app.post('/api/ai/triage-assist', async (req, res) => {
     const parsed = parseAiBody(req);
-    if (parsed.errorRes) return res.status(400).json(parsed.errorRes);
+    if (parsed.errorRes) return res.status(parsed.httpStatus || 400).json(parsed.errorRes);
     try {
       const result = await triageAssist(parsed.transcript, parsed.provenance);
-      res.json({ ok: true, ...result });
+      res.json({ ok: true, contractVersion: 1, requestId: req.requestId, ...result });
     } catch (err) {
       aiFailure(res, err, parsed.transcript.length);
     }
@@ -192,7 +206,7 @@ function createApp(db, {
   });
   app.get('/api/triage/:id', (req, res) => res.json(reportView(db, req.params.id, true)));
   app.post('/api/triage/:id/revisions', (req, res) => {
-    const result = reviseReport(db, req.params.id, req.body);
+    const result = reviseReport(db, req.params.id, req.user ? { ...req.body, actor: req.user.id } : req.body);
     broadcast('triage', { updated: result.id });
     res.json(result);
   });
@@ -215,14 +229,15 @@ function createApp(db, {
     const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : error.status || 503;
     const message = error.type === 'entity.too.large' ? 'JSON body exceeds 1 MB'
       : error.type === 'entity.parse.failed' ? 'Malformed JSON' : error.status ? error.message : 'Database unavailable; retain and retry';
-    res.status(status).json({ ok: false, error: message });
+    res.status(status).json({ ok: false, contractVersion: 1, requestId: res.get('X-Request-ID'), error: message });
   });
   return app;
 }
 
 if (require.main === module) {
+  validateLanAccess();
   const port = Number(process.env.PORT) || 3000;
-  const host = process.env.HOST || '0.0.0.0';
+  const host = process.env.HOST || '127.0.0.1';
   const app = createApp(openDb());
   app.locals.cloud.start();
   app.listen(port, host, () => {

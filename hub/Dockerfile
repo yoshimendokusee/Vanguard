@@ -22,7 +22,7 @@ WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY . .
 COPY --from=build /app/dist ./dist
-ENV PORT=3000 DB_PATH=/data/vanguard.db
+ENV PORT=3000 DB_PATH=/data/vanguard.db HOST=0.0.0.0 HUB_BIND_ADDRESS=127.0.0.1
 VOLUME /data
 EXPOSE 3000
 CMD ["node", "server.js"]

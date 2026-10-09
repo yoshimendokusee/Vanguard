@@ -62,6 +62,9 @@
     </header>
 
     <section class="settings" id="settings" role="tabpanel" aria-labelledby="tab-settings">
+      <label for="hub-token">Hospital access token</label>
+      <input id="hub-token" type="password" autocomplete="off">
+      <button id="hub-token-save" type="button">Connect to hospital</button>
       <div>
         <span class="foot-label" id="theme-label">Theme</span>
         <div class="seg" role="group" aria-labelledby="theme-label">
@@ -91,8 +94,8 @@
       </div>
       <p class="hint" id="ai-state" role="status"></p>
       <div id="ai-result" hidden></div>
-      <div id="ai-review" hidden>
-        <h3>Provisional extraction</h3>
+      <div id="ai-review">
+        <h3>Optional report details</h3>
         <p class="hint">Machine findings remain unverified. Use Evidence and corrections on a saved report to record qualified review.</p>
         <div class="ai-grid">
           <label>Breathing <select id="ai-obs-breathing"><option value="normal">normal</option><option value="abnormal">abnormal</option><option value="absent">absent</option><option value="unknown">unknown</option></select></label>
@@ -107,7 +110,7 @@
           <label>ETA (min) <input id="ai-eta" type="number" min="1" max="720" placeholder="—"></label>
         </div>
         <div class="ai-row">
-          <button type="button" class="ai-btn" id="ai-save">Save provisional report</button>
+          <button type="button" class="ai-btn" id="ai-save">Retry hospital receipt</button>
         </div>
         <p class="hint" id="ai-save-state" role="status"></p>
       </div>

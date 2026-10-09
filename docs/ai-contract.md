@@ -1,6 +1,6 @@
 # Shared local-AI contract (web, mobile, watch)
 
-Source: `hub/ai.js`, `hub/server.js`, `hub/risk.js`, `hub/public/index.html`,
+Source: `hub/ai.js`, `hub/server.js`, `hub/risk.js`, `hub/public/hub-client.js`, `hub/public/dashboard.js`,
 `watch/lib/services/ai_service.dart`, `watch/apple/Sources/VanguardApple/AiContract.swift`.
 Synthetic data only. Qwen is an extraction assistant, never the triage authority.
 
@@ -15,9 +15,17 @@ Synthetic data only. Qwen is an extraction assistant, never the triage authority
 | `POST /api/ai/triage-assist` | Same as extract, plus a reviewable draft (`injuries` string + provisional triage). |
 
 The legacy Flutter preview client calls the hub routes. Native Apple capture now uses local llama.cpp first, with optional paired-iPhone fallback. Apple devices never call Ollama directly. `127.0.0.1`
-on a watch or phone means that device itself, not the hospital computer. Use the
-hub laptop LAN IP (for example `http://192.168.8.10:3000`) and keep the hub and
-Ollama on the same hospital computer or LAN. Never expose Ollama to the internet.
+on a watch or phone means that device itself. Save a configured hospital LAN origin
+in the Apple app, such as `http://<hub-hostname>.local:3000`, and pair an assigned
+access token. Native capture never consults Docker/HTTP AI readiness. Flutter is a
+legacy hub-preview client with explicit `HUB_URL`/`HUB_TOKEN`; it is not the native
+Apple implementation. See `global-ai-connectivity.md` for pairing and discovery limits.
+
+All API requests use UUID `X-Request-ID` correlation. AI responses add
+`contractVersion: 1` and the corresponding `requestId`; existing fields remain
+compatible. Processing and sync formats retain their existing version/identity.
+The shared `fixtures/ai-v1.json` is validated by hub tests and decoded by both Swift
+preview and native-processing types without losing extraction provenance/evidence.
 
 ## Request
 
@@ -105,7 +113,7 @@ Rules every client can rely on:
   `requiresVerification` and `advisoryOnly` are always true. The model never
   assigns urgency, declares death, or diagnoses.
 - `processing.provenance.extraction` records the verified repository artifact and imported local Ollama blob. `processing.evidence` carries source/excerpt/contradiction references labeled model-inferred; the older top-level evidence strings stay compatible.
-- Preview routes remain advisory. Save with exact original processing through `/api/sync-triage`, or invoke `/api/triage/:id/ai-extract` for a current persisted report. No review checkbox gates storage; generated claims remain unverified in clinical assessment.
+- Preview routes remain advisory. The web outbox saves originals before inference, automatically sends Unassessed reports through `/api/sync-triage`, and retains failed receipts. Alternatively invoke `/api/triage/:id/ai-extract` for a current persisted report. No review checkbox gates storage; generated claims remain unverified in clinical assessment.
 - The Flutter client (`AiService`) re-validates every reply and rejects it as AI
   unavailable if any of these hold: an observation is outside the enums above, the
   `provisional.triage` is not `Immediate|Unassessed|Delayed|Minor`, either
@@ -113,13 +121,15 @@ Rules every client can rely on:
   differs from the sent transcript, or a non-null `extraction` lacks nonblank
   model/revision/runtime, a 64-lowercase-hex `artifactSha256` and
   `execution: "local"`. Missing observation keys stay `unknown`. Swift
-  `AiContract` types do not perform these checks yet.
+  `AiContract` preserves provenance/evidence and downgrades unsupported observation enums to unknown; complete native processing validation occurs in `NativeProcessing`.
 
 ## Status response
 
 ```json
 {
   "ok": true,
+  "contractVersion": 1,
+  "state": "READY",
   "available": true,
   "model": "qwen3:0.6b",
   "modelAvailable": true,
@@ -130,34 +140,45 @@ Rules every client can rely on:
 }
 ```
 
-`available` is false when Ollama is down (`ollama-unreachable`) or the model is
-missing (`model-missing`). The board header shows AI ready / AI unavailable and
-keeps working either way.
+`available` now requires verified artifact/import identity and actual completed,
+nonempty token generation. A matching tag alone is insufficient. Both health and
+status expose `state`: `INITIALIZING`, `MODEL_MISSING`, `MODEL_DOWNLOADING`,
+`MODEL_LOADING`, `READY`, `UNAVAILABLE` or `ERROR`. Provisioning progress comes from
+the verified-weights initializer. Health retains its legacy lowercase `status` and
+booleans. `AI Live` requires `READY` and `inference_available === true`. Concurrent
+health polls share one in-flight probe, never patient input. Native `QwenEngine.state`
+is READY only after real local tokens. Apple screens display local AI and LAN hub
+states separately; a LAN error never changes engine readiness.
 
-## Errors (nothing is saved)
+## AI errors (original capture/outbox remains intact)
 
 | HTTP | `error` | Meaning |
 | --- | --- | --- |
 | 400 | `invalid-transcript` | Missing or empty transcript. |
 | 400 | `transcript-too-long` | Over `AI_MAX_TRANSCRIPT`. Shorten and retry; the report stays local. |
-| 502 | `model-missing` | Ollama is up but has no `qwen3:0.6b`. Run `scripts/qwen-setup.sh` to import the verified repository GGUF locally. |
-| 503 | `ollama-unreachable` | Start Ollama on the hub computer; capture stays local. |
+| 502 | `model-missing` | Ollama is up but has no `qwen3:0.6b`. Inspect `model-init`/Ollama logs and retry Compose provisioning; host developers can use `qwen-setup.sh host`. |
+| 503 | `ollama-unreachable` | Start the internal Ollama container; capture stays local. |
 | 504 | `ollama-timeout` | One bounded call per request, no retries. Shorten the transcript and retry. |
 | 502 | `invalid-model-json`, `empty-model-response`, `invalid-model-schema`, `inference-failed` | Unusable model reply. Nothing was stored. |
 
-Error shape: `{ ok: false, error, message }`. Transcripts are never logged;
+Error shape: `{ ok: false, contractVersion: 1, requestId, error, message }`. Invalid configuration and runtime capacity failures also return actionable `invalid-runtime-url`, `invalid-ai-config` or `runtime-busy` errors. Transcripts are never logged;
 the hub logs only the error code and transcript length.
 
 ## Availability states
 
-1. Web app + local Ollama up: full extract and triage-assist flow.
-2. Watch or companion reaches the hub: same flow through `AiService` (Flutter)
-   or `AiRequest` (Swift). Fails fast on timeout so capture never waits.
-3. Watch disconnected: keep recording to local SQLite. Show AI unavailable;
-   never claim Qwen processed the report.
-4. No internet but LAN up: local inference still works if the device reaches the
-   hub computer. Internet and LAN are different things.
-5. Hub or Ollama down: graceful error, board and capture keep working.
+- Web inference uses only the configured backend and internal Docker Ollama. Without
+  internet, existing model volumes/images still support inference. Initial provisioning
+  may need internet; capture retains an Unassessed original if extraction fails.
+- Apple Watch and iPhone execute local packaged Qwen independently. A missing native
+  model or hardware budget failure is a local AI error; disconnected LAN is a separate
+  transport state. Watch audio can use the existing paired-iPhone offline fallback.
+- Native/Flutter outboxes retain reports across network errors and advance only on
+  validated ACKs. Web outboxes use distinct per-report keys per authenticated account
+  (or a synthetic browser UUID), preventing another capture from replacing the queue.
+- Each Ollama call contains only the fixed system prompt and that request's transcript;
+  no shared user messages, continuation contexts or response slots are used. Ollama
+  executes one request at a time by default with an eight-request queue. CPU threads
+  are bounded by `AI_NUM_THREADS` (default two); timeouts/busy errors retain originals.
 
 ## Native and persisted integration
 

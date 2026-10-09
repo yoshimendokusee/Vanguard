@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
-import 'sync_service.dart' show hubUrl;
+import 'hub_config.dart';
 
 /// Local AI (Qwen via the hospital hub) for the watch.
 ///
@@ -26,7 +26,10 @@ class AiStatus {
   final String? error;
 
   static AiStatus fromJson(Map<String, dynamic> json) => AiStatus(
-    available: json['available'] == true,
+    available:
+        json['available'] == true &&
+        json['state'] == 'READY' &&
+        json['inference_available'] == true,
     model: json['model'] is String ? json['model'] as String : '',
     error: json['error'] is String ? json['error'] as String : null,
   );
@@ -180,21 +183,25 @@ class AiExtraction {
 }
 
 class AiService {
-  AiService({http.Client? client, String? hub})
+  AiService({http.Client? client, String? hub, this.token = hubToken})
     : _client = client ?? http.Client(),
       _hub = hub ?? hubUrl;
 
   final http.Client _client;
   final String _hub;
+  final String token;
 
-  static const _timeout = Duration(seconds: 30);
+  static const _timeout = Duration(seconds: 130);
   static const maxTranscript = 4000;
 
   Future<AiStatus> status() async {
     try {
       final res = await _client
-          .get(Uri.parse('$_hub/api/ai/status'))
-          .timeout(const Duration(seconds: 5));
+          .get(
+            hubEndpoint(_hub, '/api/ai/status'),
+            headers: hubHeaders(token: token),
+          )
+          .timeout(const Duration(seconds: 130));
       if (res.statusCode != 200) {
         throw AiUnavailableException('Hub replied ${res.statusCode}');
       }
@@ -237,8 +244,8 @@ class AiService {
     try {
       final res = await _client
           .post(
-            Uri.parse('$_hub/api/ai/$kind'),
-            headers: {'Content-Type': 'application/json'},
+            hubEndpoint(_hub, '/api/ai/$kind'),
+            headers: hubHeaders(token: token),
             body: jsonEncode({'transcript': transcript, 'device': device}),
           )
           .timeout(_timeout);
@@ -253,11 +260,15 @@ class AiService {
           _serverMessage(res.body) ?? 'Invalid AI reply',
         );
       }
-      final out = AiExtraction.fromJson(decoded);
-      if (out.originalTranscript != transcript) {
-        throw const FormatException('Transcript was not preserved');
+      final processing = decoded['processing'];
+      if (processing is! Map<String, dynamic> ||
+          processing['version'] != 1 ||
+          processing['originalTranscript'] != transcript) {
+        throw AiUnavailableException(
+          'Mismatched AI reply; original stays local',
+        );
       }
-      return out;
+      return AiExtraction.fromJson(decoded);
     } on AiUnavailableException {
       rethrow;
     } on TimeoutException {
