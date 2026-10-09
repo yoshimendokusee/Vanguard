@@ -10,7 +10,7 @@ async function check() {
   const source = path.resolve(__dirname, '..');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vanguard-connectivity-'));
   const project = 'vanguard-connectivity-' + randomUUID().slice(0, 8);
-  const env = { ...process.env, HUB_PORT: '0', VITE_PORT: '0', HUB_USERS: '', HUB_BIND_ADDRESS: '127.0.0.1' };
+  const env = { ...process.env, HUB_PORT: '0', VITE_PORT: '0', HUB_USERS: '', HUB_BIND_ADDRESS: '127.0.0.1', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', SUPABASE_HUB_EMAIL: '', SUPABASE_HUB_PASSWORD: '' };
   const compose = (...args) => execFileSync('docker', ['compose', '-p', project, ...args], { cwd: directory, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   let started = false;
   try {

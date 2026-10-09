@@ -49,6 +49,7 @@
 		ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; name = "qwen3-0.6b"; path = "../../models/qwen3-0.6b"; sourceTree = "<group>"; };
 		AEB3DF43CF73C18E2C397CA4 /* VanguardWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VanguardWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE3BDD155A68B6776525F0AF /* VanguardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VanguardApp.swift; sourceTree = "<group>"; };
+		5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Vanguard.xcconfig; path = Config/Vanguard.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -89,6 +90,7 @@
 				9E182DD132E1C2FBC3C1B91C /* Frameworks */,
 				AA18CD65454D186D992B46D1 /* App */,
 				ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */,
+				5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */,
 			);
 			sourceTree = "<group>";
 		};
@@ -285,6 +287,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
@@ -311,6 +314,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
@@ -338,6 +342,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
@@ -367,6 +372,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/Info.plist;
 				INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking = YES;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
@@ -389,6 +395,7 @@
 		};
 		D7D62D36153BC43EF86E29ED /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -454,6 +461,7 @@
 		};
 		EC7F096894C1117E359C7E04 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;

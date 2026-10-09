@@ -18,6 +18,12 @@ services:
       AI_NUM_THREADS: "${AI_NUM_THREADS:-2}"
       HUB_USERS: "${HUB_USERS:-}"
       HUB_BIND_ADDRESS: "${HUB_BIND_ADDRESS:-127.0.0.1}"
+      # Optional Supabase backup; empty values keep the hub LAN-only.
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
+      SUPABASE_HUB_EMAIL: "${SUPABASE_HUB_EMAIL:-}"
+      SUPABASE_HUB_PASSWORD: "${SUPABASE_HUB_PASSWORD:-}"
+      CLOUD_SYNC_INTERVAL_MS: "${CLOUD_SYNC_INTERVAL_MS:-30000}"
     volumes:
       - ./data:/data
       - qwen-weights:/models/qwen3-0.6b:ro

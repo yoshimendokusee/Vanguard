@@ -49,7 +49,8 @@ final class CaptureModel: ObservableObject {
             deviceID = defaults.string(forKey: "vanguard-device") ?? prefix + UUID().uuidString.lowercased()
             defaults.set(deviceID, forKey: "vanguard-device")
             deviceIdentity = deviceID
-            hub = defaults.string(forKey: "vanguard-hub") ?? ""
+            // Saved pairing wins over public build-time configuration.
+            hub = defaults.string(forKey: "vanguard-hub") ?? ((try? AppConfiguration.load())?.hubURL.absoluteString ?? "")
             hubToken = HubCredential.read()
             status = "Capture ready; model loads on first request"
             if ProcessInfo.processInfo.arguments.contains("--qwen-smoke") { smoke() }

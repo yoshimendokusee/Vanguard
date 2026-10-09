@@ -47,8 +47,8 @@ Primary changed files are `hub/ai.js`, `server.js`, `access.js`,
 `provision-model.js`, Compose/Vite configuration, `public/hub-client.js`,
 `public/dashboard.js`, `watch/apple`'s contract/endpoint/workflow/engine/app,
 Flutter AI/sync/config services, their regression tests, the canonical fixture,
-setup/acceptance scripts and existing PR CI. No database migrations were rewritten,
-no application was relocated and no framework or service replaced Express/SQLite.
+setup/acceptance scripts and existing PR CI. No database migrations were rewritten; main's new cloud-backup migration and public Apple configuration are preserved,
+and no application was relocated and no framework or service replaced Express/SQLite.
 
 ## C. Final architecture
 
@@ -124,16 +124,16 @@ while the OS suspends the app.
 
 | Check | Actual result |
 | --- | --- |
-| Hub locked install, tests and production Vite build | PASS; 58 unit/HTTP/contract/persistence/browser tests pass; one deliberate live-test skip in the unit run (59 total) |
-| Flutter formatting, analysis and tests | PASS; 104 tests, no analysis issues |
-| Native `xcrun swift test` with real model | PASS; 15 tests, no skips/failures; includes real tokens, contract decoding, durable storage and disconnected/invalid-ACK/reconnected hub tests |
+| Hub locked install, tests and production Vite build | PASS; 68 unit/HTTP/contract/persistence/browser/cloud tests pass; one deliberate live-test skip in the unit run (69 total) |
+| Flutter formatting, analysis and tests | PASS; 111 tests, no analysis issues |
+| Native `xcrun swift test` with real model | PASS; 19 tests, no skips/failures; includes real tokens, contract decoding, durable storage and disconnected/invalid-ACK/reconnected hub tests |
 | Native real generation with outbound networking denied | PASS; directly ran the compiled XCTest bundle under `sandbox-exec`; 9 tokens, 1.492 s completion, 709,033,984 bytes peak RSS |
 | iPhone simulator | PASS on iPhone 17 Pro / iOS 26.5; 8 fresh marker tokens, 0.975 s initialization, 2.760 s completion, 1,000,964,096 bytes peak RSS; original/processing saved to SQLite |
 | Watch simulator | PASS on Series 11 46 mm / watchOS 26.5; 8 fresh marker tokens, 1.145 s initialization, 1.525 s completion, 824,262,656 bytes peak RSS; original/processing saved to SQLite |
 | iOS simulator build with embedded Watch | PASS after removing unsupported watchOS `textSelection` modifier |
 | Unsigned physical SDK build | PASS for iPhone ARM64 and embedded Watch ARM64_32; compilation only, no installation/hardware execution |
 | Both Compose entry points and repository policy checks | PASS; configuration, structure/environment consistency, shell/script syntax and whitespace checks |
-| In-image tests, in-memory DB, networking disabled | PASS; 58 pass and one deliberate live-test skip (59 total) |
+| In-image tests, in-memory DB, networking disabled | PASS; 68 pass and one deliberate live-test skip (69 total) |
 | Pointer-only fresh Docker acceptance | PASS; real Qwen, two concurrent requests, distinct correlation, shared processing contract, SQLite retention, HMR, restart and egress denial |
 | macOS native generation plus actual isolated hub receipt | PASS in an earlier live run; synthetic native processing ingested and exact ACK cleared its outbox |
 | Physical Watch/iPhone, paired radios, speech capture, suspension | NOT VERIFIED; no device evidence supplied; simulator/native-host measurements are not physical memory/latency budgets |
@@ -159,7 +159,8 @@ Failures encountered and their disposition:
 - A separate upstream image-index inspection timed out resolving
   `registry-1.docker.io`. The pinned image was already present locally; the
   pointer-only test used fresh weights/import volumes, but an uncached registry
-  pull was not independently verified on this host.
+  pull was not independently verified on this host. GitHub's first hosted run
+  subsequently passed the full Docker test with an uncached runner.
 
 Watch offline speech recognition is still unimplemented. Qwen is not STT. Watch
 audio is preserved for the existing paired-iPhone fallback; complete autonomous
@@ -175,6 +176,17 @@ Final browser UI validation completed real extraction and automatic receipt, sho
 and bleeding remained unknown despite unsupported model claims.
 
 ![Synthetic browser extraction and automatic receipt](qa/global-ai-browser-2026-10-10.jpg)
+
+Integration with updated main `0c6f1b5` preserved the cloud backup worker/migration,
+public Apple Info.plist configuration, and stricter Flutter response validation.
+Cloud status/sync and cloud SSE events use the authenticated central browser client.
+A new stream regression preserves both triage and cloud events through bounded
+reconnection. Native build-time hub configuration is a fallback behind saved pairing.
+
+A post-integration fresh download initially failed with `fetch failed`; GitHub Git
+and API requests also intermittently failed DNS/connection resolution. Existing
+models and offline tests remained usable. This is recorded as a network-dependent
+initial provisioning failure, not replaced by a cached-model success.
 
 ## F. Multi-user verification
 
@@ -198,9 +210,15 @@ continue to pass. Bearer identity is server-assigned, not a patient/device times
 
 ## G. Pull request and acceptance status
 
-The feature branch is `feature/global-ai-connectivity`, based on main `c1a2ce4`.
-The PR targets main and must not be merged automatically. Its verified URL and
-hosted-check outcome are recorded in the delivered task report after creation.
+The feature branch is `feature/global-ai-connectivity`, originally based on main
+`c1a2ce4` and then synchronized with main `0c6f1b5` after independent cloud/config
+work landed. [Draft PR #16](https://github.com/yoshimendokusee/Vanguard/pull/16)
+targets main and remains unmerged.
+
+[Initial hosted CI](https://github.com/yoshimendokusee/Vanguard/actions/runs/37962492841)
+passed all six checks on `46972ad`. It was manually dispatched after no automatic
+run appeared for the conflicting PR. That pass does not validate the later
+integration commit; current-head results are recorded in the delivered task report.
 Existing review/ruleset configuration has not been weakened; required CI checks
 retain their names. GitHub validation also runs the fresh real-model acceptance.
 

@@ -979,17 +979,46 @@ import './hub-client.js';
     VanguardApi.events(
       () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; },
       () => load(),
-      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; });
+      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; },
+      renderCloud);
   }
+  // Supabase backup status from the hub; the board never talks to Supabase directly.
+  function cloudLabel(s) {
+    if (!s.configured) return 'Cloud off';
+    if (s.state === 'syncing') return 'Cloud syncing';
+    const queued = (s.pending ? ` · ${s.pending} queued` : '') + (s.rejected ? ` · ${s.rejected} rejected` : '');
+    if (s.state === 'error') return `Cloud offline${queued}`;
+    return queued ? `Cloud${queued}` : 'Cloud synced';
+  }
+  function renderCloud(s) {
+    const el = $('cloud-conn'), btn = $('cloud-sync');
+    el.textContent = cloudLabel(s);
+    el.className = 'conn ' + (s.configured && s.state !== 'error' && !s.rejected ? 'live' : 'down');
+    el.title = s.message || (s.lastSuccessAt ? `Last cloud sync ${new Date(s.lastSuccessAt).toLocaleTimeString()}` : 'Supabase cloud backup');
+    btn.hidden = !s.configured;
+    btn.disabled = s.state === 'syncing';
+  }
+  function loadCloud() {
+    VanguardApi.request('/api/cloud/status').then((r) => r.json()).then(renderCloud)
+      .catch(() => { $('cloud-conn').textContent = 'Cloud: unknown'; $('cloud-conn').className = 'conn down'; });
+  }
+  $('cloud-sync').addEventListener('click', () => {
+    $('cloud-sync').disabled = true;
+    VanguardApi.request('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
+      .then((r) => r.json()).then(renderCloud).catch(loadCloud);
+  });
+
   readUrl();
   render();
   load();
+  loadCloud();
   connect();
   setInterval(load, 10000);
   const retryOutbox = () => VanguardApi.flush().catch(() => {});
   retryOutbox();
   window.addEventListener('online', retryOutbox);
   setInterval(retryOutbox, 30000);
+  setInterval(loadCloud, 30000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 
   // Local AI triage assistant: talks to the hub's Qwen endpoints, never to Ollama directly.

@@ -91,7 +91,7 @@
     })().finally(() => { sending = undefined; });
     return sending;
   }
-  async function events(onOpen, onTriage, onError) {
+  async function events(onOpen, onTriage, onError, onCloud) {
     // Bounded stream reconnects; authenticated polling remains the fallback.
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
@@ -106,7 +106,11 @@
           buffer += decoder.decode(value, { stream: true });
           let end;
           while ((end = buffer.indexOf('\n\n')) >= 0) {
-            if (/^event: triage$/m.test(buffer.slice(0, end))) onTriage();
+            const event = buffer.slice(0, end);
+            if (/^event: triage$/m.test(event)) onTriage();
+            if (/^event: cloud$/m.test(event) && onCloud) {
+              try { onCloud(JSON.parse(event.match(/^data: (.+)$/m)[1])); } catch {}
+            }
             buffer = buffer.slice(end + 2);
           }
           if (buffer.length > 1_048_576) { await reader.cancel(); throw Error('Invalid event stream'); }

@@ -10,10 +10,14 @@ const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
 const { randomUUID } = require('node:crypto');
 const { hubAccess, validateLanAccess } = require('./access');
+const { createCloudSync } = require('./cloud');
 
 const STATUSES = new Set(['inbound', 'arrived', 'cancelled']);
 
-function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hospital · Emergency Department' } = {}) {
+function createApp(db, {
+  hospital = process.env.HOSPITAL_NAME || 'Receiving Hospital · Emergency Department',
+  cloud = createCloudSync(db),
+} = {}) {
   const app = express();
   app.use('/api', (req, res, next) => {
     const id = req.get('X-Request-ID');
@@ -24,6 +28,7 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
   });
   app.use(express.json({ limit: '1mb' }));
   app.use('/api', hubAccess());
+  app.locals.cloud = cloud;
 
   // --- live updates (Server-Sent Events) -----------------------------------
   const clients = new Set();
@@ -31,6 +36,7 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
     const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const res of clients) res.write(msg);
   };
+  cloud.onChange((status) => broadcast('cloud', status));
 
   app.get('/api/events', (req, res) => {
     res.set({
@@ -62,7 +68,10 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
       return res.status(413).json({ ok: false, error: `Max ${MAX_BATCH} reports per batch` });
     }
     const result = ingestBatch(db, watchId.trim(), reports);
-    if (result.inserted.length) broadcast('triage', { inserted: result.inserted.length });
+    if (result.inserted.length) {
+      broadcast('triage', { inserted: result.inserted.length });
+      cloud.trigger();
+    }
     console.log(
       `[sync] ${result.inserted.length} new, ${result.duplicates} duplicate, ${result.rejected.length} rejected`
     );
@@ -94,6 +103,13 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
     }).immediate();
     broadcast('triage', { updated: Number(req.params.id) });
     res.json({ ok: true });
+  });
+
+  // --- Supabase backup (optional; never required for intake or the board) ---
+  app.get('/api/cloud/status', (_req, res) => res.json({ ok: true, ...cloud.status() }));
+  app.post('/api/cloud/sync', (req, res, next) => {
+    cloud.syncNow({ retryRejected: req.body?.retryRejected === true })
+      .then((status) => res.json({ ok: true, ...status }), next);
   });
 
   // --- local AI (Qwen via Ollama): extraction assistant, never the triage authority ---
@@ -223,6 +239,7 @@ if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
   const host = process.env.HOST || '127.0.0.1';
   const app = createApp(openDb());
+  app.locals.cloud.start();
   app.listen(port, host, () => {
     if (host === '0.0.0.0') {
       console.log(`Vanguard hospital hub listening on :${port}`);

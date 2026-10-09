@@ -69,3 +69,20 @@ test('browser saves before inference and retains originals on a crossed response
   assert.equal(retained.readyToSend, true);
   assert.equal(retained.processing, undefined, 'Never attach another session response');
 });
+
+test('authenticated stream preserves cloud backup and triage events with bounded reconnects', async () => {
+  const window = {}, values = new Map([['vanguard-access-token', 'synthetic-token']]);
+  const storage = { getItem: key => values.get(key), setItem: (key, value) => values.set(key, value) };
+  let requests = 0, triage = 0, cloud = 0;
+  const context = { window, crypto: webcrypto, Headers, AbortSignal, AbortController, TextDecoder, localStorage: storage, sessionStorage: storage,
+    setTimeout: callback => callback(),
+    fetch: async (route, options) => {
+      requests++;
+      assert.equal(route, '/api/events');
+      assert.equal(options.headers.get('Authorization'), 'Bearer synthetic-token');
+      return new Response('event: triage\ndata: {"inserted":1}\n\nevent: cloud\ndata: {"state":"disabled"}\n\n');
+    } };
+  vm.runInNewContext(fs.readFileSync(__dirname + '/public/hub-client.js', 'utf8'), context);
+  await window.VanguardApi.events(() => {}, () => { triage++; }, () => {}, status => { assert.equal(status.state, 'disabled'); cloud++; });
+  assert.equal(requests, 3); assert.equal(triage, 3); assert.equal(cloud, 3);
+});
