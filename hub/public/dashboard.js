@@ -908,7 +908,7 @@ import './hub-client.js';
 
     // 2. Top Row: 4 Stat KPI Cards Grid (Powered by Real System Data)
     const kpiGrid = el('div', 'dash-kpi-grid');
-    
+
     // Card 1 (Featured active teal card)
     const card1 = el('div', 'dash-kpi-card featured');
     card1.onclick = () => setView('all');
@@ -951,12 +951,12 @@ import './hub-client.js';
     const chartCard = el('div', 'dash-card analytics-card');
     chartCard.append(el('h4', 'dash-card-title', 'Triage Acuity Distribution'));
     chartCard.append(el('p', 'hint', 'Total patient count dynamically categorized by START triage urgency'));
-    
+
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', '0 0 540 220');
     svg.setAttribute('class', 'project-analytics-svg');
-    
+
     const defs = document.createElementNS(svgNS, 'defs');
     const pat = document.createElementNS(svgNS, 'pattern');
     pat.setAttribute('id', 'stripe-pattern');
@@ -1034,7 +1034,7 @@ import './hub-client.js';
     const urgentInbound = inbRows.filter((r) => category(r) === 'Immediate');
     const remCard = el('div', 'dash-card rem-card');
     remCard.append(el('span', 'dash-card-tag', 'Emergency Alert'));
-    
+
     if (urgentInbound.length > 0) {
       const topReport = urgentInbound[0];
       const m = minsLeft(topReport);
@@ -1131,7 +1131,7 @@ import './hub-client.js';
     const gSvg = document.createElementNS(svgNS, 'svg');
     gSvg.setAttribute('viewBox', '0 0 200 130');
     gSvg.setAttribute('class', 'gauge-svg');
-    
+
     // Background arc
     const bgArc = document.createElementNS(svgNS, 'path');
     bgArc.setAttribute('d', 'M 20 110 A 80 80 0 0 1 180 110');

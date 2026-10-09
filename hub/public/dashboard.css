@@ -24,26 +24,26 @@
   --panel-3: #E3F1F4;
   --line: #CFE4E9;
   --line-strong: #B3D8E0;
-  
+
   --text: #0F2D35;
   --dim: #45636D;
   --head: #066775;
-  
+
   --rail: #087F90;
   --on-rail: #FFFFFF;
   --rail-active-bg: #FFFFFF;
   --rail-active-fg: #055561;
-  
+
   --soft-bg: #D3EDF1;
   --soft-fg: #055561;
   --sel-bg: #087F90;
   --sel-fg: #FFFFFF;
-  
+
   --accent: #087F90;
   --on-accent: #FFFFFF;
   --accent-hover: #066C7A;
   --accent-text: #07707F;
-  
+
   --warn-bg: #FEF3C7;
   --warn-fg: #92400E;
   --danger: #B91C1C;
@@ -74,26 +74,26 @@
   --panel-3: #19404D;
   --line: #1D4B59;
   --line-strong: #276274;
-  
+
   --text: #E5F6F9;
   --dim: #9DC3CC;
   --head: #52D8E8;
-  
+
   --rail: #054653;
   --on-rail: #E9F9FC;
   --rail-active-bg: #E3F4F7;
   --rail-active-fg: #054653;
-  
+
   --soft-bg: #153C47;
   --soft-fg: #B3ECF5;
   --sel-bg: #3CC8D9;
   --sel-fg: #002227;
-  
+
   --accent: #3CC8D9;
   --on-accent: #002227;
   --accent-hover: #6FDCE9;
   --accent-text: #52D8E8;
-  
+
   --warn-bg: #3C1E06;
   --warn-fg: #FCD34D;
   --danger: #FCA5A5;
@@ -2188,4 +2188,3 @@ section[hidden] { display: none !important; }
   font-weight: 700;
   box-shadow: var(--shadow-sm);
 }
-
