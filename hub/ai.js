@@ -20,7 +20,7 @@
  */
 
 const { assessRisk, validateObservations, riskForRow } = require('./risk');
-const { extractReportFields } = require('./intake');
+const { terminologyFindings } = require('./intake');
 const { verifyModel } = require('./model');
 const { isIP } = require('node:net');
 const { loadKnowledge, retrieve, packInfo, findPhraseSpan } = require('./rag/knowledge');
@@ -91,7 +91,7 @@ class AiError extends Error {
 
 const ALLOWED = {
   breathing: ['normal', 'abnormal', 'absent', 'unknown'],
-  consciousness: ['alert', 'unresponsive', 'unknown'],
+  consciousness: ['alert', 'confused', 'unresponsive', 'unknown'],
   severeBleeding: ['present', 'absent', 'unknown'],
   walking: ['able', 'unable', 'unknown'],
 };
@@ -172,12 +172,17 @@ const CONFIRM = {
     normal: ['breathing normally', 'normal breathing', 'breathing fine', 'breathing ok', 'humihinga nang normal', 'normal huminga', 'nakakahinga', 'makahinga', 'humihinga'],
   },
   consciousness: {
+    confused: ['confused', 'disoriented', 'nalilito'],
     unresponsive: ['unconscious', 'walang malay', 'unresponsive', 'not responding', 'no response', 'passed out', 'nawalan ng malay', 'unconsciousness', 'walang ulirat', 'nawalan ng ulirat', 'hindi sumasagot', 'di sumasagot'],
     alert: ['awake', 'gising', 'alert', 'conscious', 'responsive', 'mulat'],
   },
   severeBleeding: {
     present: ['severe bleeding', 'malakas na pagdurugo', 'heavy bleeding', 'lots of blood', 'maraming dugo', 'severe blood loss', 'bleeding heavily', 'bleeding a lot', 'profuse bleeding', 'sobrang dugo', 'duguan', 'massive bleeding', 'hemorrhage'],
     absent: ['no severe bleeding', 'no bleeding', 'walang dugo', 'walang pagdurugo', 'no blood', 'bleeding stopped', 'hindi dumudugo', 'di dumudugo'],
+  },
+  circulation: {
+    present: ['radial pulse present', 'radial pulse is present', 'palpable radial pulse', 'radial pulse palpable', 'may pulso sa pulsuhan'],
+    absent: ['radial pulse absent', 'radial pulse is absent', 'no radial pulse', 'no palpable radial pulse', 'walang pulso sa pulsuhan'],
   },
   walking: {
     unable: ['cannot walk', "can't walk", 'hindi makalakad', 'di makalakad', 'hindi nakakalakad', 'di nakakalakad', 'cannot stand', 'unable to walk', 'could not walk', 'cant walk', 'can t walk'],
@@ -196,7 +201,8 @@ function findPhrase(transcript, phrases) {
 
 function oppositeOf(key, value) {
   if (key === 'breathing') return value === 'normal' ? ['absent', 'abnormal'] : value === 'unknown' ? [] : ['normal'];
-  if (key === 'consciousness') return value === 'alert' ? ['unresponsive'] : value === 'unresponsive' ? ['alert'] : [];
+  if (key === 'consciousness') return value === 'unknown' ? [] : ['alert', 'confused', 'unresponsive'].filter(other => other !== value);
+  if (key === 'circulation') return value === 'present' ? ['absent'] : value === 'absent' ? ['present'] : [];
   if (key === 'severeBleeding') return value === 'present' ? ['absent'] : value === 'absent' ? ['present'] : [];
   if (key === 'walking') return value === 'able' ? ['unable'] : value === 'unable' ? ['able'] : [];
   return [];
@@ -354,22 +360,6 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
  * Full pipeline: validate input -> Ollama -> validate + ground ->
  * deterministic provisional triage (advisory only).
  */
-function injuryLabels(o) {
-  const injuries = [];
-  if (o.breathing === 'absent') injuries.push('Not breathing');
-  else if (o.breathing === 'abnormal') injuries.push('Difficulty breathing');
-  if (o.consciousness === 'unresponsive') injuries.push('Unconscious');
-  if (o.severeBleeding === 'present') injuries.push('Severe bleeding');
-  if (o.walking === 'unable') injuries.push('Non-ambulatory');
-  if (o.walking === 'able') injuries.push('Ambulatory');
-  return injuries;
-}
-
-function extractedField(id, kind, name, value, unit, excerpt) {
-  if (value == null || !excerpt) return null;
-  return { id, kind, name, value, unit, source: 'model-inferred', excerpt, contradictory: false };
-}
-
 async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const cfg = aiConfig();
   const manifest = await localModel(opts.fetchImpl || fetch, opts);
@@ -377,28 +367,22 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const raw = await callOllama(transcript, { ...opts, glossary: matches, model: opts.model || cfg.model, ollamaUrl: opts.ollamaUrl || cfg.ollamaUrl });
   const modelJson = extractJsonObject(raw);
   const { observations, evidence, uncertainties, warnings } = toValidatedExtraction(modelJson, transcript);
-  const intake = extractReportFields(transcript, knowledgeIndex(), injuryLabels(observations));
+  const pulse = transcriptObservation('circulation', transcript);
+  observations.circulation = pulse && !pulse.conflict ? pulse.value : 'unknown';
+  evidence.circulation = pulse && !pulse.conflict ? pulse.hit.quote : null;
+  if (observations.circulation === 'unknown') uncertainties.push('Radial pulse was not clearly reported or is contradictory');
+  const fields = { location: null, patientCount: null, ageGroup: 'Unspecified', etaMinutes: null, symptomDuration: null, injuries: 'Unspecified' };
   const observationFindings = Object.entries(observations).flatMap(([name, value]) => value === 'unknown' ? [] : [{
     id: `observation-${name}`, kind: 'observation', name, value, unit: null,
     source: 'model-inferred', excerpt: evidence[name], contradictory: false,
   }]);
-  const terminologyFindings = intake.findings.filter((finding) =>
-    !(finding.name === 'Shortness of breath' && observations.breathing === 'abnormal')
-    && !(finding.name === 'Can walk' && observations.walking === 'able'));
-  const fieldFindings = [
-    extractedField('field-patient-count', 'patient', 'Patient count', intake.fields.patientCount, null, intake.evidence.patientCount),
-    extractedField('field-age-group', 'patient', 'Age group', intake.fields.ageGroup === 'Unspecified' ? null : intake.fields.ageGroup, null, intake.evidence.ageGroup),
-    extractedField('field-location', 'incident', 'Pickup location', intake.fields.location, null, intake.evidence.location),
-    extractedField('field-arrival-eta', 'incident', 'Arrival ETA', intake.fields.etaMinutes, 'minutes', intake.evidence.etaMinutes),
-    extractedField('field-symptom-duration', 'symptom', 'Symptom duration', intake.fields.symptomDuration?.value,
-      intake.fields.symptomDuration?.unit || null, intake.evidence.symptomDuration),
-  ].filter(Boolean);
+  const terms = terminologyFindings(transcript, knowledgeIndex());
   const device = cleanDevice(provenanceInput.device);
   const processing = {
     version: 1,
     originalTranscript: transcript,
     observations,
-    findings: [...observationFindings, ...terminologyFindings, ...fieldFindings],
+    findings: [...observationFindings, ...terms],
     evidence: Object.fromEntries(Object.entries(evidence).filter(([, quote]) => quote !== null)
       .map(([key, excerpt]) => [key, { source: 'model-inferred', excerpt, contradictory: false }])),
     uncertainties,
@@ -414,16 +398,16 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   // What the hospital's existing legacy finding rules say about these injury terms.
   // Preview only: the dashboard never saves AI-derived injury terms automatically, and
   // higher urgency is never lowered.
-  const legacy = riskForRow({ injuries: intake.fields.injuries, triage: 'Unassessed' });
+  const legacy = riskForRow({ injuries: fields.injuries, triage: 'Unassessed' });
   return {
     processing,
     evidence,
     warnings,
     retrieval,
-    fields: intake.fields,
-    fieldEvidence: intake.evidence,
-    fieldNotes: intake.notes,
-    locationBasis: intake.locationBasis,
+    fields,
+    fieldEvidence: {},
+    fieldNotes: [],
+    locationBasis: null,
     legacy: { triage: legacy.effective_triage, reason: legacy.risk_reason, version: legacy.rule_version },
     provisional: { ...provisional, requiresVerification: true, advisoryOnly: true },
     model: opts.model || cfg.model,

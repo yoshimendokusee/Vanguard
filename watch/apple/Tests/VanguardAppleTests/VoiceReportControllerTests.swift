@@ -203,7 +203,7 @@ final class VoiceReportControllerTests: XCTestCase {
         XCTAssertEqual(snapshot.versions.first?.transcript, "Dalawang bata, walang malay, Barangay Uno, sampung minuto papunta sa ospital.")
         XCTAssertEqual(snapshot.provisional?.triage, .immediate)
         XCTAssertEqual(snapshot.processing?.observations["consciousness"], "unresponsive")
-        XCTAssertEqual(snapshot.details, ReportDetails(location: "Barangay Uno", patientCount: 2, ageGroup: "Child", etaMinutes: 10))
+        XCTAssertEqual(snapshot.details, ReportDetails(), "only the five observations and RAG terms are extracted")
         XCTAssertEqual(snapshot.delivery?.state, .delivered)
         XCTAssertEqual(StubHospital.requests, 1)
     }
@@ -314,7 +314,7 @@ final class VoiceReportControllerTests: XCTestCase {
         XCTAssertEqual(snapshot.versions[0].transcript, original, "the original is never overwritten")
         XCTAssertEqual(snapshot.provisional?.triage, .immediate, "the corrected evidence triggered reassessment")
         XCTAssertEqual(snapshot.processing?.originalTranscript, "Can walk. Barangay Tres. Walang malay ang isa.")
-        XCTAssertEqual(snapshot.details.location, "Barangay Tres")
+        XCTAssertNil(snapshot.details.location, "pickup location is no longer extracted")
     }
 
     func testAContradictoryCorrectionIsNotResolvedByTheAI() async throws {

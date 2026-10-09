@@ -117,28 +117,6 @@ test('dashboard excludes unknown counts and invalidated findings from readiness 
   assert.equal(checkReadiness({ source_findings_current: true, age_group: 'Child' }).length, 2);
 });
 
-test('dashboard board puts every inbound report in exactly one time column and never hides Unassessed', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
-  const place = html.match(/  function colOf\(r\) \{[\s\S]*?\n  \}/)[0];
-  const sandbox = { range: 60, minsLeft: (row) => row.m };
-  const colOf = vm.runInNewContext(`${place}\ncolOf`, sandbox);
-  const columns = [0, 1, 2, 3, 4, 5, 'later', 'noeta'];
-  for (const m of [null, -90, -3, 0, 1, 9, 10, 59, 60, 61, 500]) assert.ok(columns.includes(colOf({ m })), `minutes ${m}`);
-  assert.equal(colOf({ m: null }), 'noeta', 'A report without an ETA keeps its own column');
-  assert.equal(colOf({ m: -90 }), 0, 'A report past its ETA counts in the first block');
-  assert.equal(colOf({ m: 9 }), 0);
-  assert.equal(colOf({ m: 10 }), 1);
-  assert.equal(colOf({ m: 59 }), 5);
-  assert.equal(colOf({ m: 60 }), 'later');
-  sandbox.range = 180;
-  assert.equal(colOf({ m: 29 }), 0);
-  assert.equal(colOf({ m: 30 }), 1);
-  assert.equal(colOf({ m: 179 }), 5);
-  assert.equal(colOf({ m: 180 }), 'later');
-  const urgent = vm.runInNewContext(html.match(/  const URGENT = (\[.*?\]);/)[1]);
-  assert.deepEqual([...urgent], ['Immediate', 'Unassessed'], 'Needs attention must keep unassessed reports in view');
-});
-
 test('draft setup suggestions are read-only, explain themselves, and never feed readiness', () => {
   const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
   const suggested = html.match(/  const suggestedOf = \(r\) => \{[\s\S]*?\n  \};/)[0];
@@ -157,23 +135,12 @@ test('draft setup suggestions are read-only, explain themselves, and never feed 
   assert.doesNotMatch(readiness, /suggestedOf/, 'suggestions must not enter readiness items or counts');
 });
 
-test('extracted fields only fill blanks, never overwrite typed values, and never save a guessed location', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
-  const fn = html.match(/    function applyExtractedFields\(report, data\) \{[\s\S]*?\n    \}/)[0];
-  const apply = vm.runInNewContext(`${fn}\napplyExtractedFields`, { Object, Number });
-  const blank = { location: 'Unspecified', injuries: 'Unspecified', patientCount: null, ageGroup: 'Unspecified', etaMinutes: null };
-  const fields = { location: 'Barangay Uno', patientCount: 2, ageGroup: 'Child', etaMinutes: 10, injuries: 'Chest pain' };
-  const done = apply(blank, { fields, locationBasis: 'explicit' });
-  assert.equal(JSON.stringify(done.changed), '["location","patientCount","ageGroup","etaMinutes"]');
-  assert.equal(done.report.location, 'Barangay Uno');
-  assert.equal(done.report.injuries, 'Unspecified', 'AI injury terms are never saved automatically');
-  const typed = apply({ ...blank, location: 'Plaza', patientCount: 5, ageGroup: 'Adult', etaMinutes: 30 }, { fields, locationBasis: 'explicit' });
-  assert.equal(typed.changed.length, 0);
-  assert.equal(typed.report.location, 'Plaza');
-  assert.equal(typed.report.patientCount, 5);
-  const guessed = apply(blank, { fields: { ...fields, location: 'Arnaldo' }, locationBasis: 'inferred' });
-  assert.equal(guessed.report.location, 'Unspecified', 'a guessed location is shown, not saved');
-  assert.equal(apply(blank, { fields: { ageGroup: 'Unspecified' } }).changed.length, 0);
-  // The filled version must be stored before the report is sent.
-  assert.match(html, /await VanguardApi\.retain\(Object\.assign\(\{\}, saveAttempt\.report, \{ readyToSend: true \}\)\);\s*await VanguardApi\.flush\(\);/);
+test('dashboard extraction displays five observations and retains RAG without filling patient details', () => {
+  const source = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
+  assert.match(source, /circulation: 'Circulation'/);
+  assert.match(source, /Radial pulse present/);
+  assert.match(source, /data\.retrieval && data\.retrieval\.matches/);
+  assert.ok(!source.includes('applyExtractedFields'));
+  assert.ok(!source.includes('renderDashboard'));
+  assert.ok(!source.includes('Alex Hunter'));
 });

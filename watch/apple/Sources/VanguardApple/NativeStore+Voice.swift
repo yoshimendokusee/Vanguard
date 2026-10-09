@@ -68,10 +68,14 @@ extension NativeStore {
     // MARK: Delivery state
 
     /// Creates the delivery record for a capture (LOCAL_SAVED) once; later calls change nothing.
-    public func ensureDelivery(captureID: String) throws {
+    public func ensureDelivery(captureID: String, encounterID: String? = nil) throws {
+        if let encounterID {
+            guard UUID(uuidString: encounterID) != nil, encounterID == encounterID.lowercased() else { throw NativeStoreFailure.invalidCapture }
+            if let old = try deliveryRecord(captureID: captureID), old.encounterID != encounterID { throw NativeStoreFailure.identityConflict }
+        }
         guard try rows("SELECT 1 FROM native_captures WHERE id = ?", [captureID]).first != nil else { throw NativeStoreFailure.invalidCapture }
         try rows("INSERT OR IGNORE INTO native_delivery (capture_id, state, encounter_id, updated_at) VALUES (?, 'LOCAL_SAVED', ?, ?)",
-                 [captureID, UUID().uuidString.lowercased(), Self.now()])
+                 [captureID, encounterID ?? UUID().uuidString.lowercased(), Self.now()])
     }
 
     public func deliveryRecord(captureID: String) throws -> DeliveryRecord? {
@@ -134,6 +138,34 @@ extension NativeStore {
               AND COALESCE(d.held, 0) = 0 AND COALESCE(d.state, 'QUEUED') != 'FAILED_PERMANENTLY'
             ORDER BY c.local_id
             """)
+    }
+
+    /// Persist the relay atomically: the sender retains its copy until a hospital ACK returns.
+    public func acceptRelay(_ report: RelayedReport) throws {
+        let processing = try JSONDecoder().decode(NativeProcessing.self, from: report.processing)
+        guard report.capture.audioPath == nil, report.capture.watchID.hasPrefix("APPLE-WATCH-"),
+              report.details.isValid, processing.isValid, processing.originalTranscript == report.capture.transcript else { throw NativeStoreFailure.invalidCapture }
+        try rows("BEGIN IMMEDIATE")
+        do {
+            let existing = try captures().first { $0.id == report.capture.id }
+            if let existing {
+                guard existing.watchID == report.capture.watchID, existing.createdAt == report.capture.createdAt else { throw NativeStoreFailure.identityConflict }
+            } else { try save(report.capture) }
+            try ensureDelivery(captureID: report.capture.id, encounterID: report.encounterID)
+            try complete(id: report.capture.id, transcript: processing.originalTranscript, processingJSON: report.processing)
+            if let original = try detailRevisions(captureID: report.capture.id).first {
+                guard original.details == report.details else { throw NativeStoreFailure.identityConflict }
+            } else { try appendDetails(captureID: report.capture.id, source: "extracted", report.details) }
+            guard report.corrections.count <= 100 else { throw NativeStoreFailure.invalidCapture }
+            for (index, correction) in report.corrections.enumerated() {
+                guard correction.version == index + 1 else { throw NativeStoreFailure.invalidCapture }
+                let saved = try appendCorrection(captureID: report.capture.id, transcript: correction.transcript, reason: correction.reason, requestID: correction.requestID)
+                guard saved.version == correction.version else { throw NativeStoreFailure.identityConflict }
+                if let data = correction.processing { try completeCorrection(captureID: report.capture.id, version: saved.version, processingJSON: data) }
+            }
+            try queueForDelivery(captureID: report.capture.id)
+            try rows("COMMIT")
+        } catch { _ = try? rows("ROLLBACK"); throw error }
     }
 
     // MARK: Transcript versions

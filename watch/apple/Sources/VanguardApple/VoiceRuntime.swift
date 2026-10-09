@@ -28,12 +28,12 @@ public final class VoiceRuntime: ObservableObject {
 
         let hooks = VoiceReportHooks(
             transcribeAndProcess: { capture in try await Self.transcribe(capture, store: store, workflow: workflow, relay: relay) },
-            syncHospital: { await Self.sync(workflow) })
+            syncHospital: { await Self.sync(workflow, relay: relay) })
         controller = VoiceReportController(recorder: MicrophoneRecorder(), workflow: workflow, hooks: hooks, deviceID: id, device: device,
                                            audioDirectory: documents.appendingPathComponent("Recordings"))
         let controller = self.controller
         relay.onResult = { id in Task { @MainActor in await controller.resultArrived(id) } }
-        relay.onChange = { _ in Task { await Self.sync(workflow) } }
+        relay.onChange = { _ in Task { await Self.sync(workflow, relay: relay) } }
     }
 
     /// Process audio on the Watch first. If local transcription or extraction fails, the saved recording is offered
@@ -47,7 +47,7 @@ public final class VoiceRuntime: ObservableObject {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            do { try relay.offer(capture) } catch { return .pending }
+            do { try await relay.offer(capture) } catch { return .pending }
         }
         for _ in 0..<90 {
             try Task.checkCancellation()
@@ -62,11 +62,14 @@ public final class VoiceRuntime: ObservableObject {
     }
 
     /// Uses the saved hub address and token; with none configured, reports simply stay queued on the device.
-    private static func sync(_ workflow: NativeWorkflow) async {
+    private static func sync(_ workflow: NativeWorkflow, relay: WatchRelay) async {
         let defaults = UserDefaults.standard
-        guard let text = defaults.string(forKey: "vanguard-hub") ?? (try? AppConfiguration.load())?.hubURL.absoluteString,
-              let url = try? HubEndpoint(text).url else { return }
-        _ = try? await workflow.sync(to: url, token: HubCredential.read())
+        if let text = defaults.string(forKey: "vanguard-hub") ?? (try? AppConfiguration.load())?.hubURL.absoluteString,
+           let url = try? HubEndpoint(text).url {
+            _ = try? await workflow.sync(to: url, token: HubCredential.read())
+        }
+        // Only still-pending reports need the paired iPhone; direct Watch delivery remains independent.
+        try? await relay.relayPendingReports()
     }
 }
 #endif

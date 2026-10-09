@@ -164,43 +164,29 @@ The response lists every match; the prompt gets one meaning per phrase and omits
 - Retrieval runs in the hub only. The Apple/watch apps do not yet ship or search a pack.
 - Prompt version is `vanguard-extract-v2` (v1 had no glossary).
 
-## Prefilled report fields
+## Five-field extraction scope — 2026-10-10
 
-Extraction and triage-assist responses also carry `fields` (`location`, `patientCount`,
-`ageGroup`, `etaMinutes`, `symptomDuration`, `injuries`), `fieldEvidence` (the exact transcript text each value
-came from), `fieldNotes`, `locationBasis` (`explicit` for Barangay/Purok/Sitio, `inferred`
-for an "in/sa/near X" guess) and `legacy` (`{ triage, reason, version }`).
+New extraction returns Breathing, Consciousness, Severe Bleeding, Walking Ability
+and Circulation, plus the existing RAG terminology output, evidence, uncertainty
+and provenance. Circulation records explicit radial pulse `present|absent|unknown`
+and has no triage threshold or scoring rule. The four-field Qwen prompt and local
+runtime remain unchanged; an exact transcript-grounded helper supplies circulation.
+Missing or contradictory statements stay unknown. Old four-field v1 envelopes remain
+valid. Display `alert` as Responsive; `confused` is accepted without changing urgency rules.
 
-- Implemented in `hub/intake.js` with plain pattern matching and the terminology pack. No
-  model output is used for these fields, nothing is invented, and unstated values stay `null`
-  (`ageGroup` stays `Unspecified`). Values are limited to what the hub's report validator
-  accepts (count 1-99, ETA 1-720 minutes, injuries up to 300 characters).
-- ETA needs an arrival cue next to the minutes ("ETA", "away", "out", "papunta"); a duration
-  such as "unconscious for 10 minutes" is not an ETA. Ages map to Infant (under 1 year),
-  Child (1-12), Adult (18-59) and Elderly (60+); 13-17 and mixed groups stay unspecified.
-- `symptomDuration` is a separate `{ value, unit }` field, with exact `fieldEvidence`; it
-  requires an onset/duration cue such as "for", "ago", or Tagalog "na" and is never used as ETA.
-- Location is the least reliable field. An inferred location is only a guess and the dashboard
-  says so. Roofs, stairs, body parts, hospitals and conditions are rejected, but the reviewer
-  must still check it.
-- `injuries` lists the labels from the four validated findings first, then non-denied
-  pack terms in the injury, condition, mechanism and symptom categories.
-- The AI processing envelope also saves evidence-backed observations, terminology matches,
-  patient fields, ETA and symptom duration in `processing.findings`. The report detail shows
-  them as **unverified** with transcript excerpts. They do not overwrite the legacy `injuries`
-  field or establish the saved report's clinical priority.
-- `legacy` is the hospital's existing legacy finding rules (`riskForRow`) applied to those
-  injury terms as they would be saved with triage `Unassessed`. Those rules can raise urgency
-  (for example "Chest pain", "Head injury", "Drowning" are Immediate) but never lower it. It is
-  a preview: the dashboard never saves AI-derived injury terms automatically, and the pack's terms are unreviewed.
-- The dashboard keeps the offline-first flow: the typed original is stored locally before Qwen
-  runs and is sent automatically as `Unassessed`. After extraction it fills only **blank**
-  location, patient count, age group and ETA from `fields` (anything the person typed wins, and
-  a guessed `inferred` location is shown but not saved), stores that version, then sends it.
-  The evidence quote for each filled value is shown. `injuries` is saved as typed, otherwise
-  `Unspecified`: transcript terms remain in the unverified processing findings and are shown
-  as suggestions with the legacy-rule preview, but are not promoted to the legacy field or
-  used to establish priority before a person reviews the report.
+RAG `retrieval.matches` and quote-backed terminology `processing.findings` remain
+available. Retrieval is context, not independent patient evidence. New processing
+findings contain the five observations and terminology matches, without automatically
+extracted age, sex, location, patient count, ETA or symptom duration. Legacy report
+fields remain compatible: hub preview `fields` returns null/Unspecified defaults,
+`fieldEvidence` is empty, `fieldNotes` is empty and `locationBasis` is null.
+The dashboard no longer fills patient/incident fields from extraction. Explicit
+operator input and existing reports are retained; original transcripts remain immutable.
+
+The report is saved locally before inference/transport and is sent automatically
+through existing ingestion. Deterministic triage remains provisional; machine
+observations do not establish qualified hospital assessment. The dashboard shows
+advisory device triage separately from persisted hospital priority.
 
 ## Draft board setups
 

@@ -21,6 +21,9 @@ function hubAccess(raw = process.env.HUB_USERS || '') {
     req.user = user;
     if (user.role === 'operator' || ['/config', '/ai/health', '/ai/status', '/ai/extract', '/ai/triage-assist'].includes(req.path)) return next();
     if (req.path === '/sync-triage' && req.method === 'POST' && user.watchIds.includes(req.body?.watchId)) return next();
+    // Ownership and correction-only writes are checked by the report routes before accessing data.
+    if ((req.method === 'GET' && /^\/triage\/source\/[a-f0-9-]{36}$/i.test(req.path))
+      || (req.method === 'POST' && /^\/triage\/[1-9]\d*\/revisions$/.test(req.path))) return next();
     return res.status(403).json({ ok: false, contractVersion: 1, requestId: req.requestId, error: 'access-denied', message: 'This credential cannot access that device or hospital record' });
   };
 }

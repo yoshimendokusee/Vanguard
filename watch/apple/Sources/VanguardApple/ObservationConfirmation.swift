@@ -15,6 +15,7 @@ public enum ObservationConfirmation {
             "normal": ["breathing normally", "normal breathing", "breathing fine", "breathing ok", "humihinga nang normal", "normal huminga"],
         ],
         "consciousness": [
+            "confused": ["confused", "disoriented", "nalilito"],
             "unresponsive": ["unconscious", "walang malay", "unresponsive", "not responding", "no response", "passed out",
                              "nawalan ng malay", "unconsciousness"],
             "alert": ["awake", "gising", "alert", "conscious", "responsive", "mulat"],
@@ -48,11 +49,29 @@ public enum ObservationConfirmation {
     static func opposite(_ key: String, _ value: String) -> [String] {
         switch key {
         case "breathing": return value == "normal" ? ["absent", "abnormal"] : value == "unknown" ? [] : ["normal"]
-        case "consciousness": return value == "alert" ? ["unresponsive"] : value == "unresponsive" ? ["alert"] : []
+        case "consciousness": return value == "unknown" ? [] : ["alert", "confused", "unresponsive"].filter { $0 != value }
         case "severeBleeding": return value == "present" ? ["absent"] : value == "absent" ? ["present"] : []
         case "walking": return value == "able" ? ["unable"] : value == "unable" ? ["able"] : []
         default: return []
         }
+    }
+
+    private static func denied(_ hit: Hit?, in transcript: String) -> Bool {
+        guard let hit else { return false }
+        let prefix = (transcript as NSString).substring(to: hit.start)
+        return prefix.range(of: "(?:\\b(?:no|not|without|never|denies|denied|hindi|di|wala|walang))\\s+(?:(?:po|ho|na|naman|talaga|rin|din|siya|siyang|niya|niyang)\\s+)*$", options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// Circulation is an explicit radial-pulse observation; it never adds a triage rule.
+    public static func circulation(in transcript: String) -> (value: String, quote: String?) {
+        let present = find(transcript, ["radial pulse present", "radial pulse is present", "palpable radial pulse", "radial pulse palpable", "may pulso sa pulsuhan"])
+        let absent = find(transcript, ["radial pulse absent", "radial pulse is absent", "no radial pulse", "no palpable radial pulse", "walang pulso sa pulsuhan"])
+        let positive = denied(present, in: transcript) ? nil : present
+        let negative = denied(absent, in: transcript) ? nil : absent
+        if positive != nil && negative != nil { return ("unknown", nil) }
+        if let positive { return ("present", positive.quote) }
+        if let negative { return ("absent", negative.quote) }
+        return ("unknown", nil)
     }
 
     public struct Result: Equatable, Sendable {
@@ -67,8 +86,12 @@ public enum ObservationConfirmation {
         var observations: [String: String] = [:], evidence: [String: String] = [:], warnings: [String] = []
         for key in order {
             var value = claims[key].flatMap { TriageRules.allowed[key]?.contains($0) == true ? $0 : nil } ?? "unknown"
+            if key == "consciousness", value == "unknown",
+               let hit = find(transcript, phrases[key]?["confused"] ?? []), !denied(hit, in: transcript) {
+                value = "confused"
+            }
             if value != "unknown" {
-                if let hit = find(transcript, phrases[key]?[value] ?? []) {
+                if let hit = find(transcript, phrases[key]?[value] ?? []), !denied(hit, in: transcript) {
                     let conflict = opposite(key, value).compactMap { find(transcript, phrases[key]?[$0] ?? []) }
                         // A denial ("no severe bleeding") contains the positive phrase: an opposite match
                         // strictly inside the confirming span is the denial itself, not a conflict.

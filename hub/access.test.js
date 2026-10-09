@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { randomUUID } = require('node:crypto');
 const { once } = require('node:events');
 const { createApp } = require('./server');
 const { openDb } = require('./db');
@@ -16,9 +17,10 @@ test('assigned credentials isolate device intake and protect hospital records', 
   const server = createApp(db).listen(0, '127.0.0.1');
   await once(server, 'listening');
   const base = `http://127.0.0.1:${server.address().port}`;
+  const sourceIds = { 'WATCH-A': randomUUID(), 'WATCH-B': randomUUID() };
   const send = (device, token) => fetch(base + '/api/sync-triage', { method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ watchId: device, reports: [{ localId: 1, createdAt: '2026-10-10T00:00:00Z',
+    body: JSON.stringify({ watchId: device, reports: [{ localId: 1, reportId: sourceIds[device], createdAt: '2026-10-10T00:00:00Z',
       rawText: `Synthetic ${device}`, triage: 'Unassessed', location: 'Synthetic', injuries: 'Unspecified' }] }) });
   try {
     const denied = await fetch(base + '/api/triage');
@@ -35,6 +37,19 @@ test('assigned credentials isolate device intake and protect hospital records', 
     assert.deepEqual(rows.map(row => row.raw_text).sort(), ['Synthetic WATCH-A', 'Synthetic WATCH-B']);
     assert.equal((await send('WATCH-A', 'a'.repeat(32))).status, 200);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM triage_reports').get().count, 2);
+    const deviceHeaders = { Authorization: `Bearer ${'a'.repeat(32)}`, 'Content-Type': 'application/json' };
+    const own = await (await fetch(base + '/api/triage/source/' + sourceIds['WATCH-A'], { headers: deviceHeaders })).json();
+    assert.equal(own.watch_id, 'WATCH-A');
+    assert.equal(own.encounter, undefined, 'device history does not expose hospital patient records');
+    assert.equal((await fetch(base + '/api/triage/source/' + sourceIds['WATCH-B'], { headers: deviceHeaders })).status, 403);
+    const edit = { requestId: randomUUID(), baseRevision: 0, actor: 'self', reason: 'Synthetic correction', kind: 'correction', transcript: 'Synthetic corrected A' };
+    const correct = (id, body) => fetch(base + `/api/triage/${id}/revisions`, { method: 'POST', headers: deviceHeaders, body: JSON.stringify(body) });
+    assert.equal((await correct(own.id, edit)).status, 200);
+    assert.equal((await correct(own.id, edit)).status, 200, 'the same correction retries idempotently');
+    assert.equal((await correct(own.id, { ...edit, requestId: randomUUID() })).status, 409, 'stale corrections cannot overwrite');
+    assert.equal((await correct(own.id, { requestId: randomUUID(), baseRevision: 1, actor: 'self', reason: 'Synthetic', kind: 'override', override: 'Minor' })).status, 403);
+    const other = rows.find(row => row.watch_id === 'WATCH-B');
+    assert.equal((await correct(other.id, edit)).status, 403);
     assert.equal((await fetch(base + '/api/events')).status, 401);
   } finally {
     server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); db.close();

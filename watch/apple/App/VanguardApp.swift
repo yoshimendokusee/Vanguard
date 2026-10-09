@@ -102,8 +102,7 @@ final class CaptureModel: ObservableObject {
                 localAI = .modelLoading
                 let processing = try await workflow.process(capture, device: device)
                 localAI = await workflow.engine.state
-                result = processing.observations.sorted(by: { $0.key < $1.key }).map { "\($0.key): \($0.value) (unverified)" }.joined(separator: "\n")
-                    + "\n" + processing.uncertainties.joined(separator: "\n")
+                show(processing)
                 status = "Extraction saved; provisional Unassessed — verify clinically"
                 await sync()
             } catch {
@@ -112,11 +111,24 @@ final class CaptureModel: ObservableObject {
                 status = savedCapture == nil ? "Capture could not be saved; retry: \(error)"
                     : "Original retained; local inference failed: \(error)"
                 #if os(watchOS)
-                if let capture = savedCapture { do { try relay?.offer(capture); status += "; queued for iPhone" } catch { status += "; fallback pending" } }
+                if let capture = savedCapture { do { try await relay?.offer(capture); status += "; queued for iPhone" } catch { status += "; fallback pending" } }
                 #endif
             }
         }
     }
+    private func show(_ processing: NativeProcessing) {
+        let fields: [(String, String, [String: String])] = [
+            ("breathing", "Breathing", ["normal": "Normal", "abnormal": "Difficulty breathing", "absent": "Not breathing"]),
+            ("consciousness", "Consciousness", ["alert": "Responsive", "confused": "Confused", "unresponsive": "Unresponsive"]),
+            ("severeBleeding", "Severe Bleeding", ["present": "Present", "absent": "Absent"]),
+            ("walking", "Walking Ability", ["able": "Can walk", "unable": "Cannot walk"]),
+            ("circulation", "Circulation", ["present": "Radial pulse present", "absent": "Radial pulse absent"]),
+        ]
+        result = fields.map { key, label, values in "\(label): \(values[processing.observations[key] ?? "unknown"] ?? "Unknown")" }.joined(separator: "\n")
+        let terms = processing.findings ?? []
+        result += "\nRAG: " + (terms.isEmpty ? "No terms found" : terms.map { "\($0.name) — \($0.excerpt ?? "")" }.joined(separator: " · "))
+    }
+
     func recover() {
         guard !busy, let workflow else { return }
         relay?.retry()
@@ -135,12 +147,12 @@ final class CaptureModel: ObservableObject {
                             #if os(iOS)
                             try await transcribe(capture)
                             #else
-                            try relay?.offer(capture)
+                            try await relay?.offer(capture)
                             #endif
                         }
                     } catch {
                         #if os(watchOS)
-                        try? relay?.offer(capture)
+                        try? await relay?.offer(capture)
                         #endif
                         status = "Pending input retained; retry or use paired iPhone"
                     }
@@ -164,6 +176,7 @@ final class CaptureModel: ObservableObject {
             let count = try await workflow.sync(to: endpoint.url, token: hubToken)
             lanStatus = "Connected; \(count) hospital receipts acknowledged"
         } catch { lanStatus = "Disconnected or invalid configuration; outbox retained: \(error)" }
+        try? await relay?.relayPendingReports()
     }
     func toggleRecording() {
         if recording {
@@ -178,7 +191,7 @@ final class CaptureModel: ObservableObject {
                     #if os(iOS)
                     try await transcribe(capture)
                     #else
-                    try relay?.offer(capture)
+                    try await relay?.offer(capture)
                     status = "Audio queued for iPhone. Offline Watch speech recognition is not implemented"
                     #endif
                 } catch { status = "Audio retained; transcription/fallback unavailable" }
@@ -210,7 +223,8 @@ final class CaptureModel: ObservableObject {
     private func transcribe(_ capture: NativeCapture) async throws {
         guard let workflow else { throw NativeStoreFailure.unavailable }
         localAI = .modelLoading
-        _ = try await workflow.processAudio(capture)
+        let processing = try await workflow.processAudio(capture)
+        show(processing)
         localAI = await workflow.engine.state
         await sync()
         status = "On-device speech and Qwen output persisted; clinical verification pending"
@@ -267,10 +281,11 @@ struct CaptureView: View {
                 Text("Device: \(model.deviceIdentity)").font(.caption)
                 Button("Retry hospital relay") { Task { await model.sync() } }
             }.padding()
-        }.task {
-            // Bounded foreground reconnection; retained rows survive suspension/restart.
-            for attempt in 0..<3 {
-                do { try await Task.sleep(for: .seconds(30 * (1 << attempt))) } catch { return }
+        }.task(id: phase) {
+            guard phase == .active else { return }
+            // Foreground reconnection; retained rows survive suspension/restart.
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(30)) } catch { return }
                 guard phase == .active else { return }
                 await model.sync()
             }

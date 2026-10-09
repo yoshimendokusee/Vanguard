@@ -86,3 +86,13 @@ test('ingest error rolls back the batch; no partial hospital receipt survives', 
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM triage_reports').get().n, 0);
   } finally { db.close(); }
 });
+
+test('circulation is optional, validated and preserved without changing established triage', () => {
+  const input = { version: 1, originalTranscript: 'Synthetic radial pulse present', observations: { ...unknown, circulation: 'present' },
+    uncertainties: [], provenance: { device: 'iphone', sttEngine: 'fixture', sttRuntime: 'fixture' } };
+  assert.equal(validateProcessing(input).value.observations.circulation, 'present');
+  assert.ok(validateProcessing({ ...input, observations: { ...unknown, circulation: 'invented' } }).error);
+  assert.equal(validateProcessing({ ...input, observations: unknown }).value.observations.circulation, undefined, 'legacy snapshots do not change on replay');
+  assert.equal(assessRisk(input.observations).triage, 'Unassessed');
+  assert.equal(validateObservations({ ...unknown, consciousness: 'confused' }), true);
+});

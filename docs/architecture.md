@@ -279,3 +279,35 @@ share the hospital board intentionally. Existing anonymous synthetic localhost u
 remains compatible. Authenticated status/correction events record the operator ID.
 HTTP and local storage remain unencrypted; credentials alone do not establish
 patient-data safety or clinical validity.
+
+## Focused triage delivery update — 2026-10-10
+
+Current extraction surfaces show five observations (breathing, consciousness, severe
+bleeding, walking, radial-pulse circulation) with explicit unknowns and separate RAG
+terms. Qwen's working four-field prompt, verified weights and local runtime are
+preserved. The fifth observation uses exact transcript evidence and adds no clinical
+rule. New reports do not extract patient/incident details. Existing optional details
+and old four-observation reports remain compatible; no database migration or reset
+was needed.
+
+Watch flow: capture → offline STT/Qwen → deterministic provisional result → SQLite
+report/queue → direct LAN attempt → optional paired iPhone relay of the complete
+original report → backend SQLite transaction → scoped ACK → return relay receipt.
+The iPhone fallback still processes failed Watch audio locally. Complete-report relay
+preserves the Watch source/encounter IDs, original processing, RAG findings and ordered
+corrections, atomically, without repeating inference. SQLite copies remain after receipt.
+Only backend acknowledgment advances Sent; paired storage alone does not. Both apps
+retry every 30 seconds while active and on foreground recovery. Native suspension,
+paired transfer timing, microphone/STT/Qwen performance and delivery require manual
+hardware checks; there is no guarantee of continuous background execution.
+
+The dashboard defaults to the real triage queue. Analytics/KPI charts, patient-block
+charts, fake operator profile and redundant team totals were removed. Report history,
+arrival/cancellation, corrections, overrides, reassessment and per-report readiness
+remain available. SSE plus 10-second polling refreshes SQLite reports; list loads are
+serialized and sorted stably. The five observations, exact original transcript, source
+identity/timestamps and advisory device triage are shown, without invented patient IDs.
+Optional hub transcript extraction is collapsed below the queue.
+
+See [delivery update](triage-delivery-update.md) for static checks and manual acceptance
+steps. No functional or automated tests were executed for this update.

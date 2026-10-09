@@ -195,9 +195,7 @@ public struct TriageScreen: View {
             .padding(8).background(RoundedRectangle(cornerRadius: 14).fill(look.fill))
             .accessibilityElement(children: .combine)
             .accessibilityLabel("Provisional triage: \(look.title). \(provisional?.reason ?? "")")
-            fact("heart.fill", "Vital signs: Not reported")
-            fact("lungs.fill", symptoms.isEmpty ? "Symptoms: none reported" : symptoms.joined(separator: ", "))
-            fact("clock.fill", onsetMinutes.map { "Onset: about \($0) minutes ago" } ?? "Onset: not reported")
+            fact("text.book.closed.fill", symptoms.isEmpty ? "RAG terms: none found" : "RAG: " + symptoms.joined(separator: ", "))
             if !uncertainties.isEmpty { Text(uncertainties.joined(separator: " · ")).font(.caption2).foregroundStyle(VanguardPalette.amber) }
             CapsuleButton(title: "View details", minHeight: 40, action: onDetails)
         }
@@ -223,8 +221,8 @@ public struct DetailsScreen: View {
             HStack {
                 Text("Key details").font(.system(.headline, weight: .semibold)).foregroundStyle(.white)
                 Spacer(minLength: 4)
-                Button("Edit", action: onEdit).font(.caption).buttonStyle(.plain).padding(.horizontal, 10).frame(minHeight: 28)
-                    .background(Capsule().fill(VanguardPalette.surface)).foregroundStyle(.white).accessibilityLabel("Edit details")
+                Button("Edit transcript", action: onEdit).font(.caption).buttonStyle(.plain).padding(.horizontal, 10).frame(minHeight: 28)
+                    .background(Capsule().fill(VanguardPalette.surface)).foregroundStyle(.white).accessibilityLabel("Edit transcript")
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 8) {
@@ -283,7 +281,7 @@ public struct SendScreen: View {
 // MARK: 9 · Delivery result
 
 public struct ResultScreen: View {
-    enum Kind { case delivered, pending, failed, rejected, savedOnly }
+    enum Kind { case delivered, sending, pending, failed, rejected, savedOnly }
     let state: DeliveryState?
     let held: Bool
     let lastError: String?
@@ -292,7 +290,8 @@ public struct ResultScreen: View {
     public init(state: DeliveryState?, held: Bool, lastError: String?, onRetry: @escaping () -> Void, onNew: @escaping () -> Void) { self.state = state; self.held = held; self.lastError = lastError; self.onRetry = onRetry; self.onNew = onNew }
     private var kind: Kind {
         if state == .delivered { return .delivered }
-        if held { return .savedOnly }
+        if held || state == .localSaved { return .savedOnly }
+        if state == .transferring || state == .awaitingReceipt { return .sending }
         if state == .failedPermanently { return .rejected }
         if state == .retryRequired { return .failed }
         return .pending
@@ -303,7 +302,7 @@ public struct ResultScreen: View {
             case .delivered:
                 ZStack { Circle().fill(VanguardPalette.successFill); Image(systemName: "checkmark").font(.system(size: 28, weight: .bold)).foregroundStyle(VanguardPalette.green) }.frame(width: 64, height: 64)
                 Text("Report sent").font(.system(.headline, weight: .semibold)).foregroundStyle(.white)
-                Text("ED has received your report").font(.caption).foregroundStyle(VanguardPalette.muted).multilineTextAlignment(.center)
+                Text("Backend acknowledged receipt; clinical review pending").font(.caption).foregroundStyle(VanguardPalette.muted).multilineTextAlignment(.center)
                 CapsuleButton(title: "New report", symbol: "plus", style: .secondary, action: onNew)
             case .savedOnly:
                 icon("tray.full.fill", VanguardPalette.accent)
@@ -311,9 +310,13 @@ public struct ResultScreen: View {
                 Text("Not sent. You chose Save only.").font(.caption).foregroundStyle(VanguardPalette.muted).multilineTextAlignment(.center)
                 CapsuleButton(title: "Send now", action: onRetry)
                 CapsuleButton(title: "New report", symbol: "plus", style: .secondary, action: onNew)
+            case .sending:
+                ProgressView().tint(VanguardPalette.accent)
+                Text("Sending…").font(.headline)
+                Text("Saved locally; awaiting backend acknowledgment").font(.caption).foregroundStyle(VanguardPalette.muted)
             case .pending:
                 icon("clock.fill", VanguardPalette.amber)
-                Text("Report saved").font(.system(.headline, weight: .semibold)).foregroundStyle(.white)
+                Text("Pending Sync").font(.system(.headline, weight: .semibold)).foregroundStyle(.white)
                 Text("Waiting for hospital connection").font(.caption).foregroundStyle(VanguardPalette.muted).multilineTextAlignment(.center)
                 CapsuleButton(title: "Retry", symbol: "arrow.clockwise", action: onRetry)
                 CapsuleButton(title: "New report", symbol: "plus", style: .secondary, action: onNew)
@@ -325,7 +328,7 @@ public struct ResultScreen: View {
                 CapsuleButton(title: "New report", symbol: "plus", style: .secondary, action: onNew)
             case .rejected:
                 icon("xmark.octagon.fill", VanguardPalette.highPriority)
-                Text("Hospital could not accept it").font(.system(.headline, weight: .semibold)).foregroundStyle(.white).multilineTextAlignment(.center)
+                Text("Failed to send").font(.system(.headline, weight: .semibold)).foregroundStyle(.white).multilineTextAlignment(.center)
                 Text(lastError ?? "Your report is saved safely").font(.caption2).foregroundStyle(VanguardPalette.muted).multilineTextAlignment(.center)
                 CapsuleButton(title: "Retry", symbol: "arrow.clockwise", action: onRetry)
             }

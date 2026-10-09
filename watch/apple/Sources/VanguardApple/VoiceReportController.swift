@@ -70,6 +70,7 @@ public final class VoiceReportController: ObservableObject {
     @Published public private(set) var elapsed: TimeInterval = 0
     /// Most recent microphone levels, oldest first. Real input only.
     @Published public private(set) var levels: [Float] = []
+    @Published public private(set) var preparedReportID: String?
     @Published public private(set) var snapshot: ReportSnapshot?
     @Published public private(set) var recents: [ReportSummary] = []
     @Published public private(set) var message = ""
@@ -217,6 +218,7 @@ public final class VoiceReportController: ObservableObject {
             snapshot = try await loadSnapshot(id)
             move(.preparingReport)
             move(.ready)
+            preparedReportID = id
             await refreshDelivery()
             await hooks.syncHospital()
             await refreshDelivery()
@@ -277,6 +279,11 @@ public final class VoiceReportController: ObservableObject {
     }
 
     /// Send: release any hold and attempt delivery now.
+    public func sendNowIfPending() async {
+        await hooks.syncHospital()
+        await refreshDelivery(); await loadRecents()
+    }
+
     public func sendNow() async {
         guard let id = snapshot?.captureID else { return }
         try? await workflow.store.setHeld(captureID: id, false)
@@ -306,7 +313,7 @@ public final class VoiceReportController: ObservableObject {
         if capture?.id == id, state == .failed(.transcriptionPending) { await prepareReport(id); return }
         if capture?.id == id, state == .transcribing { return }   // the waiting call will pick it up
         await hooks.syncHospital()
-        await loadRecents()
+        await refreshDelivery(); await loadRecents()
     }
 
     public func loadRecents() async { recents = (try? await workflow.store.reportSummaries(limit: 20)) ?? recents }

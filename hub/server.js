@@ -213,10 +213,28 @@ function createApp(db, {
       else next(error);
     }
   });
+  function requireReportAccess(req, id) {
+    if (req.user?.role !== 'device') return;
+    const row = db.prepare('SELECT watch_id FROM triage_reports WHERE id = ?').get(id);
+    if (!row || !req.user.watchIds.includes(row.watch_id)) fail(403, 'Report access denied');
+  }
+  app.get('/api/triage/source/:reportId', (req, res) => {
+    if (!isId(req.params.reportId)) fail(400, 'Invalid source report ID');
+    const row = db.prepare('SELECT report_id FROM report_evidence WHERE source_report_id = ?').get(req.params.reportId.toLowerCase());
+    if (!row) fail(404, 'Report not found');
+    requireReportAccess(req, row.report_id);
+    const report = reportView(db, row.report_id, true);
+    if (req.user?.role === 'device') { delete report.encounter; delete report.patient_id; }
+    res.json(report);
+  });
   app.get('/api/triage/:id', (req, res) => res.json(reportView(db, req.params.id, true)));
   app.post('/api/triage/:id/revisions', (req, res) => {
+    requireReportAccess(req, req.params.id);
+    if (req.user?.role === 'device' && req.body?.kind !== 'correction') fail(403, 'Devices can only submit transcript corrections');
+    if (req.user?.role === 'device' && req.body?.processing !== undefined && !req.body.processing?.provenance?.extraction) fail(403, 'Device extraction must remain machine-attributed');
     const result = reviseReport(db, req.params.id, req.user ? { ...req.body, actor: req.user.id } : req.body);
     broadcast('triage', { updated: result.id });
+    if (req.user?.role === 'device') { delete result.encounter; delete result.patient_id; }
     res.json(result);
   });
 

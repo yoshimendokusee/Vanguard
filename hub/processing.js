@@ -50,7 +50,7 @@ function validateProcessing(value) {
   return { value: {
     version: 1,
     originalTranscript: value.originalTranscript,
-    observations: Object.fromEntries(['breathing', 'consciousness', 'severeBleeding', 'walking'].map((key) => [key, value.observations[key]])),
+    observations: Object.fromEntries(['breathing', 'consciousness', 'severeBleeding', 'walking', ...(Object.hasOwn(value.observations, 'circulation') ? ['circulation'] : [])].map((key) => [key, value.observations[key]])),
     uncertainties: value.uncertainties,
     provenance: { device: provenance.device, sttEngine: provenance.sttEngine, sttRuntime: provenance.sttRuntime, extraction },
     evidence: normalizedEvidence,

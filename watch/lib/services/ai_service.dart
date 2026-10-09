@@ -38,9 +38,10 @@ class AiStatus {
 /// Allowed observation values, mirroring `hub/risk.js`.
 const aiObservationValues = {
   'breathing': {'normal', 'abnormal', 'absent', 'unknown'},
-  'consciousness': {'alert', 'unresponsive', 'unknown'},
+  'consciousness': {'alert', 'confused', 'unresponsive', 'unknown'},
   'severeBleeding': {'present', 'absent', 'unknown'},
   'walking': {'able', 'unable', 'unknown'},
+  'circulation': {'present', 'absent', 'unknown'},
 };
 
 /// Categories the deterministic hub rules can return; never Deceased.
@@ -52,12 +53,14 @@ class AiObservations {
     required this.consciousness,
     required this.severeBleeding,
     required this.walking,
+    this.circulation = 'unknown',
   });
 
   final String breathing;
   final String consciousness;
   final String severeBleeding;
   final String walking;
+  final String circulation;
 
   /// Missing keys stay unknown; out-of-schema values reject the whole reply.
   static AiObservations fromJson(Map<String, dynamic> json) {
@@ -74,6 +77,7 @@ class AiObservations {
       consciousness: value('consciousness'),
       severeBleeding: value('severeBleeding'),
       walking: value('walking'),
+      circulation: value('circulation'),
     );
   }
 }
