@@ -90,9 +90,10 @@ for your area.
 - `POST /api/sync-triage` accepts `{ watchId, reports: [...] }`.
 - **Duplicate protection:** unique on `(watch_id, created_at)`. A re-sent batch is skipped
   but still acknowledged, so a double sync can't make the ED prepare for patients who don't exist.
-- Board: live updates (SSE), sorted Immediate → Unassessed → Delayed → Minor → Deceased,
-  then soonest ETA; countdowns per patient; "Arrived" / "Cancel" actions; surge tiles; no
-  CDN dependencies.
+- Board (teal dashboard): a rail with status tabs (On the way, Arrived, Cancelled, All reports); the "Next to arrive" card with a countdown,
+  a readiness checklist and **Mark arrived**; "Due within 30 minutes" and "Teams to alert"; a category filter, "Coming up" cards and an
+  arrivals curve; the patient list sorted Immediate → Unassessed → Delayed → Minor → Deceased, then soonest ETA. Live updates (SSE),
+  light/dark/auto theme, no CDN dependencies.
 - Set the hospital name: `HOSPITAL_NAME="Santiago District Hospital · ED"` (env var).
 
 ```bash

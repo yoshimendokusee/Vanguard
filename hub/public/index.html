@@ -1,119 +1,431 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#DCEDF1">
 <title>Vanguard ED Pre-Arrival Board</title>
+<script>
+  // Runs before first paint so there is no light/dark flash.
+  // Preference: 'auto' (follow the system) | 'light' | 'dark'.
+  (function () {
+    var pref = 'auto';
+    try { pref = localStorage.getItem('theme') || 'auto'; } catch (e) {}
+    var dark = pref === 'dark' || (pref === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  })();
+</script>
 <style>
-  /* No external fonts/CDNs: this page must work with zero internet. */
+  /* Teal clinical dashboard. Look adapted from a reference dashboard: teal vertical rail with a white rounded active
+     pill, rounded white cards with soft shadows, a three-card row with coloured side bars, and a curve chart with a
+     range switcher. Artwork is not copied. Rail and label teals are darkened so white text meets 4.5:1.
+     Type: Poppins when installed (drop OFL files in /fonts and add url() sources to bundle it), else Avenir Next,
+     Segoe UI, Noto Sans or Cantarell. Offline by design: no CDNs. */
+  @font-face { font-family: "Poppins"; font-weight: 300; font-display: swap; src: local("Poppins Light"), local("Poppins-Light"); }
+  @font-face { font-family: "Poppins"; font-weight: 400; font-display: swap; src: local("Poppins"), local("Poppins Regular"), local("Poppins-Regular"); }
+  @font-face { font-family: "Poppins"; font-weight: 500; font-display: swap; src: local("Poppins Medium"), local("Poppins-Medium"); }
+  @font-face { font-family: "Poppins"; font-weight: 600; font-display: swap; src: local("Poppins SemiBold"), local("Poppins-SemiBold"); }
   :root {
-    --bg: #0b0e12; --panel: #141a21; --line: #26303b; --text: #eef2f6; --dim: #8b98a7;
-    --imm: #ff1744; --del: #ffd600; --min: #00e676; --dec: #b0bec5; --una: #ffffff; --accent: #4fc3f7;
+    /* shared design tokens */
+    --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+    --r-sm: 8px; --r-md: 12px; --r-lg: 16px; --r-xl: 24px; --r-2xl: 32px;
+    --dur-fast: 150ms; --dur-base: 200ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+    --font: "Poppins", "Avenir Next", "Segoe UI Variable Text", "Segoe UI", "Helvetica Neue", "Noto Sans", Cantarell, sans-serif;
   }
+  :root {
+    color-scheme: light;
+    --bg: #DCEDF1;  --shell: #EAF4F6;  --panel: #FFFFFF;  --panel-2: #EFF8FA;  --line: #D0E6EB;
+    --text: #16323A;  --dim: #4A6670;  --head: #07707F;
+    --rail: #087F90;  --on-rail: #FFFFFF;  --rail-active-bg: #FFFFFF;  --rail-active-fg: #065A67;
+    --soft-bg: #D3EDF1;  --soft-fg: #065A67;
+    --sel-bg: #087F90;  --sel-fg: #FFFFFF;
+    --accent: #087F90;  --on-accent: #FFFFFF;  --accent-hover: #066C7A;  --accent-text: #07707F;
+    --warn-bg: #FEF3C7;  --warn-fg: #92400E;  --danger: #B91C1C;  --ok: #065F46;
+    --focus: #07707F;
+    --shadow: 0 10px 30px rgba(8, 127, 144, 0.12);
+    --imm-bg: #FEE2E2;  --imm-fg: #991B1B;  --imm-ac: #DC2626;
+    --una-bg: #FFFFFF;  --una-fg: #16323A;  --una-ac: #64748B;
+    --del-bg: #FEF3C7;  --del-fg: #92400E;  --del-ac: #D97706;
+    --min-bg: #D1FAE5;  --min-fg: #065F46;  --min-ac: #059669;
+    --dec-bg: #E2E8F0;  --dec-fg: #334155;  --dec-ac: #64748B;
+    --flash: #CFFAFE;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #061419;  --shell: #0A222A;  --panel: #0F2F39;  --panel-2: #143B47;  --line: #1C4857;
+    --text: #E3F4F7;  --dim: #A9C8D0;  --head: #5ED3E3;
+    --rail: #054653;  --on-rail: #E9F9FC;  --rail-active-bg: #E3F4F7;  --rail-active-fg: #054653;
+    --soft-bg: #17414E;  --soft-fg: #BDEBF2;
+    --sel-bg: #3CC8D9;  --sel-fg: #00262C;
+    --accent: #3CC8D9;  --on-accent: #00262C;  --accent-hover: #6FDCE9;  --accent-text: #5ED3E3;
+    --warn-bg: #422006;  --warn-fg: #FCD34D;  --danger: #FCA5A5;  --ok: #6EE7B7;
+    --focus: #5ED3E3;
+    --shadow: 0 0 0 1px #1C4857;
+    --imm-bg: #4A1D1D;  --imm-fg: #FCA5A5;  --imm-ac: #F87171;
+    --una-bg: #0F2F39;  --una-fg: #E3F4F7;  --una-ac: #A9C8D0;
+    --del-bg: #422006;  --del-fg: #FCD34D;  --del-ac: #FBBF24;
+    --min-bg: #064E3B;  --min-fg: #6EE7B7;  --min-ac: #34D399;
+    --dec-bg: #1E293B;  --dec-fg: #CBD5E1;  --dec-ac: #94A3B8;
+    --flash: #164E63;
+  }
+  .Immediate  { --cbg: var(--imm-bg); --cfg: var(--imm-fg); --cac: var(--imm-ac); }
+  .Unassessed { --cbg: var(--una-bg); --cfg: var(--una-fg); --cac: var(--una-ac); }
+  .Delayed    { --cbg: var(--del-bg); --cfg: var(--del-fg); --cac: var(--del-ac); }
+  .Minor      { --cbg: var(--min-bg); --cfg: var(--min-fg); --cac: var(--min-ac); }
+  .Deceased   { --cbg: var(--dec-bg); --cfg: var(--dec-fg); --cac: var(--dec-ac); }
+
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--text);
-         font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-           padding: 14px 20px; border-bottom: 2px solid var(--accent); background: var(--panel); }
-  header h1 { margin: 0; font-size: 19px; letter-spacing: 1.5px; }
-  header small { color: var(--dim); }
-  .spacer { flex: 1; }
-  .conn { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
-  .conn.live { color: var(--min); border-color: var(--min); }
-  .conn.down { color: var(--imm); border-color: var(--imm); }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 1rem/1.5 var(--font); font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { letter-spacing: -0.01em; margin: 0; }
+  p { margin: 0; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  button:disabled { cursor: not-allowed; }
+  :where(button, input, a, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  [tabindex="-1"]:focus { outline: none; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .skip { position: absolute; inset-inline-start: var(--s4); top: var(--s2); transform: translateY(-300%); }
+  .skip:focus { transform: none; z-index: 50; background: var(--sel-bg); color: var(--sel-fg); padding: var(--s2) var(--s4); border-radius: var(--r-md); font-weight: 600; }
 
-  .surge { display: grid; grid-template-columns: minmax(180px, 1.1fr) repeat(5, minmax(100px, 1fr)); gap: 12px; padding: 16px 20px 0; }
-  .tile { background: var(--panel); border: 1px solid var(--line); border-top-width: 5px; border-radius: 8px; padding: 10px 14px; }
-  .tile b { display: block; font-size: 30px; line-height: 1.1; }
-  .tile span { color: var(--dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
-  .tile.total { border-top-color: var(--accent); }
-  .tile.total b { font-size: 38px; }
-  .tile.Immediate { border-top-color: var(--imm); } .tile.Immediate b { color: var(--imm); }
-  .tile.Unassessed { border-top-color: var(--una); }
-  .tile.Delayed { border-top-color: var(--del); } .tile.Delayed b { color: var(--del); }
-  .tile.Minor { border-top-color: var(--min); } .tile.Minor b { color: var(--min); }
-  .tile.Deceased { border-top-color: var(--dec); } .tile.Deceased b { color: var(--dec); }
+  /* ---------- app shell: rail | left cards | main panel ---------- */
+  .app { display: grid; grid-template-columns: 6.75rem 20.5rem minmax(0, 1fr); min-height: 100vh; background: var(--shell); }
+  @media (min-width: 1200px) {
+    body { padding: var(--s5); }
+    .app { max-width: 1520px; margin: 0 auto; min-height: calc(100vh - 48px); border-radius: 36px; overflow: hidden; box-shadow: var(--shadow); }
+  }
+  .app > * { min-width: 0; }
 
-  .prep { margin: 12px 20px 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line);
-          border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .prep h2 { margin: 0 8px 0 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); font-weight: 600; }
-  .chip { background: #1e2731; border: 1px solid var(--line); border-radius: 99px; padding: 3px 11px; font-size: 13px; }
-  .chip b { color: var(--accent); margin-left: 4px; }
-  .soon { color: var(--del); font-weight: 700; }
+  /* ---------- teal rail ---------- */
+  .rail { background: var(--rail); color: var(--on-rail); border-radius: var(--r-2xl); margin: var(--s3); padding: var(--s5) var(--s2); display: flex; flex-direction: column; align-items: stretch; gap: var(--s5); }
+  .rail .word { font-size: 1rem; font-weight: 600; text-align: center; line-height: 1.2; }
+  .vtabs { display: grid; gap: var(--s2); }
+  .railbtn { display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 76px; padding: var(--s2) 4px; border: 0; border-radius: var(--r-xl); background: transparent; color: var(--on-rail); font-weight: 500; font-size: 0.75rem; line-height: 1.2; text-align: center; }
+  .railbtn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .railbtn:hover { background: rgba(0, 0, 0, 0.18); }
+  .railbtn:active { background: rgba(0, 0, 0, 0.28); }
+  .railbtn[aria-selected="true"], .railbtn[aria-expanded="true"] { background: var(--rail-active-bg); color: var(--rail-active-fg); }
+  .railbtn .n { font-weight: 700; }
+  .rail .gear { margin-top: auto; }
+  .rail :focus-visible { outline-color: var(--on-rail); }
 
-  .tabs { display: flex; gap: 8px; padding: 16px 20px 8px; }
-  .tabs button { background: transparent; color: var(--dim); border: 1px solid var(--line);
-                 border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer; }
-  .tabs button.on { color: #000; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+  /* ---------- left column of cards ---------- */
+  .left { padding: var(--s3) var(--s3) var(--s3) 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); align-content: start; }
+  .card { background: var(--panel); border-radius: var(--r-xl); padding: var(--s5); box-shadow: var(--shadow); }
+  .card h2 { font-size: 1rem; font-weight: 600; margin-bottom: var(--s3); color: var(--head); }
+  .eyebrow { font-size: 0.875rem; font-weight: 500; color: var(--dim); margin-bottom: var(--s3); }
+  .hint { color: var(--dim); }
 
-  main { padding: 0 20px 40px; display: grid; gap: 10px; }
-  .card { display: grid; grid-template-columns: 130px 1fr 150px auto; gap: 14px; align-items: center;
-          background: var(--panel); border: 1px solid var(--line); border-left: 8px solid var(--una);
-          border-radius: 8px; padding: 12px 16px; }
-  .card.Immediate { border-left-color: var(--imm); } .card.Delayed { border-left-color: var(--del); }
-  .card.Minor { border-left-color: var(--min); } .card.Deceased { border-left-color: var(--dec); }
-  .card.done { opacity: .45; }
-  .card.fresh { animation: flash 2.5s ease-out; }
-  @keyframes flash { from { background: #3a1d22; } to { background: var(--panel); } }
-  .badge { font-weight: 800; letter-spacing: 1px; font-size: 13px; text-align: center; padding: 6px 0; border-radius: 6px; color: #000; background: var(--una); }
-  .Immediate .badge { background: var(--imm); color: #fff; } .Delayed .badge { background: var(--del); }
-  .Minor .badge { background: var(--min); } .Deceased .badge { background: var(--dec); }
-  .count { text-align: center; font-size: 22px; font-weight: 800; margin-top: 4px; }
-  .count small { display: block; font-size: 11px; font-weight: 500; color: var(--dim); }
-  .inj { font-size: 17px; font-weight: 700; }
-  .loc { color: var(--accent); font-weight: 600; margin-top: 2px; }
-  .needs { color: var(--dim); font-size: 13px; margin-top: 2px; }
-  .raw { color: var(--dim); font-style: italic; margin-top: 4px; font-size: 13px; }
-  .meta { color: var(--dim); font-size: 12px; margin-top: 4px; }
-  .eta { text-align: center; }
-  .eta b { display: block; font-size: 22px; }
-  .eta span { color: var(--dim); font-size: 12px; }
-  .eta.late b { color: var(--imm); } .eta.due b { color: var(--del); }
-  .actions { display: flex; flex-direction: column; gap: 6px; min-width: 100px; }
-  .actions button { font: inherit; font-weight: 700; padding: 7px 10px; border-radius: 6px; cursor: pointer;
-                    border: 1px solid var(--line); background: #1e2731; color: var(--text); }
-  .actions button.go { background: var(--accent); color: #000; border-color: var(--accent); }
-  .tag { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); text-align: center; }
-  .empty { color: var(--dim); text-align: center; padding: 60px 0; }
-  .note { color: var(--dim); font-size: 12px; padding: 0 20px 24px; }
-  @media (max-width: 900px) { .surge { grid-template-columns: repeat(3, 1fr); } .card { grid-template-columns: 1fr; } .actions { flex-direction: row; } }
+  /* hero: the "profile" card */
+  .hero { text-align: center; }
+  .hero[hidden] { display: none; }
+  .hero .eyebrow { color: var(--head); font-weight: 600; font-size: 1rem; }
+  .hero .badge { width: 76px; height: 76px; border-radius: 50%; margin: 0 auto var(--s3); display: grid; place-items: center; background: var(--cbg); color: var(--cfg); border: 3px solid var(--cac); }
+  .hero .badge .shape { width: 30px; height: 30px; }
+  .hero .who { font-size: 1.25rem; font-weight: 600; line-height: 1.25; overflow-wrap: anywhere; }
+  .hero .where { color: var(--dim); font-size: 0.9375rem; overflow-wrap: anywhere; }
+  .big { font-size: 2.25rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.05; margin-top: var(--s3); }
+  .big small { display: block; margin-top: 4px; font-size: 0.875rem; font-weight: 400; color: var(--dim); letter-spacing: 0; }
+  .big.late { color: var(--danger); } .big.soon { color: var(--warn-fg); }
+  .big.plain { font-size: 1.25rem; color: var(--dim); }
+  .stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--s2); margin-top: var(--s4); }
+  .stat small { display: block; font-size: 0.75rem; color: var(--head); font-weight: 500; }
+  .stat b { display: block; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+  .prep { margin-top: var(--s4); padding-top: var(--s3); border-top: 1px solid var(--line); text-align: left; }
+  .prep-h { font-weight: 600; margin-bottom: var(--s1); }
+  .prep-h span { font-weight: 400; color: var(--dim); font-size: 0.8125rem; margin-left: var(--s2); }
+  .ck { display: flex; align-items: center; gap: var(--s3); min-height: 44px; border-radius: var(--r-md); padding: 0 6px; cursor: pointer; }
+  .ck:hover { background: var(--panel-2); }
+  .ck input { width: 22px; height: 22px; accent-color: var(--accent); margin: 0; flex: none; cursor: pointer; }
+  .ck span { overflow-wrap: anywhere; }
+  .prep .note { min-height: 22px; margin-top: var(--s1); font-size: 0.8125rem; color: var(--warn-fg); }
+  .warn { color: var(--warn-fg); font-size: 0.875rem; margin-top: var(--s2); text-align: left; }
+  .rnote { margin-top: var(--s3); font-size: 0.875rem; text-align: left; }
+  .rnote summary { cursor: pointer; color: var(--accent-text); font-weight: 600; min-height: 44px; display: flex; align-items: center; border-radius: var(--r-md); }
+  .rnote summary:hover { text-decoration: underline; }
+  .rnote .r-raw { color: var(--dim); overflow-wrap: anywhere; padding-bottom: var(--s1); }
+  .r-meta { margin-top: var(--s2); color: var(--dim); font-size: 0.8125rem; overflow-wrap: anywhere; text-align: left; }
+  .hero-act { display: grid; gap: var(--s1); margin-top: var(--s3); }
+  .due-n { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s2); font-size: 2.25rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; overflow-wrap: anywhere; }
+  .due-n small { font-size: 0.9375rem; font-weight: 400; color: var(--dim); letter-spacing: 0; }
+  .mini-rows { display: grid; gap: var(--s3); }
+  .mini { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px var(--s3); align-items: baseline; }
+  .mini .name { font-weight: 500; overflow-wrap: anywhere; } .mini .v { font-weight: 600; }
+  .mini .track { grid-column: 1 / -1; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+  .mini .track i { display: block; height: 100%; background: var(--rail); border-radius: 3px; }
+
+  /* ---------- main white panel ---------- */
+  .panel-main { background: var(--panel); border-radius: var(--r-2xl); margin: var(--s3) var(--s3) var(--s3) 0; padding: var(--s5) var(--s6); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s4); align-content: start; }
+  .mhead { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--s4); flex-wrap: wrap; }
+  .sec-title { font-size: 1.5rem; font-weight: 400; color: var(--head); letter-spacing: -0.01em; line-height: 1.2; }
+  .mhead .sub { display: block; color: var(--dim); font-size: 0.875rem; overflow-wrap: anywhere; }
+  .mtools { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+  .search { position: relative; display: block; }
+  .search input { width: 14rem; max-width: 100%; min-height: 44px; border: 1px solid transparent; border-radius: 99px; padding: 0 40px 0 var(--s4); background: var(--panel-2); color: var(--text); }
+  .search input::placeholder { color: var(--dim); opacity: 1; }
+  .search input:hover { border-color: var(--line); }
+  .search input:focus-visible { outline-offset: 0; }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .search .x { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; border: 0; border-radius: 50%; background: transparent; color: var(--dim); font-size: 1.125rem; line-height: 1; }
+  .search .x:hover { background: var(--line); color: var(--text); }
+  .conn { display: inline-flex; align-items: center; gap: var(--s2); font-size: 0.875rem; font-weight: 600; }
+  .conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .conn.live { color: var(--ok); } .conn.down { color: var(--warn-fg); }
+  .conn.down::before { animation: pulse 1.4s ease-in-out infinite; }
+  .clock { font-size: 0.9375rem; font-weight: 600; color: var(--dim); min-width: 3rem; text-align: right; }
+
+  .settings { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: flex-end; padding: var(--s3) var(--s4); background: var(--panel-2); border-radius: var(--r-lg); }
+  .settings[hidden] { display: none; }
+  .foot-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dim); margin-bottom: var(--s1); }
+  .seg { display: grid; grid-template-columns: repeat(3, minmax(4.5rem, 1fr)); gap: 4px; padding: 4px; background: var(--panel); border-radius: var(--r-md); }
+  .seg button { border: 0; background: var(--soft-bg); color: var(--soft-fg); border-radius: var(--r-sm); min-height: 44px; font-weight: 500; font-size: 0.875rem; }
+  .seg button:hover { filter: brightness(0.96); }
+  .seg button:active { transform: translateY(1px); }
+  .seg button[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
+  .switch { display: inline-flex; align-items: center; gap: var(--s3); min-height: 44px; padding: var(--s2) var(--s4); background: var(--soft-bg); color: var(--soft-fg); border: 0; border-radius: var(--r-md); font-weight: 500; white-space: nowrap; }
+  .switch:hover { filter: brightness(0.96); } .switch:active { transform: translateY(1px); }
+  .switch .state { font-size: 0.875rem; }
+  .switch[aria-checked="true"] { background: var(--sel-bg); color: var(--sel-fg); }
+
+  /* category filter */
+  .catbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s1); }
+  .cat-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s3); min-height: 32px; font-size: 0.875rem; font-weight: 600; color: var(--dim); }
+  .link { border: 0; background: transparent; color: var(--accent-text); font-weight: 600; text-decoration: underline; min-height: 44px; padding: 0 var(--s2); border-radius: var(--r-md); }
+  .link:hover { background: var(--panel-2); } .link:active { background: var(--line); }
+  .link[hidden] { display: none; }
+  .cats { display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .tab { display: inline-flex; align-items: center; gap: var(--s2); border: 0; background: var(--soft-bg); color: var(--soft-fg); font-weight: 500; border-radius: 99px; padding: 4px var(--s4); min-height: 44px; max-width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+  .tab:hover { filter: brightness(0.96); } .tab:active { transform: scale(0.98); }
+  .tab[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
+  .tab .n { font-size: 0.8125rem; font-weight: 600; background: var(--panel); color: var(--text); border-radius: 99px; padding: 0 var(--s2); min-width: 24px; text-align: center; }
+  .tab[aria-pressed="true"] .n { background: transparent; color: inherit; box-shadow: inset 0 0 0 1px currentColor; }
+  .tab.cat[aria-pressed="true"] { background: var(--cbg); color: var(--cfg); box-shadow: inset 0 0 0 2px var(--cac); }
+  .tab.zero { color: var(--dim); }
+  .sline { font-size: 1rem; font-weight: 600; }
+  .filters { display: flex; flex-wrap: wrap; gap: var(--s2); align-items: center; }
+  .filters:empty { display: none; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; border: 0; background: var(--soft-bg); color: var(--soft-fg); border-radius: 99px; padding: 4px var(--s2) 4px var(--s3); min-height: 36px; font-weight: 500; font-size: 0.875rem; max-width: 100%; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+  .fchip:hover { filter: brightness(0.96); } .fchip:active { transform: translateY(1px); }
+
+  /* category shape (drawn, not an icon font) */
+  .shape { display: inline-block; width: 10px; height: 10px; background: currentColor; flex: none; }
+  .shape.Immediate { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .shape.Delayed { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+  .shape.Minor { border-radius: 50%; }
+  .shape.Unassessed { background: transparent; border: 2px dashed currentColor; border-radius: 50%; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 0.875rem; font-weight: 600; padding: 5px 10px; border-radius: var(--r-sm); background: var(--cbg); color: var(--cfg); }
+  .chip.Unassessed { border: 1px dashed var(--cac); }
+
+  /* ---------- sections in the main panel ---------- */
+  #view-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
+  section[hidden] { display: none; }
+  .cards3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr)); gap: var(--s4); margin-top: var(--s3); }
+  .soon-card { position: relative; text-align: left; border: 0; background: transparent; border-radius: var(--r-md); padding: var(--s2) var(--s3) var(--s2) var(--s5); min-height: 88px; display: grid; align-content: center; gap: 2px; }
+  .soon-card::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 6px; border-radius: 3px; background: var(--cac); }
+  .soon-card:hover { background: var(--panel-2); } .soon-card:active { background: var(--line); }
+  .soon-card .t { font-size: 0.8125rem; color: var(--dim); font-weight: 500; }
+  .soon-card .t.late { color: var(--danger); } .soon-card .t.soon { color: var(--warn-fg); }
+  .soon-card b { font-size: 1.0625rem; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
+  .soon-card span.s { color: var(--dim); font-size: 0.875rem; overflow-wrap: anywhere; }
+  .sec-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+  .ranges { display: flex; flex-wrap: wrap; gap: var(--s2); }
+  .rb { min-width: 56px; min-height: 44px; padding: 0 var(--s3); border: 0; border-radius: var(--r-md); background: var(--soft-bg); color: var(--soft-fg); font-weight: 500; }
+  .rb:hover { filter: brightness(0.96); } .rb:active { transform: scale(0.97); }
+  .rb[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
+  .chart { margin-top: var(--s3); min-height: 120px; }
+  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .chart .ax { fill: var(--dim); font-size: 12px; font-family: inherit; }
+  .chart .gl { stroke: var(--line); stroke-width: 1; }
+  .empty-chart { padding: var(--s6) var(--s4); text-align: center; color: var(--dim); background: var(--panel-2); border-radius: var(--r-lg); }
+  .legend2 { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); align-items: center; margin-top: var(--s2); font-size: 0.875rem; color: var(--dim); }
+  .legend2 span { display: inline-flex; align-items: center; gap: var(--s2); }
+  .legend2 .ln { display: inline-block; width: 28px; height: 0; border-top: 3px solid var(--head); }
+  .legend2 .ln.imm { border-top: 3px dashed var(--danger); }
+  .legend2[hidden] { display: none; }
+
+  /* ---------- buttons ---------- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 44px; padding: var(--s2) var(--s4); border-radius: var(--r-md); font-weight: 600; border: 1px solid var(--dim); background: transparent; color: var(--text); white-space: nowrap; }
+  .btn:hover { background: var(--panel-2); }
+  .btn:active { background: var(--line); transform: translateY(1px); }
+  .btn.primary { min-height: 52px; font-size: 1.0625rem; background: var(--accent); border-color: var(--accent); color: var(--on-accent); border-radius: var(--r-lg); }
+  .btn.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+  .btn.primary:active { background: var(--accent); transform: translateY(1px); }
+  .btn.quiet { border-color: transparent; color: var(--dim); }
+  .btn.quiet:hover { color: var(--text); background: var(--panel-2); }
+  .btn:disabled { background: var(--panel-2); border-color: var(--panel-2); color: var(--dim); transform: none; }
+  .btn.loading { pointer-events: none; }
+  .btn.loading::before { content: ""; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
+  .railbtn, .link, .search input, .search .x, .tab, .fchip, .btn, .seg button, .switch, .item, .ck, .rnote summary, .soon-card, .rb {
+    transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes pulse { 50% { opacity: .4; } }
+
+  /* ---------- patient list ---------- */
+  .grp { display: flex; justify-content: space-between; align-items: baseline; gap: var(--s3); margin: var(--s3) 0 var(--s2); font-size: 0.875rem; color: var(--dim); }
+  .grp b { color: var(--text); font-size: 1rem; font-weight: 600; }
+  .item { display: grid; grid-template-columns: 6.75rem minmax(0, 1fr) auto; grid-template-areas: "chip who time"; gap: var(--s3); align-items: center; width: 100%; min-height: 64px; padding: var(--s2) var(--s3); background: var(--panel-2); border: 0; border-radius: var(--r-lg); margin-bottom: var(--s2); text-align: left; }
+  .item:hover { background: var(--soft-bg); }
+  .item:active { transform: scale(0.995); }
+  .item.fresh { animation: flash 3s ease-out; }
+  @keyframes flash { from { background: var(--flash); } }
+  .item .chip { grid-area: chip; justify-self: start; }
+  .item .iw { grid-area: who; min-width: 0; font-weight: 500; line-height: 1.3; overflow-wrap: anywhere; }
+  .item .iw small { display: block; font-weight: 400; color: var(--dim); font-size: 0.875rem; }
+  .item .tm { grid-area: time; text-align: right; font-weight: 600; line-height: 1.2; }
+  .item .tm small { display: block; font-weight: 400; color: var(--dim); font-size: 0.8125rem; }
+  .tm.late { color: var(--danger); } .tm.soon { color: var(--warn-fg); }
+  .more { justify-self: center; margin-top: var(--s2); white-space: normal; max-width: 100%; text-align: center; }
+  #list { display: grid; grid-template-columns: minmax(0, 1fr); }
+
+  /* ---------- states: empty, error, loading ---------- */
+  .empty { padding: var(--s6) var(--s4); text-align: center; border: 1px dashed var(--dim); border-radius: var(--r-lg); }
+  .empty b { display: block; font-size: 1.0625rem; margin-bottom: 4px; }
+  .empty p { color: var(--dim); max-width: 44ch; margin: 0 auto var(--s4); }
+  .alert { display: flex; align-items: center; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; background: var(--warn-bg); color: var(--warn-fg); border-radius: var(--r-md); padding: var(--s3) var(--s4); font-weight: 600; }
+  .alert:empty { display: none; }
+  .skel { height: 14px; border-radius: 4px; background: var(--panel-2); animation: pulse 1.4s ease-in-out infinite; }
+  .skel-row { display: grid; gap: var(--s3); padding: var(--s2) 0; }
+  .note { color: var(--dim); font-size: 0.8125rem; max-width: 72ch; }
+
+  /* ---------- toasts ---------- */
+  .toasts { position: fixed; right: var(--s5); bottom: var(--s5); display: grid; gap: var(--s2); z-index: 20; max-width: min(400px, calc(100vw - 32px)); }
+  .toast { background: var(--panel); color: var(--text); box-shadow: 0 0 0 1px var(--line), var(--shadow); border-left: 6px solid var(--cac, var(--sel-bg)); border-radius: var(--r-md); padding: var(--s3) var(--s4); font-weight: 600; animation: slide .2s ease-out; overflow-wrap: anywhere; }
+  .toast small { display: block; margin-top: 2px; font-weight: 400; color: var(--dim); }
+  @keyframes slide { from { transform: translateY(8px); opacity: 0; } }
+
+  /* ---------- responsive: rail becomes a top bar, cards stack ---------- */
+  @media (max-width: 1180px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .left { display: contents; }
+    .rail { order: 0; flex-direction: row; flex-wrap: wrap; align-items: center; margin: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); padding: var(--s2) var(--s3) var(--s3); gap: var(--s2); }
+    .rail .word { text-align: left; font-size: 1.125rem; }
+    .rail .gear { order: 2; margin-top: 0; margin-left: auto; min-height: 48px; grid-auto-flow: column; gap: var(--s2); padding: 0 var(--s4); }
+    .rail .gear svg { width: 22px; height: 22px; }
+    .vtabs { order: 3; flex: 1 1 100%; grid-template-columns: repeat(auto-fit, minmax(min(4rem, 100%), 1fr)); }
+    .railbtn { min-height: 64px; border-radius: var(--r-lg); }
+    .hero { order: 1; margin: var(--s3) var(--s3) 0; }
+    .panel-main { order: 2; margin: var(--s3); padding: var(--s4); }
+    #due { order: 3; margin: 0 var(--s3); }
+    #prep { order: 4; margin: 0 var(--s3) var(--s3); }
+  }
+  @media (max-width: 560px) {
+    .search { flex: 1; } .search input { width: 100%; }
+    .mtools { width: 100%; }
+    .big { font-size: 2rem; }
+    .toasts { left: var(--s4); right: var(--s4); max-width: none; }
+    .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (max-width: 440px) {
+    .item { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "chip time" "who who"; }
+    .settings { flex-direction: column; align-items: stretch; }
+    .switch { justify-content: space-between; white-space: normal; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1 id="hospital">ED PRE-ARRIVAL BOARD</h1>
-  <small>Inbound flood casualties · air-gapped LAN</small>
-  <div class="spacer"></div>
-  <span id="conn" class="conn down">connecting…</span>
-</header>
+<a class="skip" href="#main">Skip to the next patient</a>
 
-<section class="surge">
-  <div class="tile total"><b id="n-total">0</b><span>Patients inbound · <span id="n-reports">0</span> reports</span></div>
-  <div class="tile Immediate"><b id="n-Immediate">0</b><span>Immediate</span></div>
-  <div class="tile Unassessed"><b id="n-Unassessed">0</b><span>Unassessed</span></div>
-  <div class="tile Delayed"><b id="n-Delayed">0</b><span>Delayed</span></div>
-  <div class="tile Minor"><b id="n-Minor">0</b><span>Minor</span></div>
-  <div class="tile Deceased"><b id="n-Deceased">0</b><span>Deceased</span></div>
-</section>
+<div class="app">
+  <div class="rail">
+    <h1 class="word">Vanguard<span class="sr-only"> ED pre-arrival board</span></h1>
+    <div class="vtabs" role="tablist" aria-label="Report status" aria-orientation="vertical">
+      <button class="railbtn vtab" role="tab" id="tab-inbound" data-f="inbound" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg><span>On the way</span><span class="n" id="t-inbound">0</span></button>
+      <button class="railbtn vtab" role="tab" id="tab-arrived" data-f="arrived" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>Arrived</span><span class="n" id="t-arrived">0</span></button>
+      <button class="railbtn vtab" role="tab" id="tab-cancelled" data-f="cancelled" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>Cancelled</span><span class="n" id="t-cancelled">0</span></button>
+      <button class="railbtn vtab" role="tab" id="tab-all" data-f="all" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg><span>All reports</span><span class="n" id="t-all">0</span></button>
+    </div>
+    <button class="railbtn gear" id="gear" type="button" aria-expanded="false" aria-controls="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 16h14"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg><span>Settings</span></button>
+  </div>
 
-<section class="prep" id="prep"></section>
+  <aside class="left" aria-label="Next patient and teams">
+    <section class="card hero" id="hero" aria-labelledby="hero-h"></section>
+    <section class="card" id="due"></section>
+    <section class="card" id="prep"></section>
+  </aside>
 
-<nav class="tabs">
-  <button data-f="inbound" class="on">Inbound</button>
-  <button data-f="all">All</button>
-  <button data-f="arrived">Arrived</button>
-</nav>
+  <main class="panel-main" id="main" tabindex="-1">
+    <header class="mhead">
+      <div>
+        <h2 class="sec-title" id="view-title">On the way</h2>
+        <span class="sub" id="hospital">ED pre-arrival board</span>
+      </div>
+      <div class="mtools">
+        <label class="search">
+          <span class="sr-only">Search reports</span>
+          <input id="q" type="search" placeholder="Search reports" autocomplete="off">
+          <button class="x" id="qx" type="button" aria-label="Clear search" hidden>×</button>
+        </label>
+        <span class="conn down" id="conn" role="status">Connecting</span>
+        <span class="clock" id="clock" aria-label="Current time"></span>
+      </div>
+    </header>
 
-<main id="list"></main>
+    <section class="settings" id="settings" aria-label="Display settings" hidden>
+      <div>
+        <span class="foot-label" id="theme-label">Theme</span>
+        <div class="seg" role="group" aria-labelledby="theme-label">
+          <button type="button" data-t="auto" aria-pressed="false">Auto</button>
+          <button type="button" data-t="light" aria-pressed="false">Light</button>
+          <button type="button" data-t="dark" aria-pressed="false">Dark</button>
+        </div>
+      </div>
+      <button class="switch" id="sound" type="button" role="switch" aria-checked="false">Sound alerts <span class="state">Off</span></button>
+    </section>
 
-<p class="note">
-  Triage categories are START-style and come from a rescuer's spoken report, interpreted by keyword matching on a
-  watch. They are advisory: confirm every patient on arrival. “Unassessed” means the report was saved but not understood.
-  ETAs use the watch clock, which has no network time on an air-gapped LAN, so treat countdowns as approximate.
-</p>
+    <div class="catbar">
+      <div class="cat-head"><span id="cat-label">Filter by category</span><button class="link" id="cat-clear" type="button" hidden>Show all categories</button></div>
+      <div class="cats" role="group" aria-labelledby="cat-label" id="cats"></div>
+    </div>
+    <p class="sline" id="sline" role="status">Loading reports</p>
+    <div class="filters" id="filters"></div>
+    <div id="alert"></div>
+
+    <div id="view-panel" role="tabpanel" aria-labelledby="tab-inbound">
+      <section id="soon-sec" aria-labelledby="soon-h" hidden>
+        <h2 class="sec-title" id="soon-h">Coming up</h2>
+        <div class="cards3" id="soon"></div>
+      </section>
+      <section id="curve-sec" aria-labelledby="curve-h" hidden>
+        <div class="sec-row">
+          <h2 class="sec-title" id="curve-h">Arrivals curve</h2>
+          <div class="ranges" role="group" aria-label="Chart range">
+            <button class="rb" data-r="15" type="button" aria-pressed="false">15 min</button>
+            <button class="rb" data-r="30" type="button" aria-pressed="false">30 min</button>
+            <button class="rb" data-r="60" type="button" aria-pressed="true">1 h</button>
+            <button class="rb" data-r="180" type="button" aria-pressed="false">3 h</button>
+          </div>
+        </div>
+        <div class="chart" id="curve"></div>
+        <div class="legend2" id="curve-legend" hidden>
+          <span><i class="ln"></i>All patients</span><span><i class="ln imm"></i>Immediate</span><span id="curve-note"></span>
+        </div>
+      </section>
+      <section aria-labelledby="list-h">
+        <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
+        <div id="list" aria-live="off"></div>
+      </section>
+    </div>
+
+    <p class="note">
+      Categories follow START triage from a rescuer's spoken report and are advisory. Confirm each patient on arrival.
+      "Not sure" means the report was saved but not understood. Readiness ticks are saved in this browser only.
+      ETAs use the watch clock, so treat countdowns and the curve as approximate.
+    </p>
+  </main>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+<div class="sr-only" id="live-status" role="status" aria-live="polite" aria-atomic="true"></div>
 
 <script>
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
+  // Keys must match the canonical finding names in watch/lib/nlp/triage_parser.dart.
   const PREP = {
     'Not breathing': 'Resus bay',
     'Difficulty breathing': 'Oxygen / airway',
@@ -133,161 +445,730 @@
     'Weak / dehydrated': 'IV fluids',
   };
   const TRIAGE = ['Immediate', 'Unassessed', 'Delayed', 'Minor', 'Deceased'];
+  const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
+  const LABEL = { Immediate: 'Immediate', Unassessed: 'Not sure', Delayed: 'Delayed', Minor: 'Minor', Deceased: 'Deceased' };
+  const VIEW_TITLE = { inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports' };
 
   let rows = [];
-  let filter = 'inbound';
+  let view = 'inbound';
+  let cat = null;
+  let query = '';
+  let sel = null; // report the user picked for the big card; null = the next to arrive
+  let range = 60; // arrivals curve window, in minutes
+  let lastInbound = [], curveW = 0;
+  let loadState = 'loading'; // loading | ok | error
+  let retrying = false;
+  const PAGE = 50;
+  let limit = PAGE;
   const seen = new Set();
   let firstLoad = true;
+  let soundOn = false;
+  let themePref = 'auto';
+  let ready = {}; // readiness ticks per report id, kept in this browser only
+  try {
+    soundOn = localStorage.getItem('sound') === '1';
+    themePref = localStorage.getItem('theme') || 'auto';
+    ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
+  } catch (_) {}
+  const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
   const $ = (id) => document.getElementById(id);
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const num = (n) => new Intl.NumberFormat().format(n);
+  const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
 
   function el(tag, cls, text) {
     const n = document.createElement(tag);
     if (cls) n.className = cls;
-    if (text !== undefined) n.textContent = text; // textContent: transcripts are untrusted
+    if (text !== undefined) n.textContent = text; // textContent only: transcripts are untrusted
     return n;
   }
+  const shape = (c) => el('i', `shape ${c}`);
+  const fmtDur = (m) => {
+    if (m < 60) return `${num(m)} min`;
+    if (m < 1440) { const h = Math.floor(m / 60), r = m % 60; return r ? `${h} h ${r} min` : `${h} h`; }
+    const d = Math.floor(m / 1440), h = Math.floor((m % 1440) / 60);
+    return h ? `${num(d)} d ${h} h` : `${num(d)} d`;
+  };
+  const ago = (iso) => {
+    const m = Math.round((Date.now() - Date.parse(iso)) / 60000);
+    return m < 1 ? 'just now' : m === 1 ? '1 min ago' : `${fmtDur(m)} ago`;
+  };
+  // An air-gapped watch has no network time. A clock that is days off, or ahead of the hub,
+  // cannot anchor a countdown, so fall back to when the hub received the report.
+  const badClock = (r) => {
+    const c = Date.parse(r.created_at), v = Date.parse(r.received_at);
+    return !Number.isFinite(c) || (Number.isFinite(v) && (v - c > 7 * 864e5 || c - v > 2 * 36e5));
+  };
+  const baseIso = (r) => (badClock(r) ? r.received_at : r.created_at);
+  const etaAt = (r) => (r.eta_minutes ? Date.parse(baseIso(r)) + r.eta_minutes * 60000 : null);
+  const minsLeft = (r) => { const t = etaAt(r); return t === null ? null : Math.round((t - Date.now()) / 60000); };
+  const needsOf = (r) => [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
+  const readyItems = (r) => {
+    const set = new Set(needsOf(r));
+    if (r.age_group === 'Child' || r.age_group === 'Infant') set.add('Paediatrics');
+    return [...set];
+  };
+  const patients = (list) => list.reduce((s, r) => s + r.patient_count, 0);
+  const noun = (r) => {
+    const o = { Child: ['child', 'children'], Infant: ['infant', 'infants'], Elderly: ['elderly patient', 'elderly patients'], Adult: ['adult', 'adults'] }[r.age_group] || ['patient', 'patients'];
+    return `${num(r.patient_count)} ${o[r.patient_count === 1 ? 0 : 1]}`;
+  };
 
-  const etaAt = (r) => (r.eta_minutes ? Date.parse(r.created_at) + r.eta_minutes * 60000 : null);
-
-  /** minutes until arrival (negative = overdue), or null if no ETA was given */
-  function minsLeft(r) {
-    const t = etaAt(r);
-    return t === null ? null : Math.round((t - Date.now()) / 60000);
-  }
-
+  // ---------- data ----------
   async function load() {
-    rows = await (await fetch('/api/triage')).json();
-    render();
-  }
-
-  function summarize() {
-    const inbound = rows.filter((r) => r.status === 'inbound');
-    const byTriage = Object.fromEntries(TRIAGE.map((t) => [t, 0]));
-    const needs = {};
-    let soon = 0;
-    for (const r of inbound) {
-      byTriage[r.triage] += r.patient_count;
-      if (r.triage !== 'Deceased') {
-        const seenNeeds = new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean));
-        if (r.age_group === 'Child' || r.age_group === 'Infant') seenNeeds.add('Paediatrics');
-        for (const n of seenNeeds) needs[n] = (needs[n] || 0) + r.patient_count;
-      }
-      const m = minsLeft(r);
-      if (m !== null && m <= 30 && r.triage !== 'Deceased') soon += r.patient_count;
+    try {
+      const res = await fetch('/api/triage');
+      if (!res.ok) throw new Error('bad status');
+      const next = await res.json();
+      const fresh = firstLoad ? [] : next.filter((r) => !seen.has(r.id));
+      rows = next;
+      loadState = 'ok';
+      for (const k of Object.keys(ready)) if (!rows.some((r) => String(r.id) === k)) delete ready[k];
+      saveReady();
+      render();
+      announceAll(fresh);
+    } catch (_) {
+      loadState = 'error';
+      render();
     }
-    return { inbound, byTriage, needs, soon };
   }
 
-  function renderSummary() {
-    const { inbound, byTriage, needs, soon } = summarize();
-    $('n-total').textContent = inbound.reduce((s, r) => s + r.patient_count, 0);
-    $('n-reports').textContent = inbound.length;
-    for (const t of TRIAGE) $('n-' + t).textContent = byTriage[t];
-
-    const prep = $('prep');
-    prep.replaceChildren(el('h2', '', 'Prepare for'));
-    const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);
-    if (!sorted.length) prep.append(el('span', 'note', 'Nothing inbound.'));
-    for (const [name, n] of sorted) {
-      const c = el('span', 'chip', name);
-      c.append(el('b', '', '×' + n));
-      prep.append(c);
+  async function setStatus(r, status, btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.setAttribute('aria-busy', 'true');
+    try {
+      const res = await fetch(`/api/triage/${r.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) throw new Error('bad status');
+      await load();
+    } catch (_) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.removeAttribute('aria-busy');
+      toast('Could not update this report. Check the hub connection and try again.');
     }
-    if (soon) prep.append(el('span', 'soon', `  ·  ${soon} patient${soon > 1 ? 's' : ''} due within 30 min`));
   }
 
-  function etaBlock(r) {
-    const box = el('div', 'eta');
-    const m = minsLeft(r);
-    if (r.status !== 'inbound') return box;
-    if (m === null) { box.append(el('b', '', 'ETA ?'), el('span', '', 'not stated')); return box; }
-    if (m > 1) box.append(el('b', '', `${m} min`), el('span', '', 'until arrival'));
-    else if (m >= -2) { box.classList.add('due'); box.append(el('b', '', 'DUE NOW'), el('span', '', fmt(etaAt(r)))); }
-    else { box.classList.add('late'); box.append(el('b', '', `+${-m} min`), el('span', '', 'past ETA')); }
-    return box;
+  // ---------- theme ----------
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  function applyTheme() {
+    const dark = themePref === 'dark' || (themePref === 'auto' && mq.matches);
+    document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', dark ? '#061419' : '#DCEDF1');
+    document.querySelectorAll('.seg button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.t === themePref)));
+  }
+  document.querySelectorAll('.seg button').forEach((b) => {
+    b.onclick = () => {
+      themePref = b.dataset.t;
+      try { localStorage.setItem('theme', themePref); } catch (_) {}
+      applyTheme();
+    };
+  });
+  mq.addEventListener('change', applyTheme); // follow the OS while on Auto
+  applyTheme();
+
+  // ---------- alerts ----------
+  function toast(title, sub, category) {
+    const t = el('div', `toast ${category || ''}`, title);
+    if (sub) t.append(el('small', '', sub));
+    const box = $('toasts');
+    while (box.children.length >= 4) box.firstChild.remove(); // never let a backlog fill the screen
+    box.append(t);
+    setTimeout(() => t.remove(), 7000);
+  }
+  function announce(r) {
+    toast(`New ${LABEL[r.triage]} ×${r.patient_count}: ${r.injuries}`,
+          `From ${r.location}${r.eta_minutes ? `, ETA ${r.eta_minutes} min` : ''}`, r.triage);
+    if (soundOn && r.triage === 'Immediate') beep();
+  }
+  // A watch syncing a backlog arrives as one batch: summarise it instead of one toast per report.
+  function announceAll(list) {
+    if (list.length <= 3) { list.forEach(announce); return; }
+    const imm = list.filter((r) => r.triage === 'Immediate');
+    toast(plural(list.length, 'new report'),
+          `${plural(patients(list), 'patient')}${imm.length ? `, ${plural(patients(imm), 'Immediate patient')}` : ''}`,
+          imm.length ? 'Immediate' : '');
+    if (soundOn && imm.length) beep();
+  }
+  function beep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.28, 0.56].forEach((d) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.15, ctx.currentTime + d); g.gain.setValueAtTime(0, ctx.currentTime + d + 0.18);
+        o.start(ctx.currentTime + d); o.stop(ctx.currentTime + d + 0.2);
+      });
+    } catch (_) {}
+  }
+
+  // ---------- derived data ----------
+  const inView = () => rows.filter((r) => view === 'all' || r.status === view);
+  function visible() {
+    const q = query.trim().toLowerCase();
+    return inView().filter((r) => (!cat || r.triage === cat) &&
+      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, LABEL[r.triage]].join(' ').toLowerCase().includes(q)));
+  }
+  function nextToArrive(list) {
+    const live = list.filter((r) => r.triage !== 'Deceased');
+    const timed = live.filter((r) => etaAt(r) !== null).sort((a, b) => etaAt(a) - etaAt(b) || RANK[a.triage] - RANK[b.triage]);
+    return timed[0] || live[0] || null;
+  }
+  // The report shown in the big card: the one the user picked, else the next to arrive.
+  function heroOf(list) {
+    const picked = list.find((r) => r.id === sel);
+    if (picked) return { r: picked, isNext: false };
+    sel = null;
+    const inbound = list.filter((r) => r.status === 'inbound');
+    return { r: nextToArrive(inbound) || list[0] || null, isNext: true };
+  }
+
+  // ---------- render ----------
+  // One atomic, debounced spoken status for meaningful changes in the totals, instead of making every counter live.
+  let lastStatus = '', statusTimer = null;
+  function announceStatus(inbound) {
+    if (loadState !== 'ok') return;
+    const total = patients(inbound), need = patients(inbound.filter((r) => r.triage === 'Immediate'));
+    const msg = total
+      ? `${plural(total, 'patient')} inbound, ${num(need)} ${need === 1 ? 'needs' : 'need'} care right away`
+      : 'No patients inbound';
+    if (firstLoad) { lastStatus = msg; return; }
+    if (msg === lastStatus) return;
+    lastStatus = msg;
+    clearTimeout(statusTimer);
+    statusTimer = setTimeout(() => { $('live-status').textContent = msg; }, 800);
+  }
+
+  // Lists and panels are rebuilt on every update, which would drop keyboard focus.
+  // Controls carry data-fk; after a rebuild, focus goes back to the matching control.
+  function restoreFocus(key) {
+    let n = document.querySelector(`[data-fk="${CSS.escape(key)}"]`);
+    if (!n && key.startsWith('act:')) n = document.querySelector('#hero .btn.primary, #hero .btn') || document.querySelector('#list .item') || $('list-h');
+    if (n && n !== document.activeElement) {
+      if (!n.matches('button, input, a, summary')) n.tabIndex = -1;
+      n.focus({ preventScroll: true });
+    }
   }
 
   function render() {
-    renderSummary();
-    const shown = rows.filter((r) => (filter === 'all' ? true : r.status === filter));
-    const list = $('list');
-    list.replaceChildren();
-    if (!shown.length) list.append(el('div', 'empty', 'No reports. Waiting for rescue watches to send…'));
+    const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
+    const inbound = rows.filter((r) => r.status === 'inbound');
+    announceStatus(inbound);
+    renderNav();
+    const list = loadState === 'loading' ? [] : visible();
+    renderSummary(inbound, list);
+    renderCats();
+    renderFilters();
+    renderAlert();
+    const hero = heroOf(list);
+    renderHero(hero, list);
+    renderSoon(list, hero.r);
+    renderCurve(inbound);
+    renderList(list, hero.r);
+    renderDue(inbound);
+    renderPrep(inbound);
+    for (const r of rows) seen.add(r.id);
+    if (loadState === 'ok') firstLoad = false;
+    if (focusKey) restoreFocus(focusKey);
+  }
 
-    for (const r of shown) {
-      const isNew = !firstLoad && !seen.has(r.id);
-      seen.add(r.id);
-      const card = el('div', `card ${r.triage}${r.status !== 'inbound' ? ' done' : ''}${isNew ? ' fresh' : ''}`);
+  function renderNav() {
+    for (const k of ['inbound', 'arrived', 'cancelled'])
+      $('t-' + k).textContent = num(rows.filter((r) => r.status === k).length);
+    $('t-all').textContent = num(rows.length);
+    document.querySelectorAll('.vtab').forEach((b) => {
+      const on = b.dataset.f === view;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1; // roving tabindex: arrow keys move between tabs
+    });
+    $('view-panel').setAttribute('aria-labelledby', 'tab-' + view);
+    $('view-title').textContent = VIEW_TITLE[view];
+  }
 
-      const left = el('div');
-      left.append(el('div', 'badge', r.triage.toUpperCase()));
-      const count = el('div', 'count', '×' + r.patient_count);
-      if (r.age_group !== 'Unspecified') count.append(el('small', '', r.age_group));
-      left.append(count);
-      card.append(left);
-
-      const body = el('div');
-      body.append(el('div', 'inj', r.injuries));
-      body.append(el('div', 'loc', 'From ' + r.location));
-      const needs = [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
-      if (needs.length && r.triage !== 'Deceased') body.append(el('div', 'needs', 'Prepare: ' + needs.join(' · ')));
-      if (r.raw_text) body.append(el('div', 'raw', '“' + r.raw_text + '”'));
-      body.append(el('div', 'meta', `${r.watch_id} · reported ${fmt(r.created_at)} · received ${fmt(r.received_at)} · ${r.status}`));
-      card.append(body);
-
-      card.append(etaBlock(r));
-
-      const actions = el('div', 'actions');
-      if (r.status === 'inbound') {
-        actions.append(btn(r.id, 'Arrived', 'arrived', true), btn(r.id, 'Cancel', 'cancelled'));
-      } else {
-        actions.append(el('div', 'tag', r.status), btn(r.id, 'Reopen', 'inbound'));
-      }
-      card.append(actions);
-      list.append(card);
+  // One sentence that says exactly what is on screen: the status tab, the category and any search.
+  function renderSummary(inbound, list) {
+    const s = $('sline');
+    if (loadState === 'loading') { s.textContent = 'Loading reports'; return; }
+    if (view === 'inbound' && !cat && !query.trim()) {
+      const total = patients(inbound), need = patients(inbound.filter((r) => r.triage === 'Immediate'));
+      s.textContent = total
+        ? `${plural(total, 'patient')} on the way, ${num(need)} ${need === 1 ? 'needs' : 'need'} care right away`
+        : 'No one is on the way';
+      return;
     }
-    firstLoad = false;
+    const q = query.trim();
+    const bits = [VIEW_TITLE[view]];
+    if (cat) bits.push(LABEL[cat]);
+    if (q) bits.push(`matching “${q.length > 24 ? q.slice(0, 23) + '…' : q}”`);
+    s.textContent = `Showing ${bits.join(', ')}: ${plural(list.length, 'report')}, ${plural(patients(list), 'patient')}`;
+  }
 
-    function btn(id, label, status, primary) {
-      const b = el('button', primary ? 'go' : '', label);
-      b.onclick = async () => {
-        await fetch(`/api/triage/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status }),
-        });
-        load();
-      };
+  function renderCats() {
+    const box = $('cats');
+    box.replaceChildren();
+    const list = inView();
+    const mk = (label, count, value) => {
+      const b = el('button', `tab${value ? ' cat ' + value : ''}${count === 0 ? ' zero' : ''}`);
+      b.type = 'button';
+      b.dataset.fk = 'cat:' + label;
+      b.setAttribute('aria-pressed', String(cat === value));
+      if (value) b.append(shape(value));
+      b.append(document.createTextNode(label), el('span', 'n', num(count)));
+      b.onclick = () => setCat(cat === value ? null : value);
       return b;
+    };
+    $('cat-clear').hidden = !cat;
+    box.append(mk('All categories', patients(list), null));
+    for (const t of TRIAGE) box.append(mk(LABEL[t], patients(list.filter((r) => r.triage === t)), t));
+  }
+
+  function renderFilters() {
+    const filters = $('filters');
+    filters.replaceChildren();
+    const chip = (label, onRemove, full) => {
+      const b = el('button', 'fchip', label);
+      b.type = 'button';
+      b.dataset.fk = 'chip:' + label;
+      b.title = full || label;
+      const x = el('span', '', '×');
+      x.setAttribute('aria-hidden', 'true');
+      b.append(x, el('span', 'sr-only', ', remove filter'));
+      b.onclick = onRemove;
+      filters.append(b);
+    };
+    if (query.trim()) {
+      const q = query.trim();
+      chip(`“${q.length > 28 ? q.slice(0, 27) + '…' : q}”`, () => { setQuery(''); }, q);
+    }
+    $('qx').hidden = !query;
+  }
+
+  function renderAlert() {
+    const alertBox = $('alert');
+    alertBox.replaceChildren();
+    if (loadState !== 'error') return;
+    const a = el('div', 'alert', 'Cannot reach the hub. Showing the last data and retrying every 10 seconds.');
+    a.setAttribute('role', 'alert');
+    const retry = el('button', 'btn', 'Retry now');
+    retry.type = 'button';
+    retry.dataset.fk = 'retry';
+    if (retrying) { retry.disabled = true; retry.classList.add('loading'); }
+    retry.onclick = async () => { retrying = true; render(); await load(); retrying = false; render(); };
+    a.append(retry);
+    alertBox.append(a);
+  }
+
+  // time to arrival, as a block (big on the card, compact in the list)
+  function timeBlock(r, base) {
+    const box = el('div', base);
+    if (r.status !== 'inbound') { box.classList.add('plain'); box.textContent = r.status.charAt(0).toUpperCase() + r.status.slice(1); return box; }
+    const m = minsLeft(r);
+    if (m === null) { box.append('Unknown', el('small', '', 'no time given')); return box; }
+    if (m > 10) box.append(fmtDur(m), el('small', '', 'until arrival'));
+    else if (m > 1) { box.classList.add('soon'); box.append(`${m} min`, el('small', '', 'arriving soon')); }
+    else if (m >= -2) { box.classList.add('soon'); box.append('Now', el('small', '', 'arriving')); }
+    else { box.classList.add('late'); box.append(`+${fmtDur(-m)}`, el('small', '', 'past ETA')); }
+    return box;
+  }
+
+  function actionBtn(r, label, status, kind, scope = 'row') {
+    const b = el('button', `btn ${kind || ''}`, label);
+    b.type = 'button';
+    b.dataset.fk = `act:${scope}:${r.id}:${status}`;
+    b.setAttribute('aria-label', `${label}: ${LABEL[r.triage]} ×${r.patient_count}, ${r.injuries}, from ${r.location}`);
+    b.onclick = () => setStatus(r, status, b);
+    return b;
+  }
+
+  function renderHero({ r, isNext }, list) {
+    const box = $('hero');
+    box.replaceChildren();
+    box.hidden = false;
+    if (loadState === 'loading') {
+      box.append(el('h2', 'eyebrow', 'Next to arrive'), el('div', 'skel'), el('div', 'skel'));
+      box.firstChild.id = 'hero-h';
+      return;
+    }
+    if (!r) { box.hidden = true; return; }
+
+    const h = el('h2', 'eyebrow', isNext && r.status === 'inbound' ? 'Next to arrive' : 'Selected patient');
+    h.id = 'hero-h';
+    h.tabIndex = -1;
+    const badge = el('div', `badge ${r.triage}`);
+    badge.setAttribute('role', 'img');
+    badge.setAttribute('aria-label', LABEL[r.triage]);
+    badge.append(shape(r.triage));
+    box.append(h, badge, el('h3', 'who', r.injuries), el('p', 'where', `${noun(r)} · From ${r.location}`), timeBlock(r, 'big'));
+    const stats = el('div', 'stats');
+    const stat = (k, v) => { const d = el('div', 'stat'); d.append(el('small', '', k), el('b', '', v)); return d; };
+    stats.append(stat('Patients', '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[r.triage]));
+    box.append(stats);
+
+    // readiness checklist (kept in this browser only)
+    const items = r.status === 'inbound' && r.triage !== 'Deceased' ? readyItems(r) : [];
+    if (items.length) {
+      const prep = el('div', 'prep');
+      const head = el('p', 'prep-h', 'Get ready');
+      const cnt = el('span', '');
+      head.append(cnt);
+      prep.append(head);
+      const done = new Set(ready[r.id] || []);
+      const note = el('p', 'note');
+      note.setAttribute('aria-live', 'polite');
+      const upd = () => {
+        const k = items.filter((x) => done.has(x)).length;
+        cnt.textContent = `${k} of ${items.length} ready`;
+        note.textContent = k < items.length ? `${items.length - k} not ready yet. You can still mark arrival.` : '';
+      };
+      for (const it of items) {
+        const lab = el('label', 'ck');
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = done.has(it);
+        cb.onchange = () => {
+          if (cb.checked) done.add(it); else done.delete(it);
+          ready[r.id] = [...done];
+          saveReady();
+          upd();
+        };
+        lab.append(cb, el('span', '', it));
+        prep.append(lab);
+      }
+      prep.append(note);
+      upd();
+      box.append(prep);
+    }
+    const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && !PREP[x]);
+    if (r.triage !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
+      box.append(el('p', 'warn', r.injuries === 'Unspecified'
+        ? 'No findings were understood. Read the note first.'
+        : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
+    }
+    if (r.raw_text) {
+      const d = el('details', 'rnote');
+      d.append(el('summary', '', 'Rescuer note'), el('p', 'r-raw', '“' + r.raw_text + '”'));
+      box.append(d);
+    }
+    box.append(el('p', 'r-meta', badClock(r)
+      ? `${r.watch_id}, watch clock looks wrong, received ${ago(r.received_at)} (${fmt(r.received_at)})`
+      : `${r.watch_id}, reported ${ago(r.created_at)} (${fmt(r.created_at)}), received ${fmt(r.received_at)}`));
+
+    const act = el('div', 'hero-act');
+    if (r.status === 'inbound') act.append(actionBtn(r, 'Mark arrived', 'arrived', 'primary', 'hero'), actionBtn(r, 'Cancel report', 'cancelled', 'quiet', 'hero'));
+    else act.append(actionBtn(r, 'Reopen', 'inbound', '', 'hero'));
+    box.append(act);
+  }
+
+  // Short "when" text for compact cards
+  function whenText(r) {
+    const m = minsLeft(r);
+    if (m === null) return { t: 'No time given', c: '' };
+    if (m > 10) return { t: `In ${fmtDur(m)}`, c: '' };
+    if (m > 1) return { t: `In ${m} min`, c: 'soon' };
+    if (m >= -2) return { t: 'Arriving now', c: 'soon' };
+    return { t: `+${fmtDur(-m)} past ETA`, c: 'late' };
+  }
+  function pick(r) { sel = r.id; render(); $('hero-h').focus({ preventScroll: true }); $('hero').scrollIntoView({ block: 'nearest' }); }
+
+  // Three cards for the patients after the big one, each with a coloured side bar
+  function renderSoon(list, heroReport) {
+    const sec = $('soon-sec'), box = $('soon');
+    const cards = list.filter((r) => r.status === 'inbound' && r.triage !== 'Deceased' && (!heroReport || r.id !== heroReport.id))
+      .sort((a, b) => (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity) || RANK[a.triage] - RANK[b.triage]).slice(0, 3);
+    sec.hidden = view !== 'inbound' || loadState === 'loading' || !cards.length;
+    box.replaceChildren();
+    for (const r of cards) {
+      const w = whenText(r);
+      const b = el('button', `soon-card ${r.triage}`);
+      b.type = 'button';
+      b.dataset.fk = 'soon:' + r.id;
+      b.append(el('span', `t ${w.c}`, `${LABEL[r.triage]} · ${w.t}`), el('b', '', r.injuries), el('span', 's', `${noun(r)} · ${r.location}`));
+      b.onclick = () => pick(r);
+      box.append(b);
     }
   }
 
-  document.querySelectorAll('.tabs button').forEach((b) => {
-    b.onclick = () => {
-      filter = b.dataset.f;
-      document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
-      render();
+  // Expected arrivals over the next window: a smooth curve for everyone, a dashed one for Immediate
+  const fmtRange = (m) => (m < 60 ? `${Math.round(m)} min` : `${Math.round((m / 60) * 10) / 10} h`);
+  const NS = 'http://www.w3.org/2000/svg';
+  const sv = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text !== undefined) n.textContent = text; return n; };
+  function smoothPath(pts, floor) {
+    let d = `M${pts[0][0]},${pts[0][1]}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      const c1y = Math.min(floor, p1[1] + (p2[1] - p0[1]) / 6), c2y = Math.min(floor, p2[1] - (p3[1] - p1[1]) / 6);
+      d += ` C${p1[0] + (p2[0] - p0[0]) / 6},${c1y} ${p2[0] - (p3[0] - p1[0]) / 6},${c2y} ${p2[0]},${p2[1]}`;
+    }
+    return d;
+  }
+  function renderCurve(inbound) {
+    lastInbound = inbound;
+    const sec = $('curve-sec');
+    sec.hidden = view !== 'inbound';
+    if (sec.hidden) return;
+    document.querySelectorAll('.rb').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.r) === range)));
+    const box = $('curve'), legend = $('curve-legend');
+    box.replaceChildren();
+    if (loadState === 'loading') { box.append(el('div', 'skel')); legend.hidden = true; return; }
+    const N = 12, step = range / N;
+    const all = Array(N).fill(0), imm = Array(N).fill(0);
+    let later = 0, unknown = 0, past = 0;
+    for (const r of inbound) {
+      if (r.triage === 'Deceased') continue;
+      const m = minsLeft(r);
+      if (m === null) { unknown += r.patient_count; continue; }
+      if (m > range) { later += r.patient_count; continue; }
+      if (m <= 0) past += r.patient_count;
+      const i = m <= 0 ? 0 : Math.min(N, Math.ceil(m / step)) - 1; // anyone due or past ETA counts in the first bin
+      all[i] += r.patient_count;
+      if (r.triage === 'Immediate') imm[i] += r.patient_count;
+    }
+    const total = all.reduce((a, b) => a + b, 0), immTotal = imm.reduce((a, b) => a + b, 0);
+    $('curve-note').textContent = [past ? `${num(past)} already past ETA, shown at Now` : '', later ? `${plural(later, 'patient')} later than this window` : '', unknown ? `${plural(unknown, 'patient')} with no ETA` : ''].filter(Boolean).join(' · ');
+    legend.hidden = false;
+    if (!total) { box.append(el('div', 'empty-chart', `No arrivals expected in the next ${fmtRange(range)}.`)); return; }
+
+    const W = Math.max(280, Math.floor(box.clientWidth || 600)), H = 220, L = 30, Rt = 12, T = 12, B = 30;
+    curveW = W;
+    const peak = Math.max(...all), ymax = peak <= 4 ? Math.max(2, peak) : Math.ceil(peak / 2) * 2;
+    const x = (i) => L + (i * (W - L - Rt)) / (N - 1), y = (v) => T + (H - T - B) * (1 - v / ymax), floor = y(0);
+    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
+    const bin = (i) => `${i === 0 ? 'Now' : Math.round(i * step)} to ${Math.round((i + 1) * step)} min`;
+    const busiest = all.indexOf(peak);
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', `Expected arrivals over the next ${fmtRange(range)}: ${plural(total, 'patient')}, ${num(immTotal)} Immediate. Busiest window: ${bin(busiest)} with ${plural(peak, 'patient')}.`);
+    for (const v of [0, ymax / 2, ymax]) {
+      svg.append(sv('line', { class: 'gl', x1: L, x2: W - Rt, y1: y(v), y2: y(v) }), sv('text', { class: 'ax', x: L - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(Math.round(v * 10) / 10)));
+    }
+    [[0, 'Now', 'start'], [4, `+${fmtRange(range / 3)}`, 'middle'], [8, `+${fmtRange((2 * range) / 3)}`, 'middle'], [N - 1, fmtRange(range), 'end']].forEach(([i, t, a]) => {
+      svg.append(sv('line', { class: 'gl', x1: x(i), x2: x(i), y1: T, y2: H - B }), sv('text', { class: 'ax', x: x(i), y: H - 8, 'text-anchor': a }, t));
+    });
+    const ptsAll = all.map((v, i) => [x(i), y(v)]), ptsImm = imm.map((v, i) => [x(i), y(v)]);
+    const lineAll = smoothPath(ptsAll, floor);
+    svg.append(sv('path', { d: `${lineAll} L${x(N - 1)},${floor} L${x(0)},${floor} Z`, fill: 'var(--soft-bg)', opacity: '0.9' }),
+               sv('path', { d: lineAll, fill: 'none', stroke: 'var(--head)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }));
+    if (immTotal) svg.append(sv('path', { d: smoothPath(ptsImm, floor), fill: 'none', stroke: 'var(--danger)', 'stroke-width': 2.5, 'stroke-dasharray': '7 5', 'stroke-linecap': 'round' }));
+    all.forEach((v, i) => {
+      if (!v) return;
+      const c = sv('circle', { cx: x(i), cy: y(v), r: 4.5, fill: 'var(--head)', stroke: 'var(--panel)', 'stroke-width': 2 });
+      c.append(sv('title', {}, `${bin(i)}: ${plural(v, 'patient')}${imm[i] ? `, ${num(imm[i])} Immediate` : ''}`));
+      svg.append(c);
+    });
+    box.append(svg);
+    const list = el('ul', 'sr-only');
+    all.forEach((v, i) => { if (v) list.append(el('li', '', `${bin(i)}: ${plural(v, 'patient')}${imm[i] ? `, ${num(imm[i])} Immediate` : ''}`)); });
+    box.append(list);
+  }
+  // Redraw the curve at the new width (text stays 12 px instead of shrinking with the page)
+  if (window.ResizeObserver) new ResizeObserver(() => { const w = Math.floor($('curve').clientWidth); if (w && Math.abs(w - curveW) > 2) renderCurve(lastInbound); }).observe($('curve'));
+
+  function renderList(list, heroReport) {
+    const out = $('list');
+    out.replaceChildren();
+
+    if (loadState === 'loading') {
+      for (let i = 0; i < 3; i++) {
+        const s = el('div', 'skel-row');
+        const a = el('div', 'skel'), b = el('div', 'skel');
+        a.style.width = '35%'; b.style.width = '75%';
+        s.append(a, b); out.append(s);
+      }
+      return;
+    }
+
+    if (!list.length) {
+      const e = el('div', 'empty');
+      const filtered = cat || query.trim();
+      if (filtered) {
+        e.append(el('b', '', 'No reports match'), el('p', '', 'Nothing in this view fits the current filters.'));
+        const b = el('button', 'btn', 'Clear filters'); b.type = 'button'; b.dataset.fk = 'clear';
+        b.onclick = () => { cat = null; setQuery(''); writeUrl(true); };
+        e.append(b);
+      } else if (view === 'inbound') {
+        e.append(el('b', '', 'No one is on the way'), el('p', '', 'Reports appear here as soon as a rescue watch reaches this network.'));
+      } else {
+        e.append(el('b', '', `No ${view === 'all' ? '' : VIEW_TITLE[view].toLowerCase() + ' '}reports yet`), el('p', '', 'Patients you mark on the On the way view show up here.'));
+      }
+      out.append(e);
+      return;
+    }
+
+    const rest = list.filter((r) => !heroReport || r.id !== heroReport.id);
+    const page = rest.slice(0, limit);
+    const groups = view === 'inbound'
+      ? [['Arriving soon', (r) => { const m = minsLeft(r); return m !== null && m <= 15; }], ['Later', (r) => { const m = minsLeft(r); return m === null || m > 15; }]]
+      : [[VIEW_TITLE[view], () => true]];
+
+    for (const [name, test] of groups) {
+      const part = page.filter(test);
+      if (!part.length) continue;
+      const head = el('div', 'grp');
+      head.append(el('b', '', name), el('span', '', plural(patients(part), 'patient')));
+      out.append(head);
+      for (const r of part) {
+        const isNew = !firstLoad && !seen.has(r.id);
+        const it = el('button', `item${isNew ? ' fresh' : ''}`);
+        it.type = 'button';
+        it.dataset.fk = 'item:' + r.id;
+        const chip = el('span', `chip ${r.triage}`);
+        chip.append(shape(r.triage), document.createTextNode(LABEL[r.triage]));
+        const who = el('span', 'iw', `${noun(r)}, ${r.injuries}`);
+        who.append(el('small', '', `From ${r.location}`));
+        it.append(chip, who, timeBlock(r, 'tm'));
+        it.onclick = () => pick(r);
+        out.append(it);
+      }
+    }
+    if (rest.length > limit) {
+      const more = el('button', 'btn more', `Show ${Math.min(PAGE, rest.length - limit)} more (${num(rest.length - limit)} not shown)`);
+      more.type = 'button';
+      more.dataset.fk = 'more';
+      more.onclick = () => { limit += PAGE; render(); };
+      out.append(more);
+    }
+  }
+
+  function renderDue(inbound) {
+    const box = $('due');
+    box.replaceChildren(el('h2', '', 'Due within 30 minutes'));
+    if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
+    let soon = 0, late = 0;
+    for (const r of inbound) {
+      if (r.triage === 'Deceased') continue;
+      const m = minsLeft(r);
+      if (m !== null && m <= 30) { soon += r.patient_count; if (m < -2) late += r.patient_count; }
+    }
+    const n = el('div', 'due-n', num(soon));
+    n.append(el('small', '', soon === 1 ? 'patient' : 'patients'));
+    box.append(n, el('p', 'hint', soon ? `${num(late)} past their ETA` : 'No one is due soon'));
+  }
+
+  function renderPrep(inbound) {
+    const box = $('prep');
+    box.replaceChildren(el('h2', '', 'Teams to alert'));
+    if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
+    const needs = {};
+    for (const r of inbound) {
+      if (r.triage === 'Deceased') continue;
+      for (const n of readyItems(r)) needs[n] = (needs[n] || 0) + r.patient_count;
+    }
+    const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);
+    if (!sorted.length) { box.append(el('p', 'hint', 'No teams needed right now.')); return; }
+    box.append(el('p', 'hint', 'For everyone still on the way.'));
+    box.lastChild.style.marginBottom = '12px';
+    const max = sorted[0][1];
+    const wrap = el('div', 'mini-rows');
+    for (const [name, n] of sorted) {
+      const m = el('div', 'mini');
+      m.append(el('span', 'name', name), el('span', 'v', num(n)));
+      const track = el('div', 'track'), fill = el('i');
+      fill.style.width = `${Math.round((n / max) * 100)}%`;
+      track.append(fill); m.append(track); wrap.append(m);
+    }
+    box.append(wrap);
+  }
+
+  // ---------- controls ----------
+  // Where you are (status tab, category, search) lives in the URL, so refresh and the Back button keep it.
+  const VIEWS = ['inbound', 'arrived', 'cancelled', 'all'];
+  const qInput = $('q');
+  function readUrl() {
+    const p = new URLSearchParams(location.search);
+    view = VIEWS.includes(p.get('view')) ? p.get('view') : 'inbound';
+    cat = TRIAGE.includes(p.get('cat')) ? p.get('cat') : null;
+    query = p.get('q') || '';
+    qInput.value = query;
+  }
+  function writeUrl(push) {
+    const p = new URLSearchParams();
+    if (view !== 'inbound') p.set('view', view);
+    if (cat) p.set('cat', cat);
+    if (query.trim()) p.set('q', query.trim());
+    const url = location.pathname + (p.toString() ? '?' + p : '');
+    if (url !== location.pathname + location.search) {
+      try { history[push ? 'pushState' : 'replaceState'](null, '', url); } catch (_) {}
+    }
+  }
+  function setView(v) { view = v; sel = null; limit = PAGE; writeUrl(true); render(); }
+  function setCat(c) { cat = c; sel = null; limit = PAGE; writeUrl(true); render(); }
+  window.addEventListener('popstate', () => { readUrl(); sel = null; limit = PAGE; render(); });
+
+  document.querySelectorAll('.vtab').forEach((b, i, all) => {
+    b.onclick = () => setView(b.dataset.f);
+    b.onkeydown = (e) => {
+      let n = null;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') n = (i + 1) % all.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') n = (i - 1 + all.length) % all.length;
+      else if (e.key === 'Home') n = 0;
+      else if (e.key === 'End') n = all.length - 1;
+      if (n === null) return;
+      e.preventDefault();
+      all[n].focus();
+      setView(all[n].dataset.f);
     };
   });
+  $('cat-clear').onclick = () => setCat(null);
+  document.querySelectorAll('.rb').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); render(); }; });
+
+  function setQuery(v) { query = v; qInput.value = v; sel = null; limit = PAGE; writeUrl(false); render(); }
+  qInput.addEventListener('input', () => { query = qInput.value; sel = null; limit = PAGE; writeUrl(false); render(); });
+  $('qx').onclick = () => { setQuery(''); qInput.focus(); };
+
+  $('gear').onclick = () => {
+    const s = $('settings');
+    s.hidden = !s.hidden;
+    $('gear').setAttribute('aria-expanded', String(!s.hidden));
+  };
+
+  const soundBtn = $('sound');
+  function paintSound() {
+    soundBtn.setAttribute('aria-checked', String(soundOn));
+    soundBtn.querySelector('.state').textContent = soundOn ? 'On' : 'Off';
+  }
+  soundBtn.onclick = () => {
+    soundOn = !soundOn;
+    try { localStorage.setItem('sound', soundOn ? '1' : '0'); } catch (_) {}
+    paintSound();
+    if (soundOn) beep(); // the click also unlocks audio in the browser
+  };
+  paintSound();
+
+  // Toasts must never hide the control a keyboard user is on: Escape clears them, and so does moving focus beneath them.
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('toasts').replaceChildren(); });
+  document.addEventListener('focusin', (e) => {
+    const box = $('toasts');
+    if (!box.children.length || box.contains(e.target) || !e.target.getBoundingClientRect) return;
+    const a = e.target.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom) box.replaceChildren();
+  });
+
+  function tick() { $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  tick();
+  setInterval(tick, 10000);
 
   fetch('/api/config').then((r) => r.json()).then((c) => {
-    $('hospital').textContent = c.hospital.toUpperCase();
+    $('hospital').textContent = c.hospital;
     document.title = c.hospital + ' · Pre-Arrival Board';
   }).catch(() => {});
 
   // Live push; the poll is a safety net if the stream drops.
   function connect() {
     const es = new EventSource('/api/events');
-    es.onopen = () => { $('conn').textContent = '● LIVE'; $('conn').className = 'conn live'; };
-    es.addEventListener('triage', load);
-    es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'conn down'; };
+    es.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; };
+    es.addEventListener('triage', () => load());
+    es.onerror = () => { $('conn').textContent = 'Reconnecting'; $('conn').className = 'conn down'; };
   }
-  load().catch(() => {});
+  readUrl();
+  render();
+  load();
   connect();
-  setInterval(() => load().catch(() => {}), 10000);
-  setInterval(render, 15000); // keep ETA countdowns ticking between polls
+  setInterval(load, 10000);
+  setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 </script>
 </body>
 </html>
