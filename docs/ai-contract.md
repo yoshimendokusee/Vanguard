@@ -266,7 +266,8 @@ the hub logs only the error code and transcript length.
 See `QWEN_INTEGRATION.md` for native iOS/watchOS CPU inference, model packaging,
 SQLite-first capture, bounded Watch Connectivity fallback and per-platform evidence.
 Both simulators generated tokens independently; physical-device behavior remains
-unverified. Watch offline speech recognition is not implemented. Qwen is not STT.
+unverified. Watch voice processing now runs bundled multilingual Whisper STT before
+the optional paired-iPhone fallback. Qwen remains text-only.
 
 Persisted extraction takes `{requestId: UUID, baseRevision: integer}` at
 `POST /api/triage/:id/ai-extract`. It uses the current stored transcript, appends

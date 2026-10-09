@@ -37,7 +37,7 @@ jobs:
           node --test .github/scripts/validate-repository.test.js
           node .github/scripts/validate-repository.js
           git show --format= --check --diff-merges=first-parent HEAD
-          bash -n fake-watch.sh scripts/qwen-*.sh
+          bash -n fake-watch.sh scripts/qwen-*.sh scripts/whisper-watch-build.sh
           node --check scripts/qwen-check.cjs
       - name: Workflow syntax and expression validation
         run: |
