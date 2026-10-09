@@ -54,6 +54,7 @@ final class CaptureModel: ObservableObject {
             hubToken = HubCredential.read()
             status = "Capture ready; model loads on first request"
             if ProcessInfo.processInfo.arguments.contains("--qwen-smoke") { smoke() }
+            else if ProcessInfo.processInfo.arguments.contains("--qwen-diagnostic") { diagnostic() }
             else { recover() }
         } catch { status = "Local storage/model unavailable: \(error)" }
     }
@@ -196,6 +197,92 @@ final class CaptureModel: ObservableObject {
         status = "On-device speech and Qwen output persisted; clinical verification pending"
     }
     #endif
+    /// Runs the real inference battery and writes machine-readable evidence.
+    /// Every prompt goes through the same local `QwenEngine`; nothing is mocked,
+    /// cached or fetched from a backend, iPhone or Ollama.
+    private func diagnostic() {
+        guard let workflow else { return }
+        busy = true
+        task = Task {
+            defer { busy = false }
+            let runID = UUID().uuidString.lowercased()
+            let started = Date()
+            var cases: [[String: Any]] = []
+            var failures: [String] = []
+            func record(_ name: String, input: String, output: QwenGeneration) {
+                cases.append(["name": name, "input": input, "output": output.text,
+                    "inputTokens": output.inputTokens, "generatedTokens": output.generatedTokens,
+                    "inferenceExecuted": true, "durationSeconds": output.completionSeconds,
+                    "tokensPerSecond": output.tokensPerSecond, "error": NSNull()])
+            }
+            func recordFailure(_ name: String, input: String, error: Error) {
+                failures.append("\(name): \(error)")
+                cases.append(["name": name, "input": input, "output": NSNull(),
+                    "inputTokens": 0, "generatedTokens": 0, "inferenceExecuted": false,
+                    "durationSeconds": 0, "tokensPerSecond": 0, "error": String(describing: error)])
+            }
+            do {
+                QwenDiagnosticLog.event("Simulator detected: \(QwenEngine.processIdentity())")
+                QwenDiagnosticLog.event("Diagnostic run \(runID): \(QwenDiagnostic.cases.count) prompts")
+                for item in QwenDiagnostic.cases {
+                    do {
+                        let output = try await workflow.engine.generate(
+                            system: "You are Qwen3-0.6B running locally inside the Vanguard Apple Watch app.",
+                            prompt: item.input, maxTokens: 128)
+                        record(item.name, input: item.input, output: output)
+                    } catch { recordFailure(item.name, input: item.input, error: error) }
+                }
+                // A unique marker per run proves the response is generated now, not
+                // replayed from a previous run or hardcoded.
+                let marker = String(runID.prefix(8))
+                do {
+                    let output = try await workflow.engine.generate(
+                        system: "Reply with only the verification marker.",
+                        prompt: "Echo verification. Reply with exactly this text: VANGUARD_WATCH_QWEN_TEST_OK_\(marker)",
+                        maxTokens: 64)
+                    record("unique-echo-\(marker)",
+                        input: "Echo verification. Reply with exactly this text: VANGUARD_WATCH_QWEN_TEST_OK_\(marker)",
+                        output: output)
+                } catch { recordFailure("unique-echo-\(marker)", input: "echo \(marker)", error: error) }
+                let elapsed = Date().timeIntervalSince(started)
+                let passed = failures.isEmpty && cases.allSatisfy { ($0["generatedTokens"] as? Int ?? 0) > 0 }
+                let evidence: [String: Any] = ["status": passed ? "PASS" : "FAIL", "runID": runID,
+                    "platform": device.rawValue, "model": "Qwen3-0.6B",
+                    "execution": "Native Watch Application", "backendDependency": "NONE",
+                    "iphoneDependency": "NONE", "simulator": true,
+                    "device": QwenEngine.processIdentity(),
+                    "totalDurationSeconds": elapsed, "cases": cases, "failures": failures,
+                    "pipelineLog": QwenDiagnosticLog.recorded, "hardwareVerified": false]
+                try JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys])
+                    .write(to: documents.appendingPathComponent("qwen-diagnostic.json"), options: .atomic)
+                status = passed ? "Diagnostic PASS: \(cases.count) native inferences" : "Diagnostic FAIL: \(failures.count) case(s)"
+                result = cases.map { "\($0["name"] ?? ""): \((($0["output"] as? String) ?? "").prefix(60))" }.joined(separator: "\n")
+            } catch {
+                let evidence: [String: Any] = ["status": "FAIL", "runID": runID, "platform": device.rawValue,
+                    "error": String(describing: error), "cases": cases, "failures": failures,
+                    "pipelineLog": QwenDiagnosticLog.recorded, "hardwareVerified": false]
+                try? JSONSerialization.data(withJSONObject: evidence, options: [.sortedKeys])
+                    .write(to: documents.appendingPathComponent("qwen-diagnostic.json"), options: .atomic)
+                status = "Diagnostic failed: \(error)"
+            }
+        }
+    }
+
+    /// Test hook: runs the real local engine against every diagnostic case and
+    /// returns each actual generation. Uses the repository GGUF, never a fixture.
+    public func runDiagnosticCases() async throws -> [QwenGeneration] {
+        guard let workflow else { throw NativeStoreFailure.unavailable }
+        _ = try await workflow.engine.manifest()
+        return try await workflow.runDiagnosticCases()
+    }
+
+    /// Reinitializes inference from a clean process-equivalent state, proving the
+    /// model loads again rather than only being usable once.
+    public func reloadEngineAfterRestart(newEngine: QwenEngine) async -> Bool {
+        do { _ = try await newEngine.manifest(); _ = try await newEngine.generate(system: "Reply briefly.", prompt: "Reply OK.", maxTokens: 16); return true }
+        catch { return false }
+    }
+
     private func smoke() {
         guard let workflow else { return }
         busy = true

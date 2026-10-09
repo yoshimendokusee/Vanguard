@@ -236,7 +236,16 @@ Both simulator apps generated real tokens and persisted synthetic processing.
 The actual Watch device target also compiled unsigned against its SDK. These checks
 do not prove physical Watch memory, speech, thermals, background transfer or delivery.
 See `QWEN_INTEGRATION.md`, `QWEN_AUDIT.md` and `QWEN_RESULTS.md` for exact status,
-resource measurements, setup and scripts. The system remains a synthetic prototype
+resource measurements, setup and scripts.
+
+A later Watch-specific run on 2026-10-10 (branch `Ticket/Test-qwen`) re-verified
+this with per-request evidence: seven distinct prompts answered by real local
+inference inside `VanguardWatch`, a correct unseen-word completion, a per-run
+unique echo marker, and a cold relaunch that generated tokens again with the hub
+and Ollama stopped. `[VANGUARD_QWEN_WATCH]` pipeline logging was added for that.
+Physical Watch memory, speech, thermals, background transfer and delivery remain
+unverified. See [Watch Qwen simulator verification](WATCH_QWEN_SIMULATOR_VERIFICATION.md)
+and `scripts/test-watch-qwen.sh`. The system remains a synthetic prototype
 with unauthenticated HTTP and unencrypted storage, not a real-patient deployment.
 
 

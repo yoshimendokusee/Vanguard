@@ -5,6 +5,16 @@ public actor NativeWorkflow {
     public let engine: QwenEngine
     public init(store: NativeStore, engine: QwenEngine) { self.store = store; self.engine = engine }
 
+    /// Sequential on purpose: the engine serializes generation, so this also
+    /// proves repeated inference on one loaded model.
+    public func runDiagnosticCases(system: String = "You are Qwen3-0.6B running locally inside the Vanguard Apple Watch app.") async throws -> [QwenGeneration] {
+        var results: [QwenGeneration] = []
+        for item in QwenDiagnostic.cases {
+            results.append(try await engine.generate(system: system, prompt: item.input, maxTokens: 128))
+        }
+        return results
+    }
+
     public func process(_ capture: NativeCapture, device: AiDevice) async throws -> NativeProcessing {
         // Never depend on an inference engine or paired device to preserve input.
         try await store.save(capture)

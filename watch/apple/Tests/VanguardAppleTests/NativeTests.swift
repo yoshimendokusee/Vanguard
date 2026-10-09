@@ -70,6 +70,48 @@ final class NativeTests: XCTestCase {
         XCTAssertEqual(originals[0].transcript, original)
     }
 
+    func testDiagnosticCasesCoverRepeatedAndSemanticGeneration() {
+        let cases = QwenDiagnostic.cases
+        XCTAssertGreaterThanOrEqual(cases.count, 5, "Repeated inference needs at least five distinct requests")
+        XCTAssertEqual(Set(cases.map { $0.input }).count, cases.count, "Each request must be distinct")
+        XCTAssertTrue(cases.contains { $0.input.contains("VANGUARD_QWEN_READY") })
+        XCTAssertTrue(cases.contains { $0.input.contains("2 plus 3") })
+        XCTAssertTrue(cases.contains { $0.input.lowercased().contains("bpm") })
+        // A semantic case must require an answer the prompt never states.
+        XCTAssertTrue(cases.contains { $0.input.contains("organ that pumps blood") && !$0.input.lowercased().contains("heart") })
+    }
+
+    func testDiagnosticLogRecordsPipelineEventsWithoutPromptContent() {
+        QwenDiagnosticLog.event("Synthetic pipeline event")
+        let recorded = QwenDiagnosticLog.recorded
+        XCTAssertTrue(recorded.contains { $0.hasPrefix(QwenDiagnosticLog.prefix) })
+        XCTAssertFalse(recorded.contains { $0.contains("Synthetic patient") }, "Diagnostic logs must never carry patient content")
+    }
+
+    func testLiveDiagnosticBatteryRunsRealInference() async throws {
+        guard let path = ProcessInfo.processInfo.environment["VANGUARD_LIVE_MODEL_DIR"] else { throw XCTSkip("Set VANGUARD_LIVE_MODEL_DIR; fixtures are not inference evidence") }
+        let directory = URL(fileURLWithPath: path)
+        let store = try NativeStore(file: FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString + ".sqlite"))
+        let workflow = NativeWorkflow(store: store, engine: QwenEngine(directory: directory))
+        let outputs = try await workflow.runDiagnosticCases()
+        XCTAssertEqual(outputs.count, QwenDiagnostic.cases.count)
+        for output in outputs {
+            XCTAssertGreaterThan(output.inputTokens, 0, "Prompt must be tokenized")
+            XCTAssertGreaterThan(output.generatedTokens, 0, "Model must generate tokens")
+            XCTAssertFalse(output.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            XCTAssertTrue(output.runtime.contains("llama.cpp"))
+        }
+        // Sequential repeated inference must keep working on the same engine.
+        let again = try await workflow.runDiagnosticCases()
+        XCTAssertEqual(again.count, outputs.count)
+        // A fresh engine proves the model loads again after a restart.
+        let fresh = QwenEngine(directory: directory)
+        _ = try await fresh.manifest()
+        let afterRestart = try await fresh.generate(system: "Reply briefly.", prompt: "Reply OK.", maxTokens: 16)
+        XCTAssertGreaterThan(afterRestart.generatedTokens, 0, "Qwen must initialize again after a restart")
+        print("PASS: \(outputs.count) real native diagnostic inferences plus restart reinitialization")
+    }
+
     func testLiveNativeGenerationWhenRequested() async throws {
         guard let path = ProcessInfo.processInfo.environment["VANGUARD_LIVE_MODEL_DIR"] else { throw XCTSkip("Set VANGUARD_LIVE_MODEL_DIR for real native execution; fixtures are not inference evidence") }
         if ProcessInfo.processInfo.environment["VANGUARD_REQUIRE_NETWORK_DENIED"] == "1" {

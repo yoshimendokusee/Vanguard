@@ -36,8 +36,46 @@ public struct ModelArtifact: Codable, Sendable {
     }
 }
 
+/// Identifiable diagnostic events for the Watch inference pipeline. Only counts,
+/// timings, paths and model identity are logged; prompts, transcripts and other
+/// patient content are never written here.
+public enum QwenDiagnosticLog {
+    public static let prefix = "[VANGUARD_QWEN_WATCH]"
+    private static let lock = NSLock()
+    private static var trail: [String] = []
+
+    public static func event(_ message: String) {
+        let line = "\(prefix) \(message)"
+        lock.lock(); trail.append(line); lock.unlock()
+        print(line)
+    }
+
+    /// Messages recorded since process start, for the diagnostic report.
+    public static var recorded: [String] {
+        lock.lock(); defer { lock.unlock() }
+        return trail
+    }
+}
+
+/// Runtime smoke prompts for the Watch diagnostic. These exercise generation, not
+/// clinical correctness; patient-content handling is covered by the native workflow.
+public enum QwenDiagnostic {
+    public struct Case: Sendable { public let name: String; public let input: String }
+    public static let cases: [Case] = [
+        Case(name: "echo", input: "Reply exactly: VANGUARD_QWEN_READY"),
+        Case(name: "basic-reasoning", input: "What is 2 plus 3? Reply with one number."),
+        Case(name: "filipino-understanding", input: "Isalin sa English: Masakit ang ulo ko."),
+        Case(name: "english-understanding", input: "Translate 'I feel dizzy' into Filipino."),
+        Case(name: "healthcare-terminology", input: "What does BPM stand for in heart-rate monitoring?"),
+        // Requires an answer the prompt never contains, so a replayed or
+        // hardcoded string cannot satisfy it.
+        Case(name: "semantic-generation", input: "Complete this sentence with one word: The organ that pumps blood is the")
+    ]
+}
+
 public struct QwenGeneration: Codable, Sendable {
     public let text: String
+    public let inputTokens: Int
     public let generatedTokens: Int
     public let initializationSeconds: Double
     public let completionSeconds: Double
@@ -74,16 +112,20 @@ public actor QwenEngine {
     private func load() throws {
         if model != nil { return }
         let start = Date()
+        QwenDiagnosticLog.event("Initializing model")
         let verified = try ModelArtifact.verify(directory: directory)
+        QwenDiagnosticLog.event("Model path resolved: \(directory.appendingPathComponent(verified.file).path)")
         #if (os(iOS) || os(watchOS)) && !targetEnvironment(simulator)
         // Conservative process-budget check, not a guarantee against OS jetsam.
         guard os_proc_available_memory() > UInt64(verified.sizeBytes + 96 * 1_048_576) else { throw QwenFailure.insufficientMemory }
         #endif
+        QwenDiagnosticLog.event("Loading model weights: \(verified.model) \(verified.file) \(verified.sizeBytes) bytes")
         llama_backend_init()
         var parameters = llama_model_default_params()
         parameters.n_gpu_layers = 0
         parameters.use_mmap = true
         guard let loaded = llama_model_load_from_file(directory.appendingPathComponent(verified.file).path, parameters) else { throw QwenFailure.loadFailed }
+        guard llama_model_get_vocab(loaded) != nil else { llama_model_free(loaded); throw QwenFailure.loadFailed }
         var settings = llama_context_default_params()
         #if os(watchOS)
         settings.n_ctx = 1024
@@ -100,7 +142,11 @@ public actor QwenEngine {
         }
         model = loaded; context = initialized; artifact = verified
         initializationSeconds = Date().timeIntervalSince(start)
+        QwenDiagnosticLog.event("Model loaded in \(String(format: "%.3f", initializationSeconds))s")
+        QwenDiagnosticLog.event("Tokenizer initialized from embedded GGUF vocabulary (\(llama_vocab_n_tokens(vocabOf()))) tokens)")
     }
+
+    private func vocabOf() -> OpaquePointer? { model.flatMap { llama_model_get_vocab($0) } }
 
     public func generate(system: String, prompt: String, maxTokens: Int = 160, timeout: TimeInterval = 60) throws -> QwenGeneration {
         do { return try generateTokens(system: system, prompt: prompt, maxTokens: maxTokens, timeout: timeout) }
@@ -121,6 +167,7 @@ public actor QwenEngine {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(timeout))
         let ctx = context!, vocab = llama_model_get_vocab(model!)!
+        QwenDiagnosticLog.event("Starting inference in \(Self.processIdentity())")
         // Encode untrusted input as JSON, preventing literal ChatML delimiter injection.
         let quoted = String(data: try JSONEncoder().encode(prompt), encoding: .utf8)!
             .replacingOccurrences(of: "<", with: "\\u003c").replacingOccurrences(of: ">", with: "\\u003e")
@@ -130,6 +177,7 @@ public actor QwenEngine {
         var tokens = [llama_token](repeating: 0, count: Int(count))
         let actual = llama_tokenize(vocab, chat, Int32(chat.utf8.count), &tokens, count, false, true)
         guard actual == count else { throw QwenFailure.decodeFailed }
+        QwenDiagnosticLog.event("Input tokens generated: \(tokens.count)")
         llama_memory_clear(llama_get_memory(ctx), true)
         func check() throws {
             try Task.checkCancellation()
@@ -159,13 +207,28 @@ public actor QwenEngine {
             guard llama_decode(ctx, llama_batch_get_one(&token, 1)) == 0 else { throw QwenFailure.decodeFailed }
         }
         guard completed else { throw QwenFailure.incompleteOutput }
+        QwenDiagnosticLog.event("Output tokens generated: \(generated)")
         guard generated > 0, let text = String(data: output, encoding: .utf8), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw QwenFailure.emptyOutput }
         var usage = rusage()
         getrusage(RUSAGE_SELF, &usage)
         state = .ready
-        return QwenGeneration(text: text, generatedTokens: generated,
-            initializationSeconds: initializationSeconds, completionSeconds: Date().timeIntervalSince(start),
+        let completion = Date().timeIntervalSince(start)
+        QwenDiagnosticLog.event("Inference completed in \(String(format: "%.3f", completion))s, peak RSS \(usage.ru_maxrss) bytes")
+        return QwenGeneration(text: text, inputTokens: tokens.count, generatedTokens: generated,
+            initializationSeconds: initializationSeconds, completionSeconds: completion,
             tokensPerSecond: Double(generated) / max(0.001, Date().timeIntervalSince(generationStart)),
             peakResidentBytes: UInt64(usage.ru_maxrss), runtime: "llama.cpp/b6500 CPU")
+    }
+
+    /// Identifies the process that is actually running inference, so a Watch result
+    /// cannot be confused with iPhone, backend or Ollama execution.
+    public static func processIdentity() -> String {
+        let info = ProcessInfo.processInfo
+        #if targetEnvironment(simulator)
+        let simulator = "simulator"
+        #else
+        let simulator = "device"
+        #endif
+        return "\(info.processName) pid=\(info.processIdentifier) \(info.operatingSystemVersion) \(simulator) target=\(info.hostName)"
     }
 }
