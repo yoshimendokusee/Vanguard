@@ -215,8 +215,21 @@
         <div class="check" id="check" hidden></div>
       </section>
       <section aria-labelledby="list-h">
-        <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
+        <div class="list-header-bar">
+          <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
+          <div class="per-page-wrap">
+            <label for="per-page-select" class="per-page-label">Per page:</label>
+            <select id="per-page-select" class="per-page-select" title="Number of reports per page">
+              <option value="5">5</option>
+              <option value="10" selected>10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="1000">All</option>
+            </select>
+          </div>
+        </div>
         <div id="list" aria-live="off"></div>
+        <div class="pager-nav" id="pager-nav"></div>
       </section>
     </div>
 

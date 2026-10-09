@@ -1711,26 +1711,37 @@ section[hidden] { display: none !important; }
 .g-leg.prog { color: #0EA5E9; }
 .g-leg.pend { color: #F59E0B; }
 
-/* Dashboard view display rules */
+/* Dashboard & View Grid Rules */
 .app[data-view="dashboard"] :is(.catbar, #sline, #filters, #alert, #board-sec, #hist-sec, #prep, #ai-panel) { display: none !important; }
 .app[data-view="dashboard"] .left { display: none !important; }
 .app:not([data-view="dashboard"]) #dash-sec { display: none !important; }
 
-@media (min-width: 1181px) {
-  /* Side Taskbar Mode: .rail is in column 1, .panel-main is in column 2 taking remaining space */
-  .app[data-view="dashboard"]:not([data-navpos="top"]) {
+/* Side Taskbar Mode for Dashboard */
+.app[data-view="dashboard"]:not([data-navpos="top"]) {
+  grid-template-columns: 7.5rem minmax(0, 1fr) !important;
+}
+.app[data-view="dashboard"]:not([data-navpos="top"]) .panel-main {
+  grid-column: 2 / -1 !important;
+}
+
+/* Top Taskbar Mode for Dashboard */
+.app[data-view="dashboard"][data-navpos="top"] {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+.app[data-view="dashboard"][data-navpos="top"] .panel-main {
+  grid-column: 1 / -1 !important;
+}
+
+/* Responsive adjustment when left sidebar is hidden or on narrow viewports */
+@media (max-width: 1180px) {
+  .app:not([data-navpos="top"]) {
     grid-template-columns: 7.5rem minmax(0, 1fr);
   }
-  .app[data-view="dashboard"]:not([data-navpos="top"]) .panel-main {
+  .app:not([data-view="dashboard"]) .left {
+    display: none !important;
+  }
+  .app:not([data-navpos="top"]) .panel-main {
     grid-column: 2 / -1;
-  }
-  
-  /* Top Taskbar Mode: .rail is full width on top, .panel-main spans full width below top rail */
-  .app[data-view="dashboard"][data-navpos="top"] {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .app[data-view="dashboard"][data-navpos="top"] .panel-main {
-    grid-column: 1 / -1;
   }
 }
 .app[data-view="dashboard"] #dash-sec {
@@ -1806,5 +1817,92 @@ section[hidden] { display: none !important; }
 }
 .info-dialog-head .x:hover {
   color: var(--text);
+}
+
+/* ---------- Patients List Header & Pager Controls ---------- */
+.list-header-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+  flex-wrap: wrap;
+}
+.per-page-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--dim);
+}
+.per-page-select {
+  padding: 5px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.per-page-select:hover {
+  border-color: var(--accent);
+  background: var(--panel);
+}
+
+.pager-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--s3);
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.pager-info {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--dim);
+}
+.pager-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pager-btn, .pager-num {
+  padding: 6px 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  min-height: 36px;
+  min-width: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--dur-fast) var(--ease);
+}
+.pager-btn:hover:not(:disabled), .pager-num:hover:not(.active) {
+  background: var(--panel-3);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+.pager-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.pager-num.active {
+  background: var(--accent);
+  color: var(--on-accent);
+  border-color: var(--accent);
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
 }
 

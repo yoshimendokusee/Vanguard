@@ -36,8 +36,8 @@
   let bsel = null; // board column the user picked (0-5, 'later' or 'noeta'); null follows the soonest column with patients
   let loadState = 'loading'; // loading | ok | error
   let retrying = false;
-  const PAGE = 50;
-  let limit = PAGE;
+  let pageSize = 10;
+  let currentPage = 1;
   const seen = new Set();
   let firstLoad = true;
   let soundOn = false;
@@ -48,6 +48,8 @@
     show = localStorage.getItem('show') === 'urgent' ? 'urgent' : 'all';
     themePref = localStorage.getItem('theme') || 'auto';
     ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
+    const savedSize = parseInt(localStorage.getItem('pageSize'), 10);
+    if ([5, 10, 20, 50, 1000].includes(savedSize)) pageSize = savedSize;
   } catch (_) {}
   const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
@@ -271,24 +273,28 @@
   }
 
   function render() {
-    const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
-    const inbound = rows.filter((r) => r.status === 'inbound');
-    announceStatus(inbound);
-    renderNav();
-    const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : isHistory() ? historyRows() : visible();
-    renderSummary(inbound, list);
-    renderCats();
-    renderFilters();
-    renderAlert();
-    autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
-    const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
-    const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
-    renderDashboard();
-    renderList(board || hist || list);
-    renderPrep(inbound);
-    for (const r of rows) seen.add(r.id);
-    if (loadState === 'ok') firstLoad = false;
-    if (focusKey) restoreFocus(focusKey);
+    try {
+      const focusKey = document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.fk : null;
+      const inbound = rows.filter((r) => r.status === 'inbound');
+      announceStatus(inbound);
+      renderNav();
+      const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : isHistory() ? historyRows() : visible();
+      renderSummary(inbound, list);
+      renderCats();
+      renderFilters();
+      renderAlert();
+      autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
+      const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
+      const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
+      renderDashboard();
+      renderList(board || hist || list);
+      renderPrep(inbound);
+      for (const r of rows) seen.add(r.id);
+      if (loadState === 'ok') firstLoad = false;
+      if (focusKey) restoreFocus(focusKey);
+    } catch (err) {
+      console.error('Render error:', err);
+    }
   }
 
   function renderNav() {
@@ -747,7 +753,7 @@
     b.onclick = () => setShow('all');
     fold.append(b);
   }
-  function setShow(v) { show = v; try { localStorage.setItem('show', v); } catch (_) {} limit = PAGE; render(); }
+  function setShow(v) { show = v; try { localStorage.setItem('show', v); } catch (_) {} currentPage = 1; render(); }
   // Arrow keys move between time blocks without leaving the row you are on.
   $('board').addEventListener('keydown', (e) => {
     if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) || !e.target.dataset.row) return;
@@ -1173,7 +1179,14 @@
 
   function renderList(list) {
     const out = $('list');
+    const pagerNav = $('pager-nav');
     out.replaceChildren();
+    if (pagerNav) pagerNav.replaceChildren();
+
+    const perPageSel = $('per-page-select');
+    if (perPageSel && parseInt(perPageSel.value, 10) !== pageSize) {
+      perPageSel.value = String(pageSize);
+    }
 
     if (loadState === 'loading') {
       for (let i = 0; i < 3; i++) {
@@ -1203,8 +1216,14 @@
       return;
     }
 
-    const rest = list;
-    const page = rest.slice(0, limit);
+    const totalItems = list.length;
+    const totalPages = Math.ceil(totalItems / pageSize) || 1;
+    if (currentPage > totalPages) currentPage = totalPages;
+    if (currentPage < 1) currentPage = 1;
+
+    const startIdx = (currentPage - 1) * pageSize;
+    const page = list.slice(startIdx, startIdx + pageSize);
+
     const groups = view === 'inbound'
       ? [[boardTitle || 'Patients', () => true]]
       : [[isHistory() ? histTitle : VIEW_TITLE[view], () => true]];
@@ -1213,17 +1232,63 @@
       const part = page.filter(test);
       if (!part.length) continue;
       const head = el('div', 'grp');
-      head.append(el('b', '', name), el('span', '', plural(patients(part), 'patient')));
+      head.append(el('b', '', name), el('span', '', `${plural(patients(part), 'patient')}`));
       out.append(head);
       for (const r of part) out.append(entryEl(r));
     }
-    if (rest.length > limit) {
-      const more = el('button', 'btn more', `Show ${Math.min(PAGE, rest.length - limit)} more (${num(rest.length - limit)} not shown)`);
-      more.type = 'button';
-      more.dataset.fk = 'more';
-      more.onclick = () => { limit += PAGE; render(); };
-      out.append(more);
+
+    if (pagerNav && totalItems > 0) {
+      renderPagerControls(pagerNav, totalItems, totalPages);
     }
+  }
+
+  function renderPagerControls(container, totalItems, totalPages) {
+    const startNum = (currentPage - 1) * pageSize + 1;
+    const endNum = Math.min(currentPage * pageSize, totalItems);
+
+    const info = el('div', 'pager-info', `Showing ${num(startNum)}–${num(endNum)} of ${plural(totalItems, 'report')}`);
+
+    const btns = el('div', 'pager-buttons');
+
+    // First
+    const firstBtn = el('button', 'pager-btn', '«');
+    firstBtn.title = 'First Page';
+    firstBtn.disabled = currentPage === 1;
+    firstBtn.onclick = () => { currentPage = 1; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(firstBtn);
+
+    // Prev
+    const prevBtn = el('button', 'pager-btn', '‹ Prev');
+    prevBtn.disabled = currentPage === 1;
+    prevBtn.onclick = () => { currentPage = Math.max(1, currentPage - 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(prevBtn);
+
+    // Page Numbers
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + 4);
+    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+    for (let p = startPage; p <= endPage; p++) {
+      const pageBtn = el('button', `pager-num${p === currentPage ? ' active' : ''}`, String(p));
+      pageBtn.setAttribute('aria-current', p === currentPage ? 'page' : 'false');
+      pageBtn.onclick = () => { currentPage = p; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+      btns.append(pageBtn);
+    }
+
+    // Next
+    const nextBtn = el('button', 'pager-btn', 'Next ›');
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => { currentPage = Math.min(totalPages, currentPage + 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(nextBtn);
+
+    // Last
+    const lastBtn = el('button', 'pager-btn', '»');
+    lastBtn.title = 'Last Page';
+    lastBtn.disabled = currentPage === totalPages;
+    lastBtn.onclick = () => { currentPage = totalPages; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(lastBtn);
+
+    container.append(info, btns);
   }
 
   function renderPrep(inbound) {
@@ -1275,12 +1340,23 @@
   function setView(v) {
     view = v;
     if (v === 'dashboard') cat = null;
-    limit = PAGE;
+    currentPage = 1;
     writeUrl(true);
     render();
   }
-  function setCat(c) { cat = c; limit = PAGE; writeUrl(true); render(); }
-  window.addEventListener('popstate', () => { readUrl(); limit = PAGE; render(); });
+  function setCat(c) { cat = c; currentPage = 1; writeUrl(true); render(); }
+  window.addEventListener('popstate', () => { readUrl(); currentPage = 1; render(); });
+
+  const perPageSel = $('per-page-select');
+  if (perPageSel) {
+    perPageSel.value = String(pageSize);
+    perPageSel.onchange = () => {
+      pageSize = parseInt(perPageSel.value, 10) || 10;
+      try { localStorage.setItem('pageSize', String(pageSize)); } catch (_) {}
+      currentPage = 1;
+      render();
+    };
+  }
 
   const profileBtn = $('rail-profile-btn');
   if (profileBtn) {
@@ -1338,8 +1414,8 @@
   document.querySelectorAll('.rb[data-r]').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); bsel = null; render(); }; });
   document.querySelectorAll('.rb[data-s]').forEach((b) => { b.onclick = () => setShow(b.dataset.s); });
 
-  function setQuery(v) { query = v; qInput.value = v; limit = PAGE; writeUrl(false); render(); }
-  qInput.addEventListener('input', () => { query = qInput.value; limit = PAGE; writeUrl(false); render(); });
+  function setQuery(v) { query = v; qInput.value = v; currentPage = 1; writeUrl(false); render(); }
+  qInput.addEventListener('input', () => { query = qInput.value; currentPage = 1; writeUrl(false); render(); });
   $('qx').onclick = () => { setQuery(''); qInput.focus(); };
 
   const soundBtn = $('sound');
