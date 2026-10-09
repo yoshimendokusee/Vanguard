@@ -23,7 +23,7 @@
   const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
   // Display names follow START mass-casualty triage; the stored values (the keys) never change.
   const LABEL = { Immediate: 'Immediate', Unassessed: 'Unassessed', Delayed: 'Delayed', Minor: 'Minor', Deceased: 'Deceased' };
-  const VIEW_TITLE = { inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports', settings: 'Settings' };
+  const VIEW_TITLE = { dashboard: 'Dashboard', inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports', settings: 'Settings' };
 
   let rows = [];
   let view = 'inbound';
@@ -225,7 +225,7 @@
   }
 
   // ---------- derived data ----------
-  const inView = () => rows.filter((r) => view === 'all' || r.status === view);
+  const inView = () => rows.filter((r) => view === 'all' || view === 'dashboard' || r.status === view);
   const matches = (r, q) => !q || [r.injuries, r.location, r.watch_id, r.raw_text, r.current_transcript, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q);
   function visible() {
     const q = query.trim().toLowerCase();
@@ -283,6 +283,7 @@
     autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
     const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
     const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
+    renderDashboard();
     renderList(board || hist || list);
     renderPrep(inbound);
     for (const r of rows) seen.add(r.id);
@@ -820,6 +821,328 @@
     return urgent.length ? list.filter((r) => !urgent.includes(r)) : list;
   }
 
+  // ---------- Emergency Operations & Analytics Dashboard ----------
+  function renderDashboard() {
+    const sec = $('dash-sec');
+    if (!sec) return;
+    sec.hidden = view !== 'dashboard';
+    if (sec.hidden) return;
+
+    const box = $('dash-container');
+    box.replaceChildren();
+
+    if (loadState === 'loading') {
+      box.append(el('div', 'skel'));
+      return;
+    }
+
+    const all = rows;
+    const totPatients = patients(all);
+    const immPatients = patients(all.filter((r) => category(r) === 'Immediate'));
+    const unaPatients = patients(all.filter((r) => category(r) === 'Unassessed'));
+    const delPatients = patients(all.filter((r) => category(r) === 'Delayed'));
+    const minPatients = patients(all.filter((r) => category(r) === 'Minor'));
+    const decPatients = patients(all.filter((r) => category(r) === 'Deceased'));
+
+    const inbRows = all.filter((r) => r.status === 'inbound');
+    const arrRows = all.filter((r) => r.status === 'arrived');
+    const inbPatients = patients(inbRows);
+    const arrPatients = patients(arrRows);
+
+    // 1. Dashboard Subheader with Action Buttons
+    const dHead = el('div', 'dash-header');
+    const dHeadTitle = el('div', 'dash-header-title');
+    dHeadTitle.append(
+      el('h3', '', 'Emergency Operations Dashboard'),
+      el('p', 'sub', 'Real-time pre-arrival triage telemetry, watch dispatches, and emergency department volume.')
+    );
+    const dHeadActions = el('div', 'dash-header-actions');
+    const addBtn = el('button', 'dash-btn primary', '+ View Active Dispatches');
+    addBtn.onclick = () => setView('inbound');
+    const impBtn = el('button', 'dash-btn outline', 'Refresh Telemetry');
+    impBtn.onclick = () => { load(); toast('Emergency hub telemetry refreshed.'); };
+    dHeadActions.append(addBtn, impBtn);
+    dHead.append(dHeadTitle, dHeadActions);
+    box.append(dHead);
+
+    // 2. Top Row: 4 Stat KPI Cards Grid (Powered by Real System Data)
+    const kpiGrid = el('div', 'dash-kpi-grid');
+    
+    // Card 1 (Featured active teal card)
+    const card1 = el('div', 'dash-kpi-card featured');
+    card1.onclick = () => setView('all');
+    card1.style.cursor = 'pointer';
+    const c1Head = el('div', 'dash-kpi-head');
+    c1Head.append(el('span', 'dash-kpi-label', 'Total Reports'), el('span', 'dash-kpi-arrow', '↗'));
+    card1.append(c1Head, el('b', 'dash-kpi-val', num(all.length)), el('span', 'dash-kpi-badge', `${plural(totPatients, 'patient')} recorded in hub`));
+
+    // Card 2 (Immediate Care)
+    const card2 = el('div', 'dash-kpi-card');
+    card2.onclick = () => { setView('inbound'); setCat('Immediate'); };
+    card2.style.cursor = 'pointer';
+    const c2Head = el('div', 'dash-kpi-head');
+    c2Head.append(el('span', 'dash-kpi-label', 'Immediate Care'), el('span', 'dash-kpi-arrow', '↗'));
+    card2.append(c2Head, el('b', 'dash-kpi-val', num(immPatients)), el('span', 'dash-kpi-badge sub', `${totPatients ? Math.round((immPatients / totPatients) * 100) : 0}% of total acuity`));
+
+    // Card 3 (On The Way)
+    const card3 = el('div', 'dash-kpi-card');
+    card3.onclick = () => setView('inbound');
+    card3.style.cursor = 'pointer';
+    const c3Head = el('div', 'dash-kpi-head');
+    c3Head.append(el('span', 'dash-kpi-label', 'On The Way'), el('span', 'dash-kpi-arrow', '↗'));
+    card3.append(c3Head, el('b', 'dash-kpi-val', num(inbPatients)), el('span', 'dash-kpi-badge sub', `${num(inbRows.length)} active rescue watch dispatches`));
+
+    // Card 4 (Arrived ED)
+    const card4 = el('div', 'dash-kpi-card');
+    card4.onclick = () => setView('arrived');
+    card4.style.cursor = 'pointer';
+    const c4Head = el('div', 'dash-kpi-head');
+    c4Head.append(el('span', 'dash-kpi-label', 'Arrived ED'), el('span', 'dash-kpi-arrow', '↗'));
+    card4.append(c4Head, el('b', 'dash-kpi-val', num(arrPatients)), el('span', 'dash-kpi-badge sub', `${num(arrRows.length)} ED intake completed`));
+
+    kpiGrid.append(card1, card2, card3, card4);
+    box.append(kpiGrid);
+
+    // 3. Middle Row: Real Triage Acuity Bar Chart + Urgent Notice Card
+    const midRow = el('div', 'dash-mid-row');
+
+    // Triage Acuity Distribution Bar Chart Card
+    const chartCard = el('div', 'dash-card analytics-card');
+    chartCard.append(el('h4', 'dash-card-title', 'Triage Acuity Distribution'));
+    chartCard.append(el('p', 'hint', 'Total patient count dynamically categorized by START triage urgency'));
+    
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('viewBox', '0 0 540 220');
+    svg.setAttribute('class', 'project-analytics-svg');
+    
+    const defs = document.createElementNS(svgNS, 'defs');
+    const pat = document.createElementNS(svgNS, 'pattern');
+    pat.setAttribute('id', 'stripe-pattern');
+    pat.setAttribute('width', '8');
+    pat.setAttribute('height', '8');
+    pat.setAttribute('patternUnits', 'userSpaceOnUse');
+    pat.setAttribute('patternTransform', 'rotate(45)');
+    const patLine = document.createElementNS(svgNS, 'line');
+    patLine.setAttribute('x1', '0'); patLine.setAttribute('y1', '0');
+    patLine.setAttribute('x2', '0'); patLine.setAttribute('y2', '8');
+    patLine.setAttribute('stroke', '#DC2626'); patLine.setAttribute('stroke-width', '3');
+    pat.append(patLine);
+    defs.append(pat);
+    svg.append(defs);
+
+    const triageStats = [
+      { label: 'Immediate', count: immPatients, color: '#DC2626', type: 'stripe' },
+      { label: 'Unassessed', count: unaPatients, color: '#64748B', type: 'solid' },
+      { label: 'Delayed', count: delPatients, color: '#F59E0B', type: 'solid' },
+      { label: 'Minor', count: minPatients, color: '#10B981', type: 'solid' },
+      { label: 'Deceased', count: decPatients, color: '#334155', type: 'solid' }
+    ];
+
+    const maxCount = Math.max(...triageStats.map((s) => s.count), 1);
+
+    triageStats.forEach((b, idx) => {
+      const x = 35 + idx * 98;
+      const bw = 54;
+      const baseY = 180;
+      const h = Math.max(12, (b.count / maxCount) * 140);
+      const y = baseY - h;
+
+      // Track bg
+      const track = document.createElementNS(svgNS, 'rect');
+      track.setAttribute('x', String(x)); track.setAttribute('y', '20');
+      track.setAttribute('width', String(bw)); track.setAttribute('height', '160');
+      track.setAttribute('rx', '14'); track.setAttribute('fill', 'var(--panel-2)');
+      svg.append(track);
+
+      // Pill Bar
+      const bar = document.createElementNS(svgNS, 'rect');
+      bar.setAttribute('x', String(x)); bar.setAttribute('y', String(y));
+      bar.setAttribute('width', String(bw)); bar.setAttribute('height', String(h));
+      bar.setAttribute('rx', '14');
+      if (b.type === 'stripe' && b.count > 0) {
+        bar.setAttribute('fill', 'url(#stripe-pattern)');
+      } else {
+        bar.setAttribute('fill', b.color);
+      }
+      svg.append(bar);
+
+      // Value badge above bar
+      if (b.count > 0) {
+        const txt = document.createElementNS(svgNS, 'text');
+        txt.setAttribute('x', String(x + bw / 2)); txt.setAttribute('y', String(y - 8));
+        txt.setAttribute('text-anchor', 'middle'); txt.setAttribute('fill', 'var(--text)');
+        txt.setAttribute('font-size', '12'); txt.setAttribute('font-weight', '800');
+        txt.textContent = num(b.count);
+        svg.append(txt);
+      }
+
+      // X Axis Label
+      const dayTxt = document.createElementNS(svgNS, 'text');
+      dayTxt.setAttribute('x', String(x + bw / 2)); dayTxt.setAttribute('y', '205');
+      dayTxt.setAttribute('text-anchor', 'middle'); dayTxt.setAttribute('fill', 'var(--dim)');
+      dayTxt.setAttribute('font-size', '11'); dayTxt.setAttribute('font-weight', '600');
+      dayTxt.textContent = b.label;
+      svg.append(dayTxt);
+    });
+
+    chartCard.append(svg);
+    midRow.append(chartCard);
+
+    // Urgent Pre-Arrival Notice Card (Dynamic based on real Immediate inbound reports)
+    const urgentInbound = inbRows.filter((r) => category(r) === 'Immediate');
+    const remCard = el('div', 'dash-card rem-card');
+    remCard.append(el('span', 'dash-card-tag', 'Emergency Alert'));
+    
+    if (urgentInbound.length > 0) {
+      const topReport = urgentInbound[0];
+      const m = minsLeft(topReport);
+      const titleWrap = el('div', 'rem-title-wrap');
+      titleWrap.style.display = 'flex';
+      titleWrap.style.alignItems = 'center';
+      titleWrap.style.gap = '8px';
+      const sirenIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      sirenIcon.setAttribute('viewBox', '0 0 24 24');
+      sirenIcon.setAttribute('width', '22');
+      sirenIcon.setAttribute('height', '22');
+      sirenIcon.setAttribute('fill', 'none');
+      sirenIcon.setAttribute('stroke', '#DC2626');
+      sirenIcon.setAttribute('stroke-width', '2.2');
+      sirenIcon.setAttribute('stroke-linecap', 'round');
+      sirenIcon.setAttribute('stroke-linejoin', 'round');
+      sirenIcon.innerHTML = '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>';
+      const titleEl = el('h3', 'rem-title', topReport.injuries);
+      titleWrap.append(sirenIcon, titleEl);
+      remCard.append(titleWrap);
+      remCard.append(el('p', 'rem-time', `Pickup: ${topReport.location} · ${noun(topReport)}${m !== null ? ` · ETA ${fmtDur(m)}` : ''}`));
+      const actionBtn = el('button', 'dash-btn primary block');
+      actionBtn.style.display = 'inline-flex';
+      actionBtn.style.alignItems = 'center';
+      actionBtn.style.justifyContent = 'center';
+      actionBtn.style.gap = '8px';
+      const btnIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+      btnIcon.setAttribute('viewBox', '0 0 24 24');
+      btnIcon.setAttribute('width', '18');
+      btnIcon.setAttribute('height', '18');
+      btnIcon.setAttribute('fill', 'none');
+      btnIcon.setAttribute('stroke', 'currentColor');
+      btnIcon.setAttribute('stroke-width', '2.2');
+      btnIcon.setAttribute('stroke-linecap', 'round');
+      btnIcon.setAttribute('stroke-linejoin', 'round');
+      btnIcon.innerHTML = '<path d="M12 2v20M2 12h20"/>';
+      actionBtn.append(btnIcon, document.createTextNode('Prepare Resuscitation Bay'));
+      actionBtn.onclick = () => setView('inbound');
+      remCard.append(actionBtn);
+    } else {
+      remCard.append(el('h3', 'rem-title', 'No Urgent Critical Alerts'));
+      remCard.append(el('p', 'rem-time', 'All inbound rescue watches are currently stable or clear.'));
+      const actionBtn = el('button', 'dash-btn outline block', 'View All Dispatches');
+      actionBtn.onclick = () => setView('inbound');
+      remCard.append(actionBtn);
+    }
+    midRow.append(remCard);
+
+    box.append(midRow);
+
+    // 4. Bottom Row: Real Active Watch Dispatches & ED Triage Capacity Gauge
+    const botRow = el('div', 'dash-bot-row');
+
+    // Active Rescue Dispatches Card (Real watch reports from system data)
+    const teamCard = el('div', 'dash-card team-card');
+    const teamHead = el('div', 'dash-card-head');
+    teamHead.append(el('h4', 'dash-card-title', 'Active Rescue Watch Dispatches'), el('button', 'dash-btn outline sm', 'View All'));
+    teamHead.querySelector('button').onclick = () => setView('inbound');
+    teamCard.append(teamHead);
+
+    const activeReports = inbRows.slice(0, 4);
+    if (activeReports.length > 0) {
+      const teamList = el('div', 'team-list');
+      for (const r of activeReports) {
+        const row = el('div', 'team-row');
+        row.style.cursor = 'pointer';
+        row.onclick = () => setView('inbound');
+        const avatar = el('div', 't-avatar', r.watch_id ? r.watch_id.slice(-2) : 'W');
+        const info = el('div', 't-info');
+        info.append(el('b', 't-name', `Location: ${r.location}`), el('span', 't-role', `${r.injuries} (${noun(r)})`));
+        const catName = category(r);
+        let chipCls = 'st-completed';
+        if (catName === 'Immediate') chipCls = 'st-pending';
+        else if (catName === 'Delayed' || catName === 'Unassessed') chipCls = 'st-progress';
+        const stChip = el('span', `st-chip ${chipCls}`, LABEL[catName]);
+        row.append(avatar, info, stChip);
+        teamList.append(row);
+      }
+      teamCard.append(teamList);
+    } else {
+      const emptyMsg = el('p', 'hint', 'No active watch dispatches currently en-route. Standing by for rescue watch signals.');
+      emptyMsg.style.padding = '12px 0';
+      teamCard.append(emptyMsg);
+    }
+    botRow.append(teamCard);
+
+    // ED Triage Ratio Donut Gauge Card
+    const progCard = el('div', 'dash-card prog-card');
+    progCard.append(el('h4', 'dash-card-title', 'Emergency Triage Ratio'));
+
+    const criticalRatio = totPatients ? Math.round(((immPatients + unaPatients) / totPatients) * 100) : 0;
+
+    const gaugeBox = el('div', 'gauge-box');
+    const gSvg = document.createElementNS(svgNS, 'svg');
+    gSvg.setAttribute('viewBox', '0 0 200 130');
+    gSvg.setAttribute('class', 'gauge-svg');
+    
+    // Background arc
+    const bgArc = document.createElementNS(svgNS, 'path');
+    bgArc.setAttribute('d', 'M 20 110 A 80 80 0 0 1 180 110');
+    bgArc.setAttribute('fill', 'none');
+    bgArc.setAttribute('stroke', 'var(--panel-2)');
+    bgArc.setAttribute('stroke-width', '22');
+    bgArc.setAttribute('stroke-linecap', 'round');
+
+    // Progress arc
+    const sweepAngle = (criticalRatio / 100) * 180;
+    const rad = (180 - sweepAngle) * (Math.PI / 180);
+    const endX = 100 + 80 * Math.cos(rad);
+    const endY = 110 - 80 * Math.sin(rad);
+
+    const prArc = document.createElementNS(svgNS, 'path');
+    prArc.setAttribute('d', `M 20 110 A 80 80 0 0 1 ${endX.toFixed(1)} ${endY.toFixed(1)}`);
+    prArc.setAttribute('fill', 'none');
+    prArc.setAttribute('stroke', criticalRatio > 40 ? '#DC2626' : '#087F90');
+    prArc.setAttribute('stroke-width', '22');
+    prArc.setAttribute('stroke-linecap', 'round');
+
+    gSvg.append(bgArc, prArc);
+
+    const gTxt = document.createElementNS(svgNS, 'text');
+    gTxt.setAttribute('x', '100'); gTxt.setAttribute('y', '85');
+    gTxt.setAttribute('text-anchor', 'middle'); gTxt.setAttribute('fill', 'var(--text)');
+    gTxt.setAttribute('font-size', '26'); gTxt.setAttribute('font-weight', '800');
+    gTxt.textContent = `${criticalRatio}%`;
+
+    const gSub = document.createElementNS(svgNS, 'text');
+    gSub.setAttribute('x', '100'); gSub.setAttribute('y', '105');
+    gSub.setAttribute('text-anchor', 'middle'); gSub.setAttribute('fill', 'var(--dim)');
+    gSub.setAttribute('font-size', '11'); gSub.setAttribute('font-weight', '600');
+    gSub.textContent = 'Critical Ratio';
+
+    gSvg.append(gTxt, gSub);
+    gaugeBox.append(gSvg);
+    progCard.append(gaugeBox);
+
+    // Dynamic Legend
+    const legend = el('div', 'gauge-legend');
+    legend.append(
+      el('span', 'g-leg comp', `● Immediate (${num(immPatients)})`),
+      el('span', 'g-leg prog', `● Delayed (${num(delPatients)})`),
+      el('span', 'g-leg pend', `● Minor (${num(minPatients)})`)
+    );
+    progCard.append(legend);
+    botRow.append(progCard);
+
+    box.append(botRow);
+  }
+
 
   // One patient row: a button that opens that patient's needs; history rows show when the hub received the report.
   function entryEl(r, opts = {}) {
@@ -930,11 +1253,11 @@
 
   // ---------- controls ----------
   // Where you are (status tab, category, search) lives in the URL, so refresh and the Back button keep it.
-  const VIEWS = ['inbound', 'arrived', 'cancelled', 'all', 'settings'];
+  const VIEWS = ['dashboard', 'inbound', 'arrived', 'cancelled', 'all', 'settings'];
   const qInput = $('q');
   function readUrl() {
     const p = new URLSearchParams(location.search);
-    view = VIEWS.includes(p.get('view')) ? p.get('view') : 'inbound';
+    view = VIEWS.includes(p.get('view')) ? p.get('view') : 'dashboard';
     cat = TRIAGE.includes(p.get('cat')) ? p.get('cat') : null;
     query = p.get('q') || '';
     qInput.value = query;
@@ -949,9 +1272,53 @@
       try { history[push ? 'pushState' : 'replaceState'](null, '', url); } catch (_) {}
     }
   }
-  function setView(v) { view = v; limit = PAGE; writeUrl(true); render(); }
+  function setView(v) {
+    view = v;
+    if (v === 'dashboard') cat = null;
+    limit = PAGE;
+    writeUrl(true);
+    render();
+  }
   function setCat(c) { cat = c; limit = PAGE; writeUrl(true); render(); }
   window.addEventListener('popstate', () => { readUrl(); limit = PAGE; render(); });
+
+  const profileBtn = $('rail-profile-btn');
+  if (profileBtn) {
+    profileBtn.onclick = () => {
+      toast('Operator Profile Active', 'Alex Hunter (alexhunter112@gmail.com) · Active On Duty');
+    };
+  }
+
+  const infoToggleBtn = $('info-toggle-btn');
+  const infoDialog = $('info-dialog');
+  const infoCloseBtn = $('info-dialog-close');
+  if (infoToggleBtn && infoDialog) {
+    infoToggleBtn.onclick = () => {
+      if (typeof infoDialog.showModal === 'function') {
+        infoDialog.showModal();
+      } else {
+        infoDialog.setAttribute('open', '');
+      }
+    };
+  }
+  if (infoCloseBtn && infoDialog) {
+    infoCloseBtn.onclick = () => {
+      if (typeof infoDialog.close === 'function') {
+        infoDialog.close();
+      } else {
+        infoDialog.removeAttribute('open');
+      }
+    };
+  }
+  if (infoDialog) {
+    infoDialog.addEventListener('click', (e) => {
+      const rect = infoDialog.getBoundingClientRect();
+      if (e.clientX < rect.left || e.clientX > rect.right || e.clientY < rect.top || e.clientY > rect.bottom) {
+        if (typeof infoDialog.close === 'function') infoDialog.close();
+        else infoDialog.removeAttribute('open');
+      }
+    });
+  }
 
   document.querySelectorAll('.vtab').forEach((b, i, all) => {
     b.onclick = () => setView(b.dataset.f);
