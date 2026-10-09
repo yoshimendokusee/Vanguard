@@ -22,9 +22,9 @@ storage encryption or pagination. Use synthetic data on isolated networks only.
 | `POST /api/cloud/sync` | Same body as status, after the attempt | Optional body `{"retryRejected":true}` also retries rejected rows. Joins a running sync. With cloud disabled, returns `disabled` without network access. Unauthenticated, like the rest of this API. |
 | `GET /` | Dashboard HTML | Locally served assets; same-origin API/SSE calls. |
 
-Development dashboard access is `http://localhost:3301`; Vite proxies `/api`
-unchanged to the Docker hub on port 3000, including SSE. Legacy/production Express
-serves optimized dashboard assets when `dist` exists, otherwise source assets.
+The default Docker dashboard is `http://localhost:3000`; Express serves the
+optimized assets built into the image, and API/SSE requests use the same origin.
+The optional Vite development Compose file is not included in the root startup.
 Native devices keep using the computer's isolated LAN API address/port; their own
 localhost cannot reach the computer. No wire format or acknowledgment changes.
 

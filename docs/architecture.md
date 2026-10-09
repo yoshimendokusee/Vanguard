@@ -143,10 +143,13 @@ companion phone using measured device memory, battery and latency.
 Current paths are `watch/`, `hub/`, `docs/` and `fake-watch.sh`. The larger proposed
 `apps/`, `services/` and `packages/` layout remains a possible migration, not an
 instruction to move working code now. `compose.yaml` includes the existing hub
-Compose file, which builds the existing API/production dashboard and local Ollama, plus a development-only Vite frontend through `hub/compose.dev.yaml`, and mounts
-`hub/data` at `/data`. Root include requires
-[Compose 2.20.3 or later](https://docs.docker.com/compose/how-tos/multiple-compose-files/include/).
-Root development uses localhost:3301 with a same-origin API/SSE proxy to hub:3000. The legacy `hub/` entry point serves optimized assets on port 3000 without Vite. Both default to localhost API binding and share that data directory; run only one at a time. See `docker-development.md` for performed checks and platform limits.
+Compose file, which builds the API and optimized dashboard assets and runs local
+Ollama. The web app is served on localhost:3000; it is the only published host
+port. Ollama stays internal, and `hub/data` remains mounted at `/data`. Root include
+requires [Compose 2.20.3 or later](https://docs.docker.com/compose/how-tos/multiple-compose-files/include/).
+The optional Vite frontend file is not part of default startup. The root and legacy
+`hub/` entry points share the data directory and port, so stop both before switching
+between them. See `docker-development.md` for startup and verification details.
 
 Schema ownership and reserved migration paths are in
 `database/migrations/README.md`; `openDb` applies numbered hub migrations transactionally.

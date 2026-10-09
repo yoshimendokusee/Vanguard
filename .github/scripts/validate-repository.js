@@ -29,6 +29,12 @@ function validateRepository(root) {
   assert.ok(!fs.existsSync(path.join(root, '.github/workflows/ci.yml')), 'Remove duplicate legacy CI workflow');
 
   const workflow = read('.github/workflows/pr-ci.yml');
+  const rootCompose = read('compose.yaml');
+  const hubCompose = read('hub/docker-compose.yml');
+  assert.ok(rootCompose.includes('./hub/docker-compose.yml'), 'Root Compose must include the production hub');
+  assert.ok(!rootCompose.includes('compose.dev.yaml'), 'Default Docker startup must not publish the Vite development port');
+  assert.ok(/:\s*3000:3000/.test(hubCompose), 'Default Docker web app must publish host port 3000');
+  assert.ok(!hubCompose.includes('HUB_PORT'), 'Default Docker web app host port must stay fixed at 3000');
   const jobNames = [...workflow.matchAll(/^    name: (.+)$/gm)].map((m) => m[1]);
   const policy = JSON.parse(read('.github/rulesets/main.json'));
   assert.equal(policy.target, 'branch');

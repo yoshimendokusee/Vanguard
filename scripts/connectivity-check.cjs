@@ -25,7 +25,7 @@ async function check() {
   const source = path.resolve(__dirname, '..');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vanguard-connectivity-'));
   const project = 'vanguard-connectivity-' + randomUUID().slice(0, 8);
-  const env = { ...process.env, HUB_PORT: '0', VITE_PORT: '0', HUB_USERS: '', HUB_BIND_ADDRESS: '127.0.0.1', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', SUPABASE_HUB_EMAIL: '', SUPABASE_HUB_PASSWORD: '' };
+  const env = { ...process.env, HUB_USERS: '', HUB_BIND_ADDRESS: '127.0.0.1', SUPABASE_URL: '', SUPABASE_ANON_KEY: '', SUPABASE_HUB_EMAIL: '', SUPABASE_HUB_PASSWORD: '' };
   const compose = (...args) => execFileSync('docker', ['compose', '-p', project, ...args], { cwd: directory, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   let started = false;
   try {
@@ -38,7 +38,11 @@ async function check() {
     fs.writeFileSync(path.join(directory, 'models/qwen3-0.6b/qwen3-0.6b-q4_k_m.gguf'), 'version https://git-lfs.github.com/spec/v1\n');
     started = true;
     composeUpWithPullRetry(compose);
-    const base = 'http://' + compose('port', 'frontend', '3301').trim();
+    const base = 'http://' + compose('port', 'hub', '3000').trim();
+    const html = await (await fetch(base + '/', { signal: AbortSignal.timeout(10000) })).text();
+    assert.match(html, /Vanguard ED Pre-Arrival Board/);
+    assert.match(html, /dashboard\.js/);
+    assert.doesNotMatch(html, /\/@vite\/client/);
     const get = async route => {
       const response = await fetch(base + route, { signal: AbortSignal.timeout(130000) });
       assert.equal(response.status, 200, route); return response.json();
@@ -74,7 +78,6 @@ async function check() {
     await Promise.all(envelopes.map(body => post('/api/sync-triage', body)));
     const before = await get('/api/triage'); assert.equal(before.length, 2);
     assert.ok(before.every(row => row.effective_triage === 'Unassessed'));
-    await require(path.join(directory, 'hub/qa/hmr-check.cjs')).check(base);
     compose('stop', 'ollama');
     const unavailable = await (await fetch(base + '/api/ai/health')).json();
     assert.equal(unavailable.inference_available, false);
@@ -89,7 +92,7 @@ async function check() {
     execFileSync('docker', ['run', '--rm', '--network', `container:${runtime}`, '--entrypoint', 'node', hubImage, '-e',
       "require('node:assert/strict').rejects(fetch('https://1.1.1.1', {signal: AbortSignal.timeout(3000)})).catch(() => { process.exitCode = 1; })"], { stdio: 'pipe' });
     console.log(JSON.stringify({ result: 'PASS', project, checks: ['LFS-pointer fresh clone', 'automatic pinned download/import', 'real Qwen tokens',
-      'Vite same-origin proxy and HMR', 'concurrent request isolation', 'shared contract', 'provisional SQLite persistence',
+      'production dashboard and same-origin API on port 3000', 'concurrent request isolation', 'shared contract', 'provisional SQLite persistence',
       'duplicate ACKs', 'runtime disconnect', 'container recreation and model/report retention', 'runtime external egress denied'] }, null, 2));
   } catch (error) {
     if (started) {

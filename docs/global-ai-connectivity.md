@@ -54,7 +54,7 @@ and no application was relocated and no framework or service replaced Express/SQ
 
 | Platform | Inference | Persistence and transport |
 | --- | --- | --- |
-| Web | Browser → Vite same-origin proxy or Express production assets → Express → internal Docker Ollama → verified Qwen3-0.6B | Account/browser-scoped local outbox before inference; automatic Unassessed intake to existing Express/SQLite; only matching ACK removes local entry |
+| Web | Browser → Express dashboard/API on localhost:3000 → internal Docker Ollama → verified Qwen3-0.6B | Account/browser-scoped local outbox before inference; automatic Unassessed intake to existing Express/SQLite; only matching ACK removes local entry |
 | iPhone | Packaged GGUF → native llama.cpp CPU, without HTTP/Docker/Watch dependency | Existing native SQLite original/processing/relay records → configured LAN hub, or existing Watch Connectivity fallback processing |
 | Watch | Its own packaged GGUF → native llama.cpp CPU, without iPhone/Docker dependency for typed local extraction | Existing native SQLite first; configured LAN hub when reachable; durable paired-iPhone fallback for unsupported speech/failed local processing |
 
@@ -78,6 +78,12 @@ From a repository clone with Docker available:
 docker compose up -d --build
 ```
 
+The root Compose app publishes only port 3000. To clear older root and legacy hub
+containers before switching to this setup, run `docker compose down --remove-orphans`
+and `docker compose -f hub/docker-compose.yml down --remove-orphans` first. These
+commands preserve report/model storage. Then rebuild/recreate with
+`docker compose up -d --build --force-recreate --remove-orphans`.
+
 `model-init` accepts verified checkout weights or downloads the manifest's pinned
 revision when the file is absent/a pointer/corrupt. It enforces exact size, GGUF
 header and SHA-256 before atomic installation. Imported weights and verified GGUF
@@ -86,12 +92,13 @@ setup needs internet for missing images/weights; Ollama inference has no interne
 route and no published host Ollama port. Recreating containers preserves models and
 reports. Do not delete volumes/data to recover.
 
-`node scripts/connectivity-check.cjs` was run with a temporary copy of source,
-pointer-only weights, empty model volumes/database, a unique Compose project and
-random host ports. It passed actual import/generation, Vite proxy/HMR, concurrent
+The earlier `node scripts/connectivity-check.cjs` run used a temporary copy of
+source, pointer-only weights, empty model volumes/database, a unique Compose project
+and random host ports. It passed actual import/generation, Vite proxy/HMR, concurrent
 responses, duplicate-safe intake, runtime loss, recreation/retention and external
-egress denial. It removes only its own disposable project. This is a fresh runtime
-test on this host, not a test on every teammate's computer.
+egress denial. That is historical evidence for the former Vite root setup. The
+current production-dashboard check has not run here because the Docker daemon is
+unavailable.
 
 Native packaging uses:
 
@@ -112,7 +119,8 @@ For LAN use, set `HUB_BIND_ADDRESS` (Docker) or `HOST` (native Node) and server-
 array also fails LAN startup. Configure the Apple app with a hospital origin and its
 assigned token/device identity. Flutter uses explicit build-time `HUB_URL`/`HUB_TOKEN`;
 root `.env` does not configure it automatically. Web keeps same-origin API access;
-`HUB_PORT` and `VITE_PORT` can change without source edits.
+The default Docker web app uses host port 3000. The optional Vite development
+Compose file is not included in the root startup.
 
 Manual configuration is the implemented discovery fallback. Prefer a hospital DNS
 hostname or DHCP reservation, enter a new origin when the network changes, and retry.

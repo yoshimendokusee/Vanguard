@@ -103,7 +103,7 @@ for your area.
   light/dark/auto theme, no CDN dependencies.
 - Set the hospital name: `HOSPITAL_NAME="Santiago District Hospital · ED"` (env var).
 
-## Docker development with live updates
+## Run the Docker web app
 
 Install Git and Docker Desktop (or Docker Engine with Compose **2.20.3+**).
 Clone normally. A one-shot model initializer copies verified checkout weights or
@@ -112,65 +112,42 @@ Ollama or Git LFS installation is required for Docker startup.
 No host Node.js, npm, Vite or backend libraries are needed. From the repository root:
 
 ```sh
-docker compose up -d --build   # first run; installs locked dependencies in Docker
-# Open http://localhost:3301/
-docker compose up -d           # subsequent runs; no rebuild
+docker compose down --remove-orphans
+docker compose -f hub/docker-compose.yml down --remove-orphans
+docker compose up -d --build --force-recreate --remove-orphans
+# Open http://localhost:3000/
 
 docker compose ps
-docker compose logs -f model-init frontend hub ollama
+docker compose logs -f model-init hub ollama
 docker compose down           # preserves hub/data and model volumes
 ```
 
-Every teammate runs an independent copy at the same localhost URL. Exchange code
-through Git commits/pulls; Vite updates only the files edited on your own computer.
-The initial build/image pull needs internet. Prepared images, dependencies and
-model weights run locally afterward; no cloud service is required for report capture.
+The root Docker Compose entry point builds the latest `hub/public` assets into the
+production image and serves them from Express at **localhost:3000**. Port 3000 is
+the only published host port; Ollama stays on its internal network. Rebuild and
+recreate the container after web app edits with `docker compose up -d --build
+--force-recreate --remove-orphans`. The default Docker app does not use a host
+Node.js, npm or Vite server.
 
-Edit `hub/public/index.html`, `dashboard.css`, `dashboard.js` and frontend assets
-with your editor. Root Compose adds a Vite frontend on **localhost:3301** to the
-existing Express/SQLite hub (**localhost:3000**) and internal Ollama service
-(**11434**, no host port). `/api` requests, including SSE, proxy to `http://hub:3000`
-through Docker DNS. The browser and HMR WebSocket use port 3301; Vite listens on
-`0.0.0.0:3301` inside its container with a strict port. The frontend waits for the
-hub health check; capture/board startup does not wait for optional AI readiness.
+The first two `down` commands stop the root stack and the legacy `hub/` stack before
+the update, releasing their old port mappings. They remove containers and networks
+only; they preserve `hub/data` and named model volumes. Do not run both entry points
+at once, and never use `down -v` or reset SQLite as a startup fix. If port 3000 is
+still occupied, inspect `docker ps --filter publish=3000` and stop the identified
+conflicting stack before starting Vanguard.
 
-The plain JavaScript dashboard keeps its existing framework and business logic.
-CSS updates apply in place and preserve browser state. JavaScript/HTML edits
-reload automatically; URL/localStorage state survives, unsaved forms can be lost.
-Read-only source bind mounts expose host edits; dependencies stay in the image,
-so host `node_modules` cannot shadow them. Docker Desktop polling defaults to
-250 ms for reliable Windows/macOS bind mounts. Native Linux or WSL projects kept
-inside the Linux filesystem can set `VITE_USE_POLLING=false` in root `.env` when
-file events work. Copying `.env.example` is optional; Compose has working defaults.
-
-Rebuild with `docker compose up -d --build` after dependency, Dockerfile or backend
-changes. Vite config changes restart Vite automatically; Compose environment or
-mount changes need `docker compose up -d`. UI source edits need neither command.
-For frozen optimized assets served by Express (no Vite development server):
-
-```sh
-docker compose down
-docker compose -f hub/docker-compose.yml up -d --build
-# Open http://localhost:3000/
-docker compose -f hub/docker-compose.yml down
-# Equivalent legacy entry point: cd hub &&docker compose up -d --build
-```
-
-The multi-stage Dockerfile runs `npm ci` and `npm run build`, then keeps production
-libraries and `dist` in the final image without Vite or compiler tools. Express uses
-`dist` when built, otherwise native `npm start` retains the source dashboard.
-Root development and legacy production both retain **hub/data:/data** and
-`/data/vanguard.db`; run one stack at a time. `down` keeps storage. Never delete
-`hub/data`, reset SQLite or use `down -v` as a startup fix. Synthetic QA can use
-`hub/compose.qa.yaml` with its separate named volume; stop it before using port 3301.
+The initial image/model pull needs internet. After provisioning, prepared images,
+dependencies and model weights run locally; report capture and the board do not
+require cloud access. The app remains usable if local AI is unavailable.
 
 Common fixes:
 
-- **Port already allocated:** stop the other stack owning 3301 or 3000. `HUB_PORT`
-  can change the backend host port without changing Docker API discovery or Vite.
-- **No live update:** check `docker compose logs -f frontend`, Docker Desktop file
-  sharing, and `VITE_USE_POLLING=true`. The browser should show `[vite] connected`.
-  A dependency change needs a rebuild; ordinary source changes do not.
+- **Port 3000 already allocated:** run the two `docker compose down --remove-orphans`
+  commands above. If the port remains occupied, inspect `docker ps --filter
+  publish=3000` and stop the identified conflicting stack before starting Vanguard.
+- **Old UI after an edit:** rebuild and recreate the Docker hub with
+  `docker compose up -d --build --force-recreate --remove-orphans`, then reload
+  localhost:3000.
 - **API unavailable:** check hub health/logs and the configured data-directory
   permissions. Retain data and fix the cause; don't replace the database.
 - **AI unavailable:** inspect `model-init` and Ollama logs; first-time provisioning
@@ -211,7 +188,6 @@ cd hub
 npm ci
 npm test
 npm start
-# Separate terminal in hub/: npm run dev
 # npm run build creates optimized dist assets for Express.
 ```
 
@@ -249,14 +225,15 @@ node seed.js --force                       # load another wave on purpose
 The scenario is plain data at the top of `hub/seed.js`: edit the places, findings,
 counts and arrival times to match your own barangays.
 
-Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
+Configuration: `.env.example` documents `HOSPITAL_NAME` and
 `HUB_BIND_ADDRESS` for Compose; native Node uses `PORT`, `DB_PATH` and
 `HOSPITAL_NAME` and does not auto-load `.env`. Inside Docker, port 3000 and
 `/data/vanguard.db` remain fixed. `HUB_URL`, `VOSK_MODEL`, `SUPABASE_URL` and
 `SUPABASE_ANON_KEY` are watch compile-time defines; `.env` does not automatically
 configure Flutter.
 Configuration: `.env.example` documents Compose host binding, hospital label and
-watch build settings. Inside Docker the API uses port 3000 and `/data/vanguard.db`.
+watch build settings. Docker publishes the hub on fixed port 3000 and uses
+`/data/vanguard.db`.
 Watch build-time settings are independent; root `.env` does not configure Flutter
 or Apple devices automatically. Do not run `fake-watch.sh` against existing reports.
 

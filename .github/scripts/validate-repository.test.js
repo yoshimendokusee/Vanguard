@@ -32,6 +32,11 @@ function withFixture(change) {
 
 test('current repository passes validation', () => validateRepository(root));
 
+test('default Docker startup publishes the app only on port 3000', () => withFixture((temp) => {
+  fs.writeFileSync(path.join(temp, 'compose.yaml'), 'include:\n  - path:\n      - ./hub/docker-compose.yml\n      - ./hub/compose.dev.yaml\n');
+  assert.throws(() => validateRepository(temp), /must not publish the Vite development port/);
+}));
+
 test('renaming a required CI check fails validation', () => withFixture((temp) => {
   const file = path.join(temp, '.github/workflows/pr-ci.yml');
   fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace('name: Hub tests', 'name: Renamed hub check'));
