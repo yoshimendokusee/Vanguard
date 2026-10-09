@@ -20,14 +20,15 @@ public enum TriageRules {
     public static let ruleVersion = "provisional-v1"
     public static let allowed: [String: [String]] = [
         "breathing": ["normal", "abnormal", "absent", "unknown"],
-        "consciousness": ["alert", "unresponsive", "unknown"],
-        "severeBleeding": ["present", "absent", "unknown"],
-        "walking": ["able", "unable", "unknown"],
+        "consciousness": ["alert", "confused", "unresponsive", "unknown"],
+        "severeBleeding": ["present", "absent", "uncertain", "unknown"],
+        "walking": ["able", "unable", "assisted", "unknown"],
+        "circulation": ["present", "absent", "uncertain", "unknown"],
     ]
 
     public static func isValid(_ observations: [String: String]) -> Bool {
-        observations.count == allowed.count
-            && allowed.allSatisfy { key, values in observations[key].map(values.contains) ?? false }
+        observations.keys.allSatisfy { allowed[$0] != nil }
+            && allowed.allSatisfy { key, values in values.contains(observations[key] ?? (key == "circulation" ? "unknown" : "")) }
     }
 
     /// Returns nil for observations outside the schema rather than guessing.

@@ -32,7 +32,7 @@ preview and native-processing types without losing extraction provenance/evidenc
 
 ```json
 {
-  "transcript": "Synthetic patient is awake, breathing normally, no severe bleeding, can walk.",
+  "transcript": "Synthetic patient is responsive, breathing normally, no severe bleeding, can walk.",
   "device": "hospital-browser",
   "sttEngine": "typed/hub-form",
   "sttRuntime": "hub-ai-v1"
@@ -54,12 +54,13 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
   "ok": true,
   "processing": {
     "version": 1,
-    "originalTranscript": "Synthetic patient is awake, breathing normally, no severe bleeding, can walk.",
+    "originalTranscript": "Synthetic patient is responsive, breathing normally, no severe bleeding, can walk.",
     "observations": {
       "breathing": "normal",
       "consciousness": "alert",
       "severeBleeding": "absent",
-      "walking": "able"
+      "walking": "able",
+      "circulation": "unknown"
     },
     "uncertainties": ["Extracted observations require qualified verification"],
     "provenance": {
@@ -71,9 +72,10 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
   },
   "evidence": {
     "breathing": "breathing normally",
-    "consciousness": "awake",
+    "consciousness": "responsive",
     "severeBleeding": "no severe bleeding",
-    "walking": "can walk"
+    "walking": "can walk",
+    "circulation": null
   },
   "warnings": [],
   "provisional": {
@@ -84,7 +86,7 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
     "advisoryOnly": true
   },
   "model": "qwen3:0.6b",
-  "promptVersion": "vanguard-extract-v2"
+  "promptVersion": "vanguard-extract-v3"
 }
 ```
 
@@ -103,10 +105,10 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
 
 Rules every client can rely on:
 
-- `observations` always has all four keys. Allowed values are fixed in
+- `observations` always has all five keys. Allowed values are fixed in
   `hub/risk.js`: breathing `normal|abnormal|absent|unknown`, consciousness
-  `alert|unresponsive|unknown`, severeBleeding `present|absent|unknown`,
-  walking `able|unable|unknown`. Unsupported model enums become `unknown`; a
+  `alert|confused|unresponsive|unknown`, severeBleeding `present|absent|uncertain|unknown`,
+  walking `able|unable|assisted|unknown`, circulation `present|absent|uncertain|unknown`. Unsupported model enums become `unknown`; a
   supported transcript phrase may independently recover the observation.
 - `unknown` never means absent or normal. Supported explicit transcript phrases
   can recover an observation when the model misses or mislabels it; the exact
@@ -161,8 +163,8 @@ The response lists every match; the prompt gets one meaning per phrase and omits
 - The shipped pack is `reviewStatus: "unreviewed-draft"`: starter vocabulary not reviewed
   by a clinician or translator. No clinical guidelines or protocols are shipped. Supply
   those only from an authoritative, versioned, clinician-reviewed source.
-- Retrieval runs in the hub only. The Apple/watch apps do not yet ship or search a pack.
-- Prompt version is `vanguard-extract-v2` (v1 had no glossary).
+- The hub retrieves glossary context. Apple apps bundle the identical offline term pack for deterministic details; their five-field Qwen prompt needs no retrieval.
+- Prompt version is `vanguard-extract-v3` (v1 had no glossary; v2 had four fields).
 
 ## Prefilled report fields
 
@@ -228,7 +230,7 @@ panel. Changing that is a clinical-safety decision tracked in the architecture n
   "modelAvailable": true,
   "modelsSeen": 1,
   "error": null,
-  "promptVersion": "vanguard-extract-v2",
+  "promptVersion": "vanguard-extract-v3",
   "maxTranscript": 4000
 }
 ```
@@ -288,3 +290,29 @@ idempotent; stale/concurrent corrected revisions return 409. Originals and prior
 corrections remain unchanged. Native/LLM failures retain pending capture/history.
 
 No browser-native Qwen, new cloud dependency, BLE or React replacement is claimed.
+
+
+## Five-field grounding — 2026-10-10
+
+The hub and native `ObservationConfirmation` share a bounded bundled phrase pack
+and explicit synthetic expected-result fixtures. Qwen emits JSON suggestions;
+only supported current transcript statements survive validation. The validator
+can recover an explicit observation missed by the model. Unknown remains unknown,
+uncertain bleeding/pulse has its own state, and assisted walking is distinct.
+Awake or simply mentioning breathing establishes neither alertness nor normal
+breathing. Patient pulse rate and the rescuer's heart rate cannot establish a
+palpable radial pulse. Current qualified assessment remains separate from these
+unverified extracted claims.
+
+Negation, contained denial phrases, uncertainty/questions, contradictions,
+explicit corrections, historical context, obvious rescuer references, multiple
+patient references and instruction clauses are covered in shared regressions.
+Unsupported wording is conservatively unknown. This is a bounded language
+validator, not proof of general clinical NLP accuracy or reliable subject resolution.
+Native relay adoption rechecks grounding before storing a paired result.
+
+The existing offline terminology glossary now includes radial-pulse vocabulary.
+It contains word meanings only; no patient history or synthetic-example retrieval
+was introduced. Optional example RAG remains unimplemented: the requested
+100-held-out/5-point-improvement/critical-recall evaluation has not been performed.
+The reference glossary cannot supply patient evidence or a clinical scoring rule.

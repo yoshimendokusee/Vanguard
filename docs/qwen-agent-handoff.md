@@ -90,7 +90,8 @@ when the phone retries a Watch capture.
     "breathing": "unknown",
     "consciousness": "unresponsive",
     "severeBleeding": "unknown",
-    "walking": "unknown"
+    "walking": "unknown",
+    "circulation": "unknown"
   },
   "uncertainties": ["Breathing, bleeding and walking were not assessed", "Extracted observations require qualified verification"],
   "provenance": {
@@ -112,7 +113,7 @@ The placeholders above are documentation only; checksum placeholders fail the
 validator. Never fabricate provenance values. `extraction: null` is valid for
 non-LLM processing, but does not establish Qwen execution.
 
-Allowed observation values are fixed in `hub/risk.js`; all four keys are required.
+Allowed observation values are fixed in `hub/risk.js`; all five keys are emitted; legacy input may omit circulation (normalized to unknown).
 Unknown never means negative/normal. Limit originals to 16,000 characters and
 uncertainties to 30 entries of 300 characters. Over-limit text stays preserved in
 the local queue; reject/report the limit rather than silently shortening it.

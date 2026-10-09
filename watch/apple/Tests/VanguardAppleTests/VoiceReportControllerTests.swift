@@ -319,8 +319,8 @@ final class VoiceReportControllerTests: XCTestCase {
 
     func testAContradictoryCorrectionIsNotResolvedByTheAI() async throws {
         await controller.submitText("Can walk. Barangay Tres.")
-        await controller.correctTranscript("Awake and can walk, Barangay Tres. Walang malay ang isa.")
-        XCTAssertNotEqual(controller.snapshot?.provisional?.triage, .immediate, "awake and unconscious in one report stays unknown")
+        await controller.correctTranscript("Responsive and can walk, Barangay Tres. Walang malay ang isa.")
+        XCTAssertNotEqual(controller.snapshot?.provisional?.triage, .immediate, "responsive and unconscious in one report stays unknown")
         XCTAssertEqual(controller.snapshot?.processing?.observations["consciousness"], "unknown")
         XCTAssertTrue(controller.snapshot?.processing?.uncertainties.contains { $0.contains("Contradictory") } == true, "the conflict stays visible")
     }

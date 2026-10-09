@@ -14,7 +14,8 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         super.init()
         if WCSession.isSupported() { session.delegate = self; session.activate() }
     }
-    public func offer(_ capture: NativeCapture) throws {
+    public func offer(_ original: NativeCapture) async throws {
+        let capture = try await workflow.fallbackCapture(original)
         guard session.activationState == .activated else { throw NativeStoreFailure.unavailable }
         let data = try JSONEncoder().encode(capture)
         if let path = capture.audioPath {
@@ -44,12 +45,13 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
             if FileManager.default.fileExists(atPath: destination.path) {
                 guard try Data(contentsOf: destination) == Data(contentsOf: file.fileURL) else { throw NativeStoreFailure.identityConflict }
             } else { try FileManager.default.copyItem(at: file.fileURL, to: destination) }
-            let capture = NativeCapture(id: source.id, watchID: source.watchID, createdAt: source.createdAt, transcript: nil, audioPath: destination.path)
+            let capture = NativeCapture(id: source.id, watchID: source.watchID, createdAt: source.createdAt, transcript: nil, audioPath: destination.path, encounterID: source.encounterID)
             Task {
                 do {
-                    try await workflow.store.save(capture)
+                    try await workflow.store.saveFallback(capture)
                     let processing = try await workflow.processAudio(capture)
                     session.transferUserInfo(["vanguardResult": try JSONEncoder().encode(processing), "captureID": capture.id])
+                    onResult?(capture.id)
                     onChange?("Watch audio and original speech preserved; iPhone result queued")
                 } catch { onChange?("Watch audio retained; offline speech/model processing pending") }
             }
@@ -62,7 +64,7 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         Task {
             do {
                 #if os(watchOS)
-                for capture in try await workflow.store.captures(pendingOnly: true) { try offer(capture) }
+                for capture in try await workflow.store.captures(pendingOnly: true) { try await offer(capture) }
                 #else
                 for capture in try await workflow.store.captures() where capture.watchID.hasPrefix("APPLE-WATCH-") {
                     if let processing = try await workflow.store.processing(id: capture.id) {
@@ -81,10 +83,11 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
                     let capture = try JSONDecoder().decode(NativeCapture.self, from: data)
                     // Incoming text jobs cannot supply an arbitrary local audio path.
                     guard capture.audioPath == nil, capture.transcript != nil else { throw NativeStoreFailure.invalidCapture }
-                    try await workflow.store.save(capture)
+                    let stored = try await workflow.store.saveFallback(capture)
                     #if os(iOS)
-                    let processing = try await workflow.process(capture, device: .iphone)
+                    let processing = try await workflow.process(stored, device: .iphone)
                     session.transferUserInfo(["vanguardResult": try JSONEncoder().encode(processing), "captureID": capture.id])
+                    onResult?(capture.id)
                     onChange?("Paired Watch report processed and persisted on iPhone")
                     #endif
                 } catch { onChange?("Fallback pending; processing or persistence unavailable") }

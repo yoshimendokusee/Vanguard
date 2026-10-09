@@ -279,3 +279,30 @@ share the hospital board intentionally. Existing anonymous synthetic localhost u
 remains compatible. Authenticated status/correction events record the operator ID.
 HTTP and local storage remain unencrypted; credentials alone do not establish
 patient-data safety or clinical validity.
+
+
+## Five global observations — 2026-10-10
+
+Native Watch/iPhone and the hospital now use the existing processing-v1 envelope
+with five observations, including reported radial pulse. Compatible states add
+confused responsiveness, assisted walking and uncertain bleeding/pulse. The
+existing deterministic `provisional-v1` rules are unchanged; circulation is stored
+and displayed without affecting priority. Shared transcript grounding rejects
+unsupported machine claims and preserves explicit unknowns. Watch and iPhone
+show five statuses and a short optional voice guide using the existing UI.
+
+Existing JSON SQLite snapshots need no schema change. Historical four-field rows
+remain readable with unknown circulation in current views; immutable originals,
+corrections, IDs and histories are retained. LAN replay normalizes legacy JSON
+before comparing. Watch inference-only fallback sends its saved speech rather
+than re-transcribing; the optional handoff also retains the persisted encounter
+UUID and STT engine, committed atomically with the received capture on the phone. Captured audio stays on the Watch. Remote results are grounded
+again, and both senders must receive their own scoped LAN ACK before recording receipt. A phone that already received audio can resume the same capture from later Watch speech, retaining the recording and rejecting conflicting completed originals.
+
+Real Qwen on macOS, synthetic SQLite/HTTP delivery, fallback result adoption,
+retry and dashboard rendering were checked; iPhone/Watch simulator builds passed.
+Physical Watch STT, iPhone speech locale support and paired Watch Connectivity
+transfer/background behavior remain NOT TESTED. A pre-existing Swift intake-parity
+test fails with ten assertions on both the starting commit and this implementation;
+feature regressions pass. See `five-observation-implementation.md` for current
+commands, statuses, changed files and the isolated worktree used for review.

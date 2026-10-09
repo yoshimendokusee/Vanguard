@@ -55,11 +55,24 @@ public actor NativeWorkflow {
         return processing
     }
 
+    /// An inference failure relays the immutable Watch transcript; audio stays on the Watch.
+    public func fallbackCapture(_ capture: NativeCapture) async throws -> NativeCapture {
+        try await store.ensureDelivery(captureID: capture.id)
+        let encounter = try await store.deliveryRecord(captureID: capture.id)?.encounterID
+        let speech = try await store.transcription(id: capture.id)
+        let transcript = capture.transcript ?? speech?.text
+        return NativeCapture(id: capture.id, watchID: capture.watchID, createdAt: capture.createdAt, transcript: transcript,
+                             audioPath: transcript == nil ? capture.audioPath : nil, localID: capture.localID,
+                             encounterID: encounter, sttEngine: speech?.engine)
+    }
+
     /// Stores the iPhone's speech transcript and extraction for an audio capture recorded on this device.
     /// The original audio stays; the speech text becomes the immutable original transcript.
     public func adoptRemote(captureID: String, processingJSON: Data) async throws {
         let processing = try JSONDecoder().decode(NativeProcessing.self, from: processingJSON)
         guard processing.isValid, let capture = try await store.captures().first(where: { $0.id == captureID }) else { throw NativeStoreFailure.invalidCapture }
+        let grounded = ObservationConfirmation.confirm(claims: processing.observations, transcript: processing.originalTranscript)
+        guard processing.observations.allSatisfy({ key, value in value == "unknown" || (grounded.observations[key] == value && processing.evidence[key] != nil) }) else { throw NativeStoreFailure.invalidCapture }
         if capture.transcript == nil {
             try await store.saveTranscription(id: captureID, transcript: processing.originalTranscript, engine: processing.provenance.sttEngine)
         }

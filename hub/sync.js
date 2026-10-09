@@ -109,7 +109,7 @@ function ingestBatch(db, watchId, reports) {
         const fields = { location: 'location', injuries: 'injuries', triage: 'triage', patientCount: 'patient_count',
           ageGroup: 'age_group', etaMinutes: 'eta_minutes', rawText: 'raw_text' };
         if (Object.entries(fields).some(([key, column]) => value[key] !== row[column])
-          || (value.processing === null ? null : encode(value.processing)) !== row.processing_json
+          || (value.processing === null ? null : encode(value.processing)) !== (row.processing_json === null ? null : encode(validateProcessing(JSON.parse(row.processing_json)).value))
           || value.reportId !== row.source_report_id || (value.encounterId !== null && value.encounterId !== row.encounter_id)
           || (Object.hasOwn(JSON.parse(row.payload_json), 'patientCountKnown')
             && value.patientCountKnown !== Boolean(row.patient_count_known))) {

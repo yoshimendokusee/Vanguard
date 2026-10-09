@@ -73,7 +73,7 @@ test('retrieval puts matched terms in the prompt and the response, with the draf
     assert.match(prompt, /not patient evidence/);
     assert.ok(result.retrieval.matches.some((m) => m.id === 'chest-pain'));
     assert.equal(result.retrieval.reviewStatus, 'unreviewed-draft');
-    assert.equal(result.promptVersion, 'vanguard-extract-v2');
+    assert.equal(result.promptVersion, 'vanguard-extract-v3');
     // The original transcript is sent untouched and stays the stored original.
     assert.ok(prompt.includes(TAGLISH));
     assert.equal(result.processing.originalTranscript, TAGLISH);
@@ -150,7 +150,7 @@ test('an invalid or missing knowledge pack disables retrieval without breaking e
 test('denied terms and duplicate phrases are kept out of the prompt but still reported', () =>
   withOllama({ observations: { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' } }, async (chats) => {
     delete process.env.RAG_ENABLED;
-    const result = await extractEmergency('Awake, breathing normally, no severe bleeding, can walk.');
+    const result = await extractEmergency('Responsive, breathing normally, no severe bleeding, can walk.');
     const prompt = userMessage(chats[0]);
     assert.doesNotMatch(prompt, /severe bleeding =/i);
     assert.match(prompt, /breathing normally = Breathing normally/);

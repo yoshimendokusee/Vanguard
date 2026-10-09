@@ -18,7 +18,7 @@ fs.writeFileSync(path.join(fixtureDir, manifest.file), artifact);
 fs.writeFileSync(path.join(fixtureDir, 'manifest.json'), JSON.stringify(manifest));
 test.after(() => fs.rmSync(fixtureDir, { recursive: true, force: true }));
 
-const TRANSCRIPT = 'Synthetic patient is awake, breathing normally, no severe bleeding, can walk.';
+const TRANSCRIPT = 'Synthetic patient is responsive, breathing normally, no severe bleeding, can walk.';
 
 // --- unit: input validation -------------------------------------------------
 test('AI rejects empty and oversized transcripts without calling Ollama', () => {
@@ -47,11 +47,11 @@ test('AI parses fenced and think-wrapped model output; rejects non-JSON', () => 
 });
 
 test('AI validation confirms claims in-transcript and drops unconfirmed ones', () => {
-  const transcript = 'Synthetic patient is awake, breathing normally, no severe bleeding, can walk.';
+  const transcript = 'Synthetic patient is responsive, breathing normally, no severe bleeding, can walk.';
   const out = toValidatedExtraction({
     observations: { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' },
   }, transcript);
-  assert.deepEqual(out.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' });
+  assert.deepEqual(out.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able', circulation: 'unknown' });
   assert.equal(out.evidence.breathing.toLowerCase(), 'breathing normally');
   assert.ok(out.uncertainties.some((u) => u.includes('verification')));
   assert.deepEqual(out.warnings, []);
@@ -90,13 +90,13 @@ test('Tagalog clitics inside a reported phrase still confirm the claim', () => {
 });
 
 test('explicit transcript phrases recover model misses while negation and conflicts stay unknown', () => {
-  const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Gising siya at sumasagot. Walang pagdurugo at nakakalakad siya.';
+  const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Responsive siya at sumasagot. Walang pagdurugo at nakakalakad siya.';
   const out = toValidatedExtraction({
     observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
   }, transcript);
-  assert.deepEqual(out.observations, { breathing: 'abnormal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' });
+  assert.deepEqual(out.observations, { breathing: 'abnormal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able', circulation: 'unknown' });
   assert.equal(out.evidence.breathing, 'Nahihirapan siyang huminga');
-  assert.equal(out.evidence.consciousness, 'Gising');
+  assert.equal(out.evidence.consciousness, 'Responsive');
   assert.equal(out.evidence.severeBleeding, 'Walang pagdurugo');
   assert.equal(out.evidence.walking, 'nakakalakad');
   assert.ok(!out.uncertainties.some((item) => /^(breathing|consciousness|severeBleeding|walking) was/.test(item)));
@@ -110,7 +110,7 @@ test('explicit transcript phrases recover model misses while negation and confli
     observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
   }, 'Nahihirapan siyang huminga pero humihinga nang normal.');
   assert.equal(conflicting.observations.breathing, 'unknown');
-  assert.ok(conflicting.warnings.some((item) => item.includes('Contradictory transcript phrases about breathing')));
+  assert.ok(conflicting.warnings.some((item) => item.includes('Contradictory statements about breathing')));
 });
 
 test('a non-particle gap or an opposite statement still blocks confirmation', () => {
@@ -130,7 +130,7 @@ test('AI validation coerces invented enums to unknown instead of failing', () =>
   const out = toValidatedExtraction({
     observations: { breathing: 'yes', consciousness: 'awake', severeBleeding: 'no', walking: 'sometimes' },
   }, 'Synthetic patient report without supported observations.');
-  assert.deepEqual(out.observations, { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' });
+  assert.deepEqual(out.observations, { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown', circulation: 'unknown' });
   assert.ok(out.warnings.length >= 3);
 });
 
@@ -226,7 +226,7 @@ test('AI extract returns validated processing + deterministic provisional triage
     assert.equal(data.ok, true);
     assert.equal(data.processing.version, 1);
     assert.equal(data.processing.originalTranscript, TRANSCRIPT);
-    assert.deepEqual(data.processing.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' });
+    assert.deepEqual(data.processing.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able', circulation: 'unknown' });
     assert.equal(data.processing.provenance.extraction.artifactSha256, manifest.sha256);
     assert.equal(data.processing.evidence.walking.source, 'model-inferred');
     assert.equal(data.provisional.triage, 'Minor'); // deterministic assessRisk, not the model
@@ -245,7 +245,7 @@ test('AI extraction persists a complete evidence-backed report without assigning
   withAiApp(fakeOllama({ chat: JSON.stringify({ observations: {
     breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown',
   } }) }), async (base) => {
-    const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Gising siya at sumasagot. Walang pagdurugo at nakakalakad siya mga 30 minutes na.';
+    const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Responsive siya at sumasagot. Walang pagdurugo at nakakalakad siya mga 30 minutes na.';
     const extracted = await (await fetch(`${base}/api/ai/extract`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript }),
     })).json();

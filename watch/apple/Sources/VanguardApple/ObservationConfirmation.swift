@@ -1,86 +1,80 @@
 import Foundation
 
-/// Swift port of the hub's observation confirmation (`CONFIRM`, `findPhrase`, `oppositeOf` and
-/// `toValidatedExtraction` in `hub/ai.js`). A model claim counts only when a phrase that really means
-/// that value occurs in the transcript as a whole word. The model's own quote is never trusted, so a
-/// transcript cannot talk the model into an observation, and a denial ("no severe bleeding") or a
-/// conflicting statement leaves the observation unknown. `docs/fixtures/observation-parity-v1.json`
-/// is generated from the hub validator and `ObservationParityTests` must match it exactly.
+/// Same grounding as hub/observation-confirmation.js, locked by shared parity fixtures.
+// shortcut: bounded language grounding, expand only with reviewed phrases and shared regression cases.
 public enum ObservationConfirmation {
-    static let phrases: [String: [String: [String]]] = [
-        "breathing": [
-            "absent": ["not breathing", "hindi humihinga", "no breathing", "stopped breathing", "walang paghinga"],
-            "abnormal": ["difficulty breathing", "nahihirapan huminga", "hirap huminga", "drowning", "nalunod", "shortness of breath",
-                         "trouble breathing", "gasping", "difficulty of breathing"],
-            "normal": ["breathing normally", "normal breathing", "breathing fine", "breathing ok", "humihinga nang normal", "normal huminga"],
-        ],
-        "consciousness": [
-            "unresponsive": ["unconscious", "walang malay", "unresponsive", "not responding", "no response", "passed out",
-                             "nawalan ng malay", "unconsciousness"],
-            "alert": ["awake", "gising", "alert", "conscious", "responsive", "mulat"],
-        ],
-        "severeBleeding": [
-            "present": ["severe bleeding", "malakas na pagdurugo", "heavy bleeding", "lots of blood", "maraming dugo",
-                        "severe blood loss", "bleeding heavily", "bleeding a lot", "profuse bleeding"],
-            "absent": ["no severe bleeding", "no bleeding", "walang dugo", "walang pagdurugo", "no blood", "bleeding stopped"],
-        ],
-        "walking": [
-            "unable": ["cannot walk", "can't walk", "hindi makalakad", "cannot stand", "unable to walk", "could not walk", "cant walk"],
-            "able": ["can walk", "nakakalakad", "able to walk", "walking"],
-        ],
-    ]
-    /// Same iteration order as the hub's `ALLOWED` keys.
-    static let order = ["breathing", "consciousness", "severeBleeding", "walking"]
-
-    struct Hit { let quote: String; let start: Int; let end: Int }
-
-    /// First phrase (in list order) that occurs as a whole word, case-insensitively.
-    static func find(_ transcript: String, _ list: [String]) -> Hit? {
-        let text = transcript as NSString
-        for phrase in list {
-            guard let regex = try? NSRegularExpression(pattern: "\\b\(NSRegularExpression.escapedPattern(for: phrase))\\b", options: [.caseInsensitive]),
-                  let match = regex.firstMatch(in: transcript, range: NSRange(location: 0, length: text.length)) else { continue }
-            return Hit(quote: String(text.substring(with: match.range).prefix(120)), start: match.range.location, end: match.range.location + match.range.length)
-        }
-        return nil
+    static let order = ["breathing", "consciousness", "severeBleeding", "walking", "circulation"]
+    private struct Language: Decodable {
+        let phrases: [String: [String: [String]]]
+        let mentions: [String: String]
+        let uncertainty, unassessed, otherSubject, multiplePatients, instruction, correction, historical, gap, negation: String
     }
-
-    static func opposite(_ key: String, _ value: String) -> [String] {
-        switch key {
-        case "breathing": return value == "normal" ? ["absent", "abnormal"] : value == "unknown" ? [] : ["normal"]
-        case "consciousness": return value == "alert" ? ["unresponsive"] : value == "unresponsive" ? ["alert"] : []
-        case "severeBleeding": return value == "present" ? ["absent"] : value == "absent" ? ["present"] : []
-        case "walking": return value == "able" ? ["unable"] : value == "unable" ? ["able"] : []
-        default: return []
-        }
+    private static let language: Language? = {
+        guard let file = Bundle.module.url(forResource: "observation-phrases", withExtension: "json") else { return nil }
+        return try? JSONDecoder().decode(Language.self, from: Data(contentsOf: file))
+    }()
+    private static func matches(_ pattern: String, _ text: String) -> [NSTextCheckingResult] {
+        (try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]))?
+            .matches(in: text, range: NSRange(location: 0, length: (text as NSString).length)) ?? []
     }
-
+    private static func test(_ pattern: String, _ text: String) -> Bool { !matches(pattern, text).isEmpty }
+    private struct Hit { let value: String; let quote: String?; var start = 0; var end = 0 }
     public struct Result: Equatable, Sendable {
         public let observations: [String: String]
-        /// The transcript text that confirmed each non-unknown observation.
         public let evidence: [String: String]
         public let warnings: [String]
     }
 
-    /// `claims` are what the model said. Anything the transcript does not support becomes unknown.
     public static func confirm(claims: [String: String], transcript: String) -> Result {
         var observations: [String: String] = [:], evidence: [String: String] = [:], warnings: [String] = []
+        guard let language else {
+            return Result(observations: Dictionary(uniqueKeysWithValues: order.map { ($0, "unknown") }), evidence: [:], warnings: ["Observation language pack unavailable; all observations unknown"])
+        }
+        let multiple = test(language.multiplePatients, transcript)
+        let text = transcript as NSString
+        let splits = matches("(?<=\\?)|[.!;,\\n]+|(?=\\b(?:correction|actually|now|ngayon|pala)\\b)", transcript)
+        var clauses: [String] = [], offset = 0
+        for split in splits {
+            clauses.append(text.substring(with: NSRange(location: offset, length: split.range.location - offset)))
+            offset = split.range.location + split.range.length
+        }
+        clauses.append(text.substring(from: offset))
         for key in order {
-            var value = claims[key].flatMap { TriageRules.allowed[key]?.contains($0) == true ? $0 : nil } ?? "unknown"
-            if value != "unknown" {
-                if let hit = find(transcript, phrases[key]?[value] ?? []) {
-                    let conflict = opposite(key, value).compactMap { find(transcript, phrases[key]?[$0] ?? []) }
-                        // A denial ("no severe bleeding") contains the positive phrase: an opposite match
-                        // strictly inside the confirming span is the denial itself, not a conflict.
-                        .contains { !($0.start >= hit.start && $0.end <= hit.end) }
-                    if conflict {
-                        value = "unknown"; warnings.append("Contradictory statements about \(key); treated as unknown")
-                    } else { evidence[key] = hit.quote }
-                } else {
-                    value = "unknown"; warnings.append("Unconfirmed claim for \(key) was treated as unknown (no transcript evidence)")
+            var hits: [Hit] = []
+            for clause in clauses {
+                if multiple || test(language.otherSubject, clause) || test(language.instruction, clause) { continue }
+                let phrases = language.phrases[key] ?? [:]
+                if !test(language.mentions[key] ?? "(?!)", clause) && !phrases.values.flatMap({ $0 }).contains(where: { clause.lowercased().contains($0) }) { continue }
+                if test(language.correction, clause) { hits = [] }
+                if test(language.unassessed, clause) || (test(language.historical, clause) && !test(language.correction, clause)) {
+                    hits.append(Hit(value: "unknown", quote: nil)); continue
                 }
+                if test(language.uncertainty, clause) {
+                    hits.append(Hit(value: ["circulation", "severeBleeding"].contains(key) ? "uncertain" : "unknown",
+                                    quote: String(clause.trimmingCharacters(in: .whitespacesAndNewlines).prefix(120)))); continue
+                }
+                var found: [Hit] = []
+                let source = clause as NSString
+                // Stable state order matches the bundled JSON/hub even when phrases overlap.
+                for value in ["absent", "abnormal", "normal", "unresponsive", "alert", "confused", "present", "uncertain", "unable", "able", "assisted"] {
+                    for phrase in phrases[value] ?? [] {
+                        let pattern = phrase.components(separatedBy: " ").map(NSRegularExpression.escapedPattern).joined(separator: language.gap)
+                        for match in matches("\\b\(pattern)\\b(?![-\\w])", clause) {
+                            if !test(language.negation, source.substring(to: match.range.location)) {
+                                found.append(Hit(value: value, quote: source.substring(with: match.range), start: match.range.location, end: match.range.location + match.range.length))
+                            }
+                        }
+                    }
+                }
+                found = found.filter { hit in !found.contains { other in other.value != hit.value && other.start <= hit.start && other.end >= hit.end } }
+                hits.append(contentsOf: found)
             }
+            let values = Set(hits.map(\.value))
+            let value = values.count == 1 ? hits[0].value : "unknown"
             observations[key] = value
+            if value != "unknown", let quote = hits.first?.quote { evidence[key] = String(quote.prefix(120)) }
+            if values.count > 1 { warnings.append("Contradictory statements about \(key); treated as unknown") }
+            else if let claim = claims[key], claim != value { warnings.append("Unconfirmed claim for \(key); used transcript-grounded \(value)") }
         }
         return Result(observations: observations, evidence: evidence, warnings: warnings)
     }

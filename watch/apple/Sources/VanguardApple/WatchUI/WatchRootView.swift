@@ -106,7 +106,7 @@ struct PushedScreen: View {
                                  uncertainties: controller.snapshot?.processing?.uncertainties.filter { $0.hasPrefix("Contradictory") || $0.hasPrefix("Conflicting") } ?? [],
                                  onDetails: { path.append(.details) })
                 case .details:
-                    DetailsScreen(rows: detailRows, onEdit: { editor = .details }, onContinue: { path.append(.send) })
+                    DetailsScreen(rows: detailRows, observations: controller.snapshot?.processing?.observations ?? [:], onEdit: { editor = .details }, onContinue: { path.append(.send) })
                 case .send:
                     SendScreen(hospital: hospitalName, status: deliveryStatusLine, held: controller.snapshot?.delivery?.held ?? false,
                                delivered: controller.snapshot?.delivery?.state == .delivered,

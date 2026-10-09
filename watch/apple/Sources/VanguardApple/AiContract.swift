@@ -81,9 +81,10 @@ public struct AiObservations: Codable, Sendable {
     public let consciousness: String
     public let severeBleeding: String
     public let walking: String
+    public let circulation: String
 
     private enum CodingKeys: String, CodingKey {
-        case breathing, consciousness, severeBleeding, walking
+        case breathing, consciousness, severeBleeding, walking, circulation
     }
 
     /// Missing keys decode as unknown so a newer hub never breaks this client.
@@ -94,9 +95,10 @@ public struct AiObservations: Codable, Sendable {
             return allowed.contains(value) ? value : "unknown"
         }
         breathing = safe(.breathing, ["normal", "abnormal", "absent", "unknown"])
-        consciousness = safe(.consciousness, ["alert", "unresponsive", "unknown"])
-        severeBleeding = safe(.severeBleeding, ["present", "absent", "unknown"])
-        walking = safe(.walking, ["able", "unable", "unknown"])
+        consciousness = safe(.consciousness, TriageRules.allowed["consciousness"]!)
+        severeBleeding = safe(.severeBleeding, TriageRules.allowed["severeBleeding"]!)
+        walking = safe(.walking, TriageRules.allowed["walking"]!)
+        circulation = safe(.circulation, TriageRules.allowed["circulation"]!)
     }
 }
 

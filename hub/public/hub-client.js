@@ -56,9 +56,10 @@
         || result.requestId !== response.headers.get('X-Request-ID')) {
         throw Error('Invalid inference response; original retained');
       }
-      const allowed = { breathing: ['normal', 'abnormal', 'absent', 'unknown'], consciousness: ['alert', 'unresponsive', 'unknown'],
-        severeBleeding: ['present', 'absent', 'unknown'], walking: ['able', 'unable', 'unknown'] };
-      if (!Object.entries(allowed).every(([key, values]) => values.includes(result.processing.observations?.[key]))) throw Error('Invalid observations; original retained');
+      const allowed = { breathing: ['normal', 'abnormal', 'absent', 'unknown'], consciousness: ['alert', 'confused', 'unresponsive', 'unknown'],
+        severeBleeding: ['present', 'absent', 'uncertain', 'unknown'], walking: ['able', 'unable', 'assisted', 'unknown'],
+        circulation: ['present', 'absent', 'uncertain', 'unknown'] };
+      if (!Object.entries(allowed).every(([key, values]) => values.includes(key === 'circulation' && result.processing.observations && !Object.hasOwn(result.processing.observations, key) ? 'unknown' : result.processing.observations?.[key]))) throw Error('Invalid observations; original retained');
       await retain({ ...report, readyToSend: true, processing: result.processing });
       return result;
     } catch (error) {

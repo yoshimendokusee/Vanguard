@@ -9,7 +9,11 @@
   },
   "processing" : {
     "evidence" : {
-
+      "breathing" : {
+        "contradictory" : false,
+        "excerpt" : "Nahihirapan siyang huminga",
+        "source" : "model-inferred"
+      }
     },
     "findings" : [
       {
@@ -80,7 +84,8 @@
       }
     ],
     "observations" : {
-      "breathing" : "unknown",
+      "breathing" : "abnormal",
+      "circulation" : "unknown",
       "consciousness" : "unknown",
       "severeBleeding" : "unknown",
       "walking" : "unknown"
@@ -100,10 +105,10 @@
     },
     "uncertainties" : [
       "Machine extraction is unverified; qualified assessment required",
-      "breathing is unknown or lacks source evidence",
       "consciousness is unknown or lacks source evidence",
       "severeBleeding is unknown or lacks source evidence",
-      "walking is unknown or lacks source evidence"
+      "walking is unknown or lacks source evidence",
+      "circulation is unknown or lacks source evidence"
     ],
     "version" : 1
   }

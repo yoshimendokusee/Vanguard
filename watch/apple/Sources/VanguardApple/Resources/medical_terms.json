@@ -1,6 +1,6 @@
 {
  "packId": "vanguard-fil-en-terms",
- "packVersion": "0.3.0-draft",
+ "packVersion": "0.3.1-draft",
  "reviewStatus": "unreviewed-draft",
  "reviewNote": "Draft vocabulary written by the development team from general knowledge. It has NOT been reviewed by a qualified clinician or translator, and individual translations may be wrong or incomplete. It translates words only: it contains no triage rules, urgency, diagnosis, dosing or guideline content. Replace or extend it from an authoritative, versioned, clinician-reviewed source before any real use.",
  "entries": [
@@ -14354,6 +14354,18 @@
    "english": "Shaken baby",
    "medicalTerm": "Shaking injury",
    "category": "mechanism"
+  },
+  {
+   "id": "radial-pulse",
+   "phrases": [
+    "radial pulse",
+    "pulso sa pulsohan",
+    "pulsohan"
+   ],
+   "filipino": "Pulso sa pulsohan",
+   "english": "Radial pulse",
+   "medicalTerm": "Radial pulse",
+   "category": "sign"
   }
  ]
 }

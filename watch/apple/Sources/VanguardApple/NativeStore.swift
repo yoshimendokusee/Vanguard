@@ -8,9 +8,12 @@ public struct NativeCapture: Codable, Sendable {
     public let transcript: String?
     public let audioPath: String?
     public let localID: Int64?
-    public init(id: String = UUID().uuidString.lowercased(), watchID: String, createdAt: String, transcript: String?, audioPath: String? = nil, localID: Int64? = nil) {
+    public let encounterID: String?
+    public let sttEngine: String?
+    public init(id: String = UUID().uuidString.lowercased(), watchID: String, createdAt: String, transcript: String?, audioPath: String? = nil, localID: Int64? = nil, encounterID: String? = nil, sttEngine: String? = nil) {
         self.id = id; self.watchID = watchID; self.createdAt = createdAt
         self.transcript = transcript; self.audioPath = audioPath; self.localID = localID
+        self.encounterID = encounterID; self.sttEngine = sttEngine
     }
 }
 
@@ -101,6 +104,31 @@ public actor NativeStore: FallbackRepository {
         }
         try rows("INSERT INTO native_captures (id, watch_id, created_at, transcript, audio_path) VALUES (?, ?, ?, ?, ?)",
             [capture.id, capture.watchID, capture.createdAt, capture.transcript, capture.audioPath])
+    }
+    /// A received fallback job and its source identity commit together before processing or any receipt.
+    @discardableResult
+    public func saveFallback(_ capture: NativeCapture) throws -> NativeCapture {
+        try rows("BEGIN IMMEDIATE")
+        do {
+            var stored = capture
+            // A later Watch transcript resumes an audio handoff without rewriting its immutable recording.
+            if capture.audioPath == nil, capture.transcript != nil,
+               let old = try rows("SELECT * FROM native_captures WHERE id = ?", [capture.id]).first,
+               old["transcript"] == nil, let path = old["audio_path"] {
+                guard old["watch_id"] == capture.watchID, old["created_at"] == capture.createdAt else { throw NativeStoreFailure.identityConflict }
+                stored = NativeCapture(id: capture.id, watchID: capture.watchID, createdAt: capture.createdAt,
+                                       transcript: nil, audioPath: path, localID: old["local_id"].flatMap(Int64.init), encounterID: capture.encounterID)
+            }
+            try save(stored)
+            try ensureDelivery(captureID: capture.id, encounterID: capture.encounterID)
+            if let transcript = capture.transcript {
+                if let original = try rows("SELECT transcript FROM native_extractions WHERE capture_id = ?", [capture.id]).first?["transcript"],
+                   original != transcript { throw NativeStoreFailure.transcriptConflict }
+                try saveTranscription(id: capture.id, transcript: transcript, engine: capture.sttEngine ?? "typed/original")
+            }
+            try rows("COMMIT")
+            return stored
+        } catch { try? rows("ROLLBACK"); throw error }
     }
     private static func date(_ text: String) -> Date? {
         let formatter = ISO8601DateFormatter(); formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]

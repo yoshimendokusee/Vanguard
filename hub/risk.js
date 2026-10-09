@@ -1,15 +1,16 @@
 const OBSERVATIONS = {
   breathing: ['normal', 'abnormal', 'absent', 'unknown'],
-  consciousness: ['alert', 'unresponsive', 'unknown'],
-  severeBleeding: ['present', 'absent', 'unknown'],
-  walking: ['able', 'unable', 'unknown'],
+  consciousness: ['alert', 'confused', 'unresponsive', 'unknown'],
+  severeBleeding: ['present', 'absent', 'uncertain', 'unknown'],
+  walking: ['able', 'unable', 'assisted', 'unknown'],
+  circulation: ['present', 'absent', 'uncertain', 'unknown'],
 };
 const RULE_VERSION = 'provisional-v1';
 
 function validateObservations(value) {
   return value && typeof value === 'object' && !Array.isArray(value)
     && Object.keys(value).every((key) => Object.hasOwn(OBSERVATIONS, key))
-    && Object.entries(OBSERVATIONS).every(([key, options]) => options.includes(value[key]));
+    && Object.entries(OBSERVATIONS).every(([key, options]) => options.includes(key === 'circulation' && !Object.hasOwn(value, key) ? 'unknown' : value[key]));
 }
 
 // Prototype rules only: unknown never means normal; no automatic death declaration.
@@ -57,4 +58,4 @@ function riskForRow(row) {
     rule_version: 'legacy-findings-v1', requires_verification: true };
 }
 
-module.exports = { validateObservations, assessRisk, RULE_VERSION, LEGACY_RULES, riskForRow };
+module.exports = { OBSERVATIONS, validateObservations, assessRisk, RULE_VERSION, LEGACY_RULES, riskForRow };

@@ -13,15 +13,17 @@
    "expected": {
     "observations": {
      "breathing": "normal",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "breathing normally",
-     "consciousness": "awake",
+     "consciousness": null,
      "severeBleeding": "no severe bleeding",
-     "walking": "can walk"
+     "walking": "can walk",
+     "circulation": null
     }
    }
   },
@@ -35,16 +37,18 @@
    },
    "expected": {
     "observations": {
-     "breathing": "abnormal",
+     "breathing": "unknown",
      "consciousness": "unresponsive",
      "severeBleeding": "unknown",
-     "walking": "unable"
+     "walking": "unable",
+     "circulation": "unknown"
     },
     "evidence": {
-     "breathing": "nalunod",
+     "breathing": null,
      "consciousness": "walang malay",
      "severeBleeding": null,
-     "walking": "hindi makalakad"
+     "walking": "hindi makalakad",
+     "circulation": null
     }
    }
   },
@@ -61,13 +65,15 @@
      "breathing": "absent",
      "consciousness": "unresponsive",
      "severeBleeding": "present",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "Hindi humihinga",
      "consciousness": "walang malay",
      "severeBleeding": "malakas na pagdurugo",
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -84,13 +90,15 @@
      "breathing": "unknown",
      "consciousness": "unresponsive",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": "Walang malay",
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -107,13 +115,15 @@
      "breathing": "unknown",
      "consciousness": "unresponsive",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": "Walang malay",
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -130,13 +140,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -153,13 +165,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -174,15 +188,17 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": "conscious",
+     "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -199,13 +215,15 @@
      "breathing": "unknown",
      "consciousness": "unresponsive",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": "unconscious",
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -222,13 +240,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -245,13 +265,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -268,13 +290,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unable"
+     "walking": "unable",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": "can't walk"
+     "walking": "can't walk",
+     "circulation": null
     }
    }
   },
@@ -291,13 +315,15 @@
      "breathing": "normal",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unable"
+     "walking": "unable",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "breathing normally",
      "consciousness": null,
      "severeBleeding": null,
-     "walking": "cant walk"
+     "walking": "cant walk",
+     "circulation": null
     }
    }
   },
@@ -313,14 +339,16 @@
     "observations": {
      "breathing": "unknown",
      "consciousness": "unknown",
-     "severeBleeding": "absent",
-     "walking": "unknown"
+     "severeBleeding": "unknown",
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
-     "severeBleeding": "No severe bleeding",
-     "walking": null
+     "severeBleeding": null,
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -337,13 +365,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": "No severe bleeding",
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -360,13 +390,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": "No severe bleeding",
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -383,13 +415,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": "Walang dugo",
-     "walking": "nakakalakad"
+     "walking": "nakakalakad",
+     "circulation": null
     }
    }
   },
@@ -406,13 +440,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": "Walang dugo",
-     "walking": "nakakalakad"
+     "walking": "nakakalakad",
+     "circulation": null
     }
    }
   },
@@ -427,15 +463,17 @@
    "expected": {
     "observations": {
      "breathing": "abnormal",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "Nahihirapan huminga",
-     "consciousness": "gising",
+     "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -452,13 +490,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -475,13 +515,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -496,15 +538,17 @@
    "expected": {
     "observations": {
      "breathing": "normal",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "Humihinga nang normal",
-     "consciousness": "mulat",
+     "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -521,13 +565,15 @@
      "breathing": "absent",
      "consciousness": "unresponsive",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "NOT BREATHING",
      "consciousness": "UNRESPONSIVE",
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -541,16 +587,18 @@
    },
    "expected": {
     "observations": {
-     "breathing": "absent",
+     "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
-     "breathing": "stopped breathing",
+     "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -564,16 +612,18 @@
    },
    "expected": {
     "observations": {
-     "breathing": "absent",
+     "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
-     "breathing": "stopped breathing",
+     "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -590,13 +640,15 @@
      "breathing": "unknown",
      "consciousness": "unresponsive",
      "severeBleeding": "present",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": "passed out",
      "severeBleeding": "bleeding heavily",
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -612,14 +664,16 @@
     "observations": {
      "breathing": "unknown",
      "consciousness": "unknown",
-     "severeBleeding": "unknown",
-     "walking": "unknown"
+     "severeBleeding": "absent",
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
-     "severeBleeding": null,
-     "walking": null
+     "severeBleeding": "Bleeding stopped",
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -636,13 +690,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -659,13 +715,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -682,13 +740,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "able"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": "Walking"
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -705,13 +765,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -728,13 +790,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -748,16 +812,18 @@
    },
    "expected": {
     "observations": {
-     "breathing": "abnormal",
+     "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
-     "breathing": "Drowning",
+     "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -772,15 +838,17 @@
    "expected": {
     "observations": {
      "breathing": "abnormal",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": "hirap huminga",
-     "consciousness": "gising",
+     "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -797,13 +865,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "present",
-     "walking": "unable"
+     "walking": "unable",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": "severe blood loss",
-     "walking": "cannot walk"
+     "walking": "cannot walk",
+     "circulation": null
     }
    }
   },
@@ -818,15 +888,17 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": "gising",
+     "consciousness": null,
      "severeBleeding": "Walang pagdurugo",
-     "walking": "Nakakalakad"
+     "walking": "Nakakalakad",
+     "circulation": null
     }
    }
   },
@@ -841,15 +913,17 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "alert",
+     "consciousness": "unknown",
      "severeBleeding": "absent",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": "gising",
+     "consciousness": null,
      "severeBleeding": "Walang pagdurugo",
-     "walking": "Nakakalakad"
+     "walking": "Nakakalakad",
+     "circulation": null
     }
    }
   },
@@ -866,13 +940,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "unknown"
+     "walking": "unknown",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": null
+     "walking": null,
+     "circulation": null
     }
    }
   },
@@ -889,13 +965,15 @@
      "breathing": "unknown",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
-     "walking": "able"
+     "walking": "able",
+     "circulation": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
      "severeBleeding": null,
-     "walking": "can walk"
+     "walking": "can walk",
+     "circulation": null
     }
    }
   }

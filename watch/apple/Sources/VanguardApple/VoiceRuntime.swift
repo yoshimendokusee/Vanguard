@@ -47,7 +47,7 @@ public final class VoiceRuntime: ObservableObject {
         } catch is CancellationError {
             throw CancellationError()
         } catch {
-            do { try relay.offer(capture) } catch { return .pending }
+            do { try await relay.offer(capture) } catch { return .pending }
         }
         for _ in 0..<90 {
             try Task.checkCancellation()

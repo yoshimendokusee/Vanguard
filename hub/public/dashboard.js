@@ -1,4 +1,5 @@
 import './hub-client.js';
+import './observations.js';
 
   const VanguardApi = window.VanguardApi;
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
@@ -460,7 +461,7 @@ import './hub-client.js';
     if (extractedFindings.length) {
       const extracted = el('details', 'rnote');
       extracted.append(el('summary', '', 'Extracted findings · unverified'));
-      const labels = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
+      const labels = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking', circulation: 'Circulation' };
       for (const finding of extractedFindings) {
         const label = labels[finding.name] || finding.name;
         const value = finding.contradictory ? ': conflicting; verification required'
@@ -469,6 +470,8 @@ import './hub-client.js';
       }
       box.append(extracted);
     }
+
+    box.append(window.VanguardObservations.render(r.processing?.observations));
 
     // readiness checklist (kept in this browser only)
     const items = r.status === 'inbound' && category(r) !== 'Deceased' ? readyItems(r) : [];
@@ -1608,7 +1611,7 @@ import './hub-client.js';
     var extractBtn = $('ai-extract'), assistBtn = $('ai-assist'), saveBtn = $('ai-save');
     var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
     var busy = false, lastExtraction = null, saveAttempt = null, lastApplied = null;
-    var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
+    var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking', circulation: 'Circulation' };
     function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
     async function refreshStatus() {
       try {
@@ -1643,7 +1646,7 @@ import './hub-client.js';
       resultEl.replaceChildren();
       var t = document.createElement('div'); t.className = 'ai-table';
       var obs = data.processing.observations;
-      Object.keys(OBS_LABEL).forEach(function (k) { rowOf(t, OBS_LABEL[k], obs[k]); });
+      Object.keys(OBS_LABEL).forEach(function (k) { rowOf(t, OBS_LABEL[k], window.VanguardObservations.status(k, obs[k])); });
       if (data.fields.symptomDuration) rowOf(t, 'Symptom duration', data.fields.symptomDuration.value + ' ' + data.fields.symptomDuration.unit);
       resultEl.append(t);
       var ev = document.createElement('p'); ev.className = 'ai-ev';
@@ -1690,6 +1693,7 @@ import './hub-client.js';
       $('ai-obs-consciousness').value = obs.consciousness;
       $('ai-obs-bleeding').value = obs.severeBleeding;
       $('ai-obs-walking').value = obs.walking;
+      $('ai-obs-circulation').value = obs.circulation ?? 'unknown';
       fillFields(data);
       reviewEl.hidden = false;
     }
@@ -1774,6 +1778,6 @@ import './hub-client.js';
       } catch (e) { saveStateEl.textContent = 'Receipt unavailable; retain this form and retry the same report.'; }
       finally { saveBtn.disabled = false; }
     };
-    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; $(id).value = 'unknown'; });
+    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking', 'ai-obs-circulation'].forEach(function (id) { $(id).disabled = true; $(id).value = 'unknown'; });
     refreshStatus();
   })();

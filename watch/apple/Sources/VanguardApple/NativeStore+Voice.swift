@@ -68,10 +68,14 @@ extension NativeStore {
     // MARK: Delivery state
 
     /// Creates the delivery record for a capture (LOCAL_SAVED) once; later calls change nothing.
-    public func ensureDelivery(captureID: String) throws {
+    public func ensureDelivery(captureID: String, encounterID: String? = nil) throws {
+        if let encounterID {
+            guard UUID(uuidString: encounterID) != nil else { throw NativeStoreFailure.invalidCapture }
+            if let existing = try deliveryRecord(captureID: captureID), existing.encounterID != encounterID { throw NativeStoreFailure.identityConflict }
+        }
         guard try rows("SELECT 1 FROM native_captures WHERE id = ?", [captureID]).first != nil else { throw NativeStoreFailure.invalidCapture }
         try rows("INSERT OR IGNORE INTO native_delivery (capture_id, state, encounter_id, updated_at) VALUES (?, 'LOCAL_SAVED', ?, ?)",
-                 [captureID, UUID().uuidString.lowercased(), Self.now()])
+                 [captureID, encounterID ?? UUID().uuidString.lowercased(), Self.now()])
     }
 
     public func deliveryRecord(captureID: String) throws -> DeliveryRecord? {

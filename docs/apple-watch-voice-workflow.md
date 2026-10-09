@@ -134,3 +134,13 @@ and duplicate concurrent extractions of one capture (now one shared job per capt
 * Locating a report for a correction fetches `GET /api/triage` (the whole list); a lookup by report ID would scale better.
 * The hospital name on the Send screen is generic until the hub's configuration is surfaced in the app.
 * Hub transport is unauthenticated HTTP on the LAN unless an access token is configured; storage is unencrypted.
+
+
+## Five-observation update — 2026-10-10
+
+The current shared pipeline and details screen now display five observations:
+breathing, consciousness, severe bleeding, walking and circulation/radial pulse.
+Earlier four-field descriptions above are historical. Both native apps use the
+same validator and voice guide. Inference-only fallback sends the immutable Watch
+speech text, saved STT provenance and encounter UUID; original audio remains local. If the phone already has an audio handoff, recovered Watch speech resumes that capture; original speech and completed results remain immutable.
+See `five-observation-implementation.md` for tests and physical-device limitations.

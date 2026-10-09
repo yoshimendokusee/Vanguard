@@ -238,3 +238,9 @@ test('everyday Tagalog filler words and "yung" do not stop a phrase from matchin
   // Fillers never turn unrelated speech into a finding.
   assert.deepEqual(ids('Si Juan ay nasa bahay po namin at kumakain ng kanin.'), []);
 });
+
+test('radial pulse vocabulary is offline guidance and cannot infer circulation from heart rate', () => {
+  assert.ok(ids('May radial pulse ang pasyente.').includes('radial-pulse'));
+  assert.ok(ids('Nakakapa ang pulso sa pulsohan.').includes('radial-pulse'));
+  assert.equal(toValidatedExtraction({ circulation: 'present' }, 'Patient heart rate 80 bpm.').observations.circulation, 'unknown');
+});

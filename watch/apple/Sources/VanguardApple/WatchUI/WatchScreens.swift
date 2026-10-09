@@ -33,7 +33,7 @@ public struct HomeScreen: View {
             }
             .buttonStyle(.plain).accessibilityLabel("Record a voice report").accessibilityHint("Starts recording from the microphone")
             Text("Tap to record").font(.system(.headline, weight: .semibold)).foregroundStyle(.white)
-            Text("Voice → Transcript → Triage").font(.system(.caption2)).foregroundStyle(VanguardPalette.muted).lineLimit(1).minimumScaleFactor(0.75)
+            Text("Describe breathing, responsiveness, severe bleeding, walking and radial pulse. Only what you assessed.").font(.system(.caption2)).foregroundStyle(VanguardPalette.muted).fixedSize(horizontal: false, vertical: true)
             Button(action: onRecent) {
                 HStack {
                     Image(systemName: "doc.text").font(.footnote)
@@ -215,9 +215,10 @@ public struct TriageScreen: View {
 public struct DetailsScreen: View {
     struct Row: Identifiable { let id = UUID(); let symbol: String; let title: String; let value: String? }
     let rows: [(symbol: String, title: String, value: String?)]
+    let observations: [String: String]
     var onEdit: () -> Void
     var onContinue: () -> Void
-    public init(rows: [(symbol: String, title: String, value: String?)], onEdit: @escaping () -> Void, onContinue: @escaping () -> Void) { self.rows = rows; self.onEdit = onEdit; self.onContinue = onContinue }
+    public init(rows: [(symbol: String, title: String, value: String?)], observations: [String: String] = [:], onEdit: @escaping () -> Void, onContinue: @escaping () -> Void) { self.rows = rows; self.observations = observations; self.onEdit = onEdit; self.onContinue = onContinue }
     public var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -225,6 +226,11 @@ public struct DetailsScreen: View {
                 Spacer(minLength: 4)
                 Button("Edit", action: onEdit).font(.caption).buttonStyle(.plain).padding(.horizontal, 10).frame(minHeight: 28)
                     .background(Capsule().fill(VanguardPalette.surface)).foregroundStyle(.white).accessibilityLabel("Edit details")
+            }
+            Text("Triage observations · unverified").font(.caption2).foregroundStyle(VanguardPalette.muted)
+            ForEach(ObservationConfirmation.order, id: \.self) { key in
+                Text("\(ObservationPresentation.labels[key] ?? key): \(ObservationPresentation.status(key, observations[key]))")
+                    .font(.caption2).foregroundStyle(VanguardPalette.muted).fixedSize(horizontal: false, vertical: true)
             }
             ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 8) {

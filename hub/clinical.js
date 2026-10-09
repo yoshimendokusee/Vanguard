@@ -3,7 +3,7 @@ const { validateProcessing, text } = require('./processing');
 const { assessRisk, riskForRow } = require('./risk');
 const { fail, encode, validateEdit, getRecord } = require('./records');
 
-const UNKNOWN = { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' };
+const UNKNOWN = { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown', circulation: 'unknown' };
 const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
 
 function validateReportId(id) {
@@ -81,7 +81,7 @@ const REPORT_VIEW = `SELECT r.*, e.encounter_id, e.source_report_id, e.patient_c
 function viewFromRow({ state_json, assessment_json, submitted_json, ...row }) {
   const state = JSON.parse(state_json);
   return { ...row, ...JSON.parse(assessment_json),
-    current_transcript: state.transcript, processing: state.processing,
+    current_transcript: state.transcript, processing: state.processing ? validateProcessing(state.processing).value : null,
     source_findings_current: !state.transcriptChanged && state.processing === null,
     receipt_state: 'received', patient_count_known: Boolean(row.patient_count_known) };
 }

@@ -185,7 +185,7 @@ final class VoiceStoreTests: XCTestCase {
 
     func testRecentReportsListPersistedRowsWithRealTriageAndDelivery() async throws {
         let store = try store()
-        let capture = try await store.capture(watchID: "W", transcript: "Awake, breathing normally, no severe bleeding, can walk.")
+        let capture = try await store.capture(watchID: "W", transcript: "Responsive, breathing normally, no severe bleeding, can walk.")
         let generated = "{\"breathing\":\"normal\",\"consciousness\":\"alert\",\"severeBleeding\":\"absent\",\"walking\":\"able\",\"evidence\":{\"breathing\":\"breathing normally\",\"consciousness\":\"Awake\",\"severeBleeding\":\"no severe bleeding\",\"walking\":\"can walk\"}}"
         try await store.complete(id: capture.id, transcript: capture.transcript!, processingJSON: Self.processing(capture.transcript!, generated: generated))
         let none = try await store.capture(watchID: "W", transcript: "Unknown things only.")

@@ -138,3 +138,15 @@ existing offline capture/restart/LAN flow on a real watch, then address durable
 identity, bounded sync and authenticated/scoped acknowledgments before broadening
 transport or patient-data use. The approved extension roadmap is preserved in
 `architecture.md`; this foundation does not implement those product extensions.
+
+
+## Five observations verification — 2026-10-10
+
+Five-field local extraction, backward-compatible JSON storage/replay and persisted
+hospital rows are implemented in the existing apps/service. Current macOS real-Qwen
+checks and native simulator builds do not establish physical speech/paired transfer
+or clinical validity. Baseline Swift `IntakeParityTests.testSwiftMatchesTheHubForEveryFixtureTranscript`
+has ten assertion failures (missing symptomDuration evidence and a matched-phrase
+difference); these were reproduced from the untouched starting commit in a temporary
+archive. The scoped five-observation regressions pass. Full details and current
+remaining blockers are in `five-observation-implementation.md`.

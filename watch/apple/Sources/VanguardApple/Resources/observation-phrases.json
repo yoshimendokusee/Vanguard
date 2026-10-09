@@ -1,0 +1,183 @@
+{
+  "phrases": {
+    "breathing": {
+      "absent": [
+        "not breathing",
+        "hindi humihinga",
+        "no breathing",
+        "stopped breathing",
+        "walang paghinga"
+      ],
+      "abnormal": [
+        "difficulty breathing",
+        "nahihirapan huminga",
+        "nahihirapang huminga",
+        "hirap huminga",
+        "nahihirapan makahinga",
+        "hirap makahinga",
+        "hirap paghinga",
+        "kinakapos hininga",
+        "kapos hininga",
+        "hindi makahinga",
+        "di makahinga",
+        "cannot breathe",
+        "can't breathe",
+        "cant breathe",
+        "can t breathe",
+        "unable to breathe",
+        "shortness of breath",
+        "trouble breathing",
+        "gasping",
+        "difficulty of breathing"
+      ],
+      "normal": [
+        "breathing normally",
+        "normal breathing",
+        "breathing fine",
+        "breathing ok",
+        "humihinga nang normal",
+        "normal huminga"
+      ]
+    },
+    "consciousness": {
+      "unresponsive": [
+        "unconscious",
+        "walang malay",
+        "unresponsive",
+        "not responding",
+        "no response",
+        "passed out",
+        "nawalan ng malay",
+        "unconsciousness",
+        "walang ulirat",
+        "nawalan ng ulirat",
+        "hindi sumasagot",
+        "di sumasagot",
+        "hindi tumutugon",
+        "hindi nagre-respond",
+        "hindi nagrerespond"
+      ],
+      "alert": [
+        "alert",
+        "responsive",
+        "responding normally",
+        "tumutugon"
+      ],
+      "confused": [
+        "confused",
+        "disoriented",
+        "altered responsiveness",
+        "nalilito",
+        "litong-lito"
+      ]
+    },
+    "severeBleeding": {
+      "present": [
+        "severe bleeding",
+        "malakas na pagdurugo",
+        "malakas ang pagdurugo",
+        "heavy bleeding",
+        "severe blood loss",
+        "bleeding heavily",
+        "bleeding a lot",
+        "profuse bleeding",
+        "massive bleeding"
+      ],
+      "absent": [
+        "no severe bleeding",
+        "no bleeding",
+        "walang pagdurugo",
+        "no blood",
+        "bleeding stopped",
+        "hindi dumudugo",
+        "di dumudugo",
+        "walang dugo"
+      ],
+      "uncertain": [
+        "minor bleeding",
+        "mild bleeding",
+        "some bleeding",
+        "bleeding severity uncertain",
+        "kaunting pagdurugo"
+      ]
+    },
+    "walking": {
+      "unable": [
+        "cannot walk",
+        "can't walk",
+        "hindi makalakad",
+        "di makalakad",
+        "hindi nakakalakad",
+        "di nakakalakad",
+        "unable to walk",
+        "could not walk",
+        "cant walk",
+        "can t walk"
+      ],
+      "able": [
+        "can walk independently",
+        "can walk",
+        "nakakalakad",
+        "able to walk",
+        "kayang maglakad"
+      ],
+      "assisted": [
+        "can walk only with assistance",
+        "can walk with assistance",
+        "can walk with help",
+        "walks with assistance",
+        "walking with assistance",
+        "assisted walking",
+        "makalakad nang may alalay",
+        "nakakalakad na may alalay",
+        "can walk but only with assistance"
+      ]
+    },
+    "circulation": {
+      "present": [
+        "palpable radial pulse",
+        "radial pulse is palpable",
+        "radial pulse present",
+        "may radial pulse",
+        "has a radial pulse",
+        "has radial pulse",
+        "can feel a radial pulse",
+        "can feel the radial pulse",
+        "nakakapa ang pulso sa pulsohan"
+      ],
+      "absent": [
+        "radial pulse not palpable",
+        "radial pulse is not palpable",
+        "no palpable radial pulse",
+        "no radial pulse",
+        "absent radial pulse",
+        "cannot feel a radial pulse",
+        "cannot feel the radial pulse",
+        "can't feel a radial pulse",
+        "hindi ko makapa ang pulso sa pulsohan",
+        "hindi ko ma-feel ang radial pulse",
+        "hindi makapa ang radial pulse"
+      ],
+      "uncertain": [
+        "radial pulse uncertain",
+        "uncertain radial pulse"
+      ]
+    }
+  },
+  "mentions": {
+    "breathing": "\\b(breathing|breathe|huminga|humihinga|makahinga|paghinga)\\b",
+    "consciousness": "\\b(responsiveness|responsive|unresponsive|responding|conscious|consciousness|alert|confused|malay|tumutugon)\\b",
+    "severeBleeding": "\\b(bleeding|pagdurugo|dugo)\\b",
+    "walking": "\\b(walk|walking|makalakad|nakakalakad|maglakad)\\b",
+    "circulation": "\\b(radial pulse|pulsohan|circulation)\\b"
+  },
+  "uncertainty": "\\?|\\b(unsure|uncertain|not sure|maybe|possibly|might|perhaps|yata|baka|hindi sigurado|di sigurado)\\b",
+  "unassessed": "\\b(unassessed|not assessed|not checked|not measured|unknown|hindi nasuri|hindi pa nasuri)\\b",
+  "otherSubject": "\\b(rescuer|bystander|my pulse|my radial pulse|pulso ko|my heart|my watch|apple watch|previous patient|past patient|family history)\\b",
+  "multiplePatients": "\\b(another patient|other patient|first patient|second patient|patient one|patient two|patient [ab12]|another victim|other victim|unang pasyente|ibang pasyente|isang pasyente.*isa pa)\\b",
+  "instruction": "\\b(ignore|instructions?|mark|classify|set all|pretend|example|if the patient|suppose|hypothetical)\\b",
+  "correction": "\\b(correction|actually|now|ngayon|pala)\\b",
+  "historical": "\\b(earlier|previously|yesterday|dati|kanina|used to)\\b",
+  "gap": "\\s+(?:(?:po|ho|na|nang|pa|naman|lang|din|rin|siya|siyang|niya|niyang|ko)\\s+){0,4}",
+  "negation": "\\b(no|not|without|never|denies|denied|hindi|di|wala|walang)(?:\\s+(?:po|ho|na|naman|talaga|rin|din|siya|siyang|niya|niyang)){0,3}\\s*$"
+}

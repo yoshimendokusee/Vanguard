@@ -149,7 +149,7 @@ while retrying an unchanged edit. Status PATCH remains compatible.
 ## Structured intake and findings
 
 `processing` v1 uses the envelope in `qwen-agent-handoff.md`: exact
-`originalTranscript` (up to 16,000 characters), all four `observations`, up to 30
+`originalTranscript` (up to 16,000 characters), all five `observations` (the circulation key may be omitted by legacy callers), up to 30
 `uncertainties` (300 characters each), and STT/extraction `provenance`. Local
 extraction metadata includes model/revision/runtime/artifact SHA-256 and execution
 `local`. The Qwen prototype now verifies repository-managed weights and local runtime execution; physical clinical/hardware validation remains incomplete.
@@ -270,3 +270,31 @@ also applies to SSE; the browser central client uses fetch streaming with three
 reconnection attempts, then authenticated polling. The health liveness route remains
 public and contains no records. Read the AI contract and `global-ai-connectivity.md`
 for readiness states, independent native inference and pairing instructions.
+
+
+## Five-observation extension — 2026-10-10
+
+Processing v1 now carries `breathing`, `consciousness`, `severeBleeding`, `walking`
+and `circulation`. The additive states are consciousness `confused`, severeBleeding
+`uncertain`, walking `assisted`, and circulation `present|absent|uncertain|unknown`.
+`alert` retains its wire spelling and means explicitly reported responsiveness;
+being awake alone does not establish it. Circulation records a reported palpable
+radial pulse, never a heart-rate reading or an inference from breathing.
+
+The first four keys remain required. A missing circulation key is accepted only
+for compatibility and becomes `unknown` in normalized intake and current retrieval.
+Explicit null/invalid circulation values reject intake. Processing remains JSON
+in the existing SQLite history tables: no database reset or migration is needed.
+Historical source submissions and revision bytes remain untouched. Replay compares
+normalized processing so an identical pre-extension report still gets an ACK.
+Corrections remain new revisions; report UUIDs, legacy LAN identity and encounters
+retain their existing meaning. Circulation introduces no triage scoring rule.
+
+The hospital board displays five current persisted values with explicit unknowns
+and an unverified label. The existing dashboard uses JavaScript rather than
+TypeScript; its response validation now accepts these states. Shared native models,
+Watch speech success, iPhone speech/inference fallback and relay results use the
+same five-field validator. Text fallback carries saved speech/STT provenance and
+the Watch's persisted encounter UUID; both senders can receive duplicate ACKs
+without creating another report or encounter. Audio remains on the originating
+Watch. If audio was already received before Watch speech recovers, text retry resumes that same persisted capture without replacing its audio. Existing original speech or completed extraction rejects conflicting late speech atomically. Physical paired transfer/background delivery is still unverified.
