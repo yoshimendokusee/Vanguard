@@ -9,7 +9,8 @@ let package = Package(
                .executable(name: "VanguardWatchMac", targets: ["VanguardWatchMac"])],
     targets: [
         .binaryTarget(name: "llama", path: ".native/llama.xcframework"),
-        .target(name: "VanguardApple", dependencies: ["llama"], resources: [.process("Migrations"), .copy("Resources/medical_terms.json")], linkerSettings: [.linkedLibrary("sqlite3")]),
+        .binaryTarget(name: "whisper", path: ".native/whisper.xcframework"),
+        .target(name: "VanguardApple", dependencies: ["llama", .target(name: "whisper", condition: .when(platforms: [.watchOS]))], resources: [.process("Migrations"), .copy("Resources/medical_terms.json")], linkerSettings: [.linkedLibrary("sqlite3")]),
         .executableTarget(name: "VanguardWatchMac", dependencies: ["VanguardApple"], path: "Sources/VanguardWatchMac",
             exclude: ["Info.plist"],
             // Embeds usage descriptions so macOS can ask for the microphone and speech permissions.

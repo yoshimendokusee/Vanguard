@@ -185,13 +185,15 @@ public final class VoiceReportController: ObservableObject {
             switch try await hooks.transcribeAndProcess(capture) {
             case .pending:
                 move(.failed(.transcriptionPending))
-                message = "Saved safely. It will be transcribed when the paired iPhone is reachable."
+                message = "Saved safely. Watch transcription did not finish; the paired iPhone can retry when reachable."
             case .processed:
                 await prepareReport(capture.id)
             }
         } catch is CancellationError { move(.failed(.transcriptionPending)); message = "Saved safely. Processing will resume." }
-        catch TranscriptionFailure.permissionRequired { move(.failed(.transcriptionUnavailable)); message = "Speech recognition is not allowed on the iPhone. Audio is saved." }
-        catch TranscriptionFailure.onDeviceUnavailable { move(.failed(.transcriptionUnavailable)); message = "Offline speech recognition is unavailable here. Audio is saved." }
+        catch TranscriptionFailure.permissionRequired { move(.failed(.transcriptionUnavailable)); message = "Speech recognition is not allowed on this device. Audio is saved." }
+        catch TranscriptionFailure.onDeviceUnavailable { move(.failed(.transcriptionUnavailable)); message = "Offline speech recognition is unavailable on this device. Audio is saved." }
+        catch TranscriptionFailure.empty { move(.failed(.transcriptionUnavailable)); message = "No transcript was produced. Audio is saved; try again or use the paired iPhone." }
+        catch TranscriptionFailure.timeout { move(.failed(.transcriptionUnavailable)); message = "Offline transcription took too long. Audio is saved; try again or use the paired iPhone." }
         catch { move(.failed(.processingFailed)); message = "Processing failed. Audio and transcript are saved; try again." }
     }
 

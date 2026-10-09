@@ -36,13 +36,19 @@ public final class VoiceRuntime: ObservableObject {
         relay.onChange = { _ in Task { await Self.sync(workflow) } }
     }
 
-    /// The Watch has no offline speech recognition (watchOS has no Speech framework), so recorded audio goes to the
-    /// paired iPhone, which transcribes on-device and extracts locally. It waits a bounded time, then reports "pending":
-    /// the audio stays saved and the transfer is retried. The iPhone transcribes itself.
+    /// Process audio on the Watch first. If local transcription or extraction fails, the saved recording is offered
+    /// to the paired iPhone as a fallback and remains pending until its result arrives.
     private static func transcribe(_ capture: NativeCapture, store: NativeStore, workflow: NativeWorkflow, relay: WatchRelay) async throws -> TranscriptionOutcome {
         if try await store.processing(id: capture.id) != nil { return .processed }
         #if os(watchOS)
-        do { try relay.offer(capture) } catch { return .pending }
+        do {
+            _ = try await workflow.processAudio(capture)
+            return .processed
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            do { try relay.offer(capture) } catch { return .pending }
+        }
         for _ in 0..<90 {
             try Task.checkCancellation()
             if try await store.processing(id: capture.id) != nil { return .processed }
