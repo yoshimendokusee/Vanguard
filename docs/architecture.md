@@ -21,11 +21,11 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 | Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive or LLM runtime is bundled. Qwen implementation belongs to a teammate; automatic reporting does not require pre-send review. |
 | Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; no complete companion application/iOS project or durable adapter exists. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
-| Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta`; hub `triage_reports` with WAL. No migration runner, encryption or retention policy. |
-| Hospital LAN | Offline receiving API + dashboard | `hub/`: Express, SQLite, static HTML/CSS/JS dashboard, SSE + polling, deterministic provisional priority and visible rule reasons/source categories. No external dashboard assets; audited clinical corrections await database integration. HTTP without auth/TLS. |
+| Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta` with sqflite v1→v2 upgrade; hub `triage_reports` with WAL and numbered transactional migrations. Neither database is encrypted; no retention policy. |
+| Hospital LAN | Offline receiving API + dashboard | Express, SQLite, local HTML/CSS/JS, SSE + polling and deterministic provisional priority. Clinical corrections await database integration. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One small service: `server.js` routes, `sync.js` validation/ingest, `db.js` persistence. Do not split into services. Add feature modules as features arrive. |
 | Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies or build step. Retain it until a separately tested replacement exists. |
-| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | No Supabase client, deployment config, schema, RLS or cloud sync. Reserved migration path is documentation only. |
+| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
 | Repository | Monorepo + Compose + CI | Existing `watch/` and `hub/` form a small monorepo. Foundation adds root Compose, documentation and checks for those applications only. |
 
 ## Implemented three-tier flow
@@ -36,7 +36,8 @@ Presentation: Wear OS Flutter screen                 Hospital HTML board
 Application: Vosk -> keyword parser -> report        Express routes + ingest
                         |                                  |
 Data:        watch SQLite -> automatic HTTP LAN POST -> hospital SQLite
-                                      <- ACK IDs --        |
+                  |                   <- ACK IDs --        |
+                  +-> Supabase upsert (authenticated, per-user RLS)
                                                    SSE event / poll
 ```
 
@@ -53,6 +54,21 @@ a transaction. Identical duplicate reports are also acknowledged; different immu
 on watch identity and normalized UTC creation timestamp. Invalid reports stay
 pending. The dashboard fetches rows, updates statuses and refreshes through SSE
 with a ten-second polling fallback. See `api-contract.md` for the existing API.
+
+`watch/lib/services/cloud_sync_service.dart` separately upserts UUID-keyed
+reports to Supabase using the signed-in user's session. SQLite records remain
+the local source of truth; cloud sync state does not change LAN sync state.
+Reports created while signed out and pre-upgrade rows have no cloud owner.
+Uploading those rows requires explicit confirmation to assign them to the
+current account. An upload is acknowledged only after Supabase returns the
+upserted report IDs.
+
+The hub applies `hub/migrations/0001_initial_schema.sql` transactionally and
+tracks its schema with SQLite `PRAGMA user_version`. Existing compatible
+databases are adopted at version 1 without dropping records; incompatible
+unversioned schemas fail explicitly. The watch v2 upgrade is implemented through
+sqflite's `onUpgrade`; the Supabase migration is tracked separately by the
+Supabase CLI.
 
 ## Integrity limits of the prototype
 
@@ -92,9 +108,15 @@ See [Apple's background behavior](https://developer.apple.com/library/archive/do
 and [Android's background BLE guidance](https://developer.android.com/develop/connectivity/bluetooth/ble/background).
 
 Supabase is an eventual online sync route, not a prerequisite for local capture
-or an offline hospital hub. Introduce Auth, scoped roles, RLS, versioned migrations
-and conflict/delivery semantics together. Keep server credentials out of clients.
-An optional Python/FastAPI AI service or relay simulator is allowed only when
+or an offline hospital hub. The watch saves first to SQLite, assigns each report
+a stable UUID, and retries Supabase upserts by that ID. Each local row records
+the authenticated account that owned it at capture time; unowned rows from
+signed-out capture or before this upgrade require explicit user confirmation
+before assignment to an account. Supabase RLS limits each account to its own
+rows. The LAN hub remains a separate route with its existing legacy identity.
+Realtime, protected local storage/transports and trusted hospital-delivery
+semantics are not implemented. Keep server credentials out of clients. An
+optional Python/FastAPI AI service or relay simulator is allowed only when
 needed; a server AI service cannot satisfy the offline client requirement.
 A local LLM extracts explicit facts with uncertainty; deterministic rules and
 qualified review govern provisional triage. Decide placement on watch versus

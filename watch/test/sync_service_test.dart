@@ -18,6 +18,9 @@ TriageRow row(int id, {String text = 'Synthetic'}) => TriageRow(
   rawText: text,
   createdAt: DateTime.utc(2026, 10, 9, 0, 0, id).toIso8601String(),
   synced: false,
+  reportId: 'synthetic-$id',
+  cloudOwnerId: null,
+  cloudSynced: false,
 );
 
 http.Response ack(List<int> ids, {List<Object> rejected = const []}) =>
