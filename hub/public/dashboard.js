@@ -57,7 +57,10 @@ import './hub-client.js';
   const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
   const $ = (id) => document.getElementById(id);
-  $('hub-token-save').onclick = () => VanguardApi.setToken($('hub-token').value).catch(error => toast(error.message));
+  const hubTokenSaveBtn = $('hub-token-save');
+  if (hubTokenSaveBtn) {
+    hubTokenSaveBtn.onclick = () => VanguardApi.setToken($('hub-token')?.value || '').catch(error => toast(error.message));
+  }
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const num = (n) => new Intl.NumberFormat().format(n);
   const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
@@ -1459,51 +1462,72 @@ import './hub-client.js';
       setView(all[n].dataset.f);
     };
   });
-  $('cat-clear').onclick = () => setCat(null);
+  const catClearBtn = $('cat-clear');
+  if (catClearBtn) catClearBtn.onclick = () => setCat(null);
   document.querySelectorAll('.rb[data-r]').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); bsel = null; render(); }; });
   document.querySelectorAll('.rb[data-s]').forEach((b) => { b.onclick = () => setShow(b.dataset.s); });
 
-  function setQuery(v) { query = v; qInput.value = v; currentPage = 1; writeUrl(false); render(); }
-  qInput.addEventListener('input', () => { query = qInput.value; currentPage = 1; writeUrl(false); render(); });
-  $('qx').onclick = () => { setQuery(''); qInput.focus(); };
+  function setQuery(v) { query = v; if (qInput) qInput.value = v; currentPage = 1; writeUrl(false); render(); }
+  if (qInput) qInput.addEventListener('input', () => { query = qInput.value; currentPage = 1; writeUrl(false); render(); });
+  const qxBtn = $('qx');
+  if (qxBtn) qxBtn.onclick = () => { setQuery(''); if (qInput) qInput.focus(); };
 
   const soundBtn = $('sound');
   function paintSound() {
+    if (!soundBtn) return;
     soundBtn.setAttribute('aria-checked', String(soundOn));
-    soundBtn.querySelector('.state').textContent = soundOn ? 'On' : 'Off';
+    const st = soundBtn.querySelector('.state');
+    if (st) st.textContent = soundOn ? 'On' : 'Off';
   }
-  soundBtn.onclick = () => {
-    soundOn = !soundOn;
-    try { localStorage.setItem('sound', soundOn ? '1' : '0'); } catch (_) {}
+  if (soundBtn) {
+    soundBtn.onclick = () => {
+      soundOn = !soundOn;
+      try { localStorage.setItem('sound', soundOn ? '1' : '0'); } catch (_) {}
+      paintSound();
+      if (soundOn) beep(); // the click also unlocks audio in the browser
+    };
     paintSound();
-    if (soundOn) beep(); // the click also unlocks audio in the browser
-  };
-  paintSound();
+  }
 
   // Toasts must never hide the control a keyboard user is on: Escape clears them, and so does moving focus beneath them.
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') $('toasts').replaceChildren(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const box = $('toasts');
+      if (box) box.replaceChildren();
+    }
+  });
   document.addEventListener('focusin', (e) => {
     const box = $('toasts');
-    if (!box.children.length || box.contains(e.target) || !e.target.getBoundingClientRect) return;
+    if (!box || !box.children.length || box.contains(e.target) || !e.target.getBoundingClientRect) return;
     const a = e.target.getBoundingClientRect(), b = box.getBoundingClientRect();
     if (a.right > b.left && a.left < b.right && a.bottom > b.top && a.top < b.bottom) box.replaceChildren();
   });
 
-  function tick() { $('clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  function tick() {
+    const clk = $('clock');
+    if (clk) clk.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
   tick();
   setInterval(tick, 10000);
 
   VanguardApi.request('/api/config').then((r) => r.json()).then((c) => {
-    $('hospital').textContent = c.hospital;
+    const hosp = $('hospital');
+    if (hosp) hosp.textContent = c.hospital;
     document.title = c.hospital + ' · Pre-Arrival Board';
   }).catch(() => {});
 
   // Live push; the poll is a safety net if the stream drops.
   function connect() {
     VanguardApi.events(
-      () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; },
+      () => {
+        const conn = $('conn');
+        if (conn) { conn.textContent = 'Live'; conn.className = 'conn live'; }
+      },
       () => load(),
-      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; },
+      () => {
+        const conn = $('conn');
+        if (conn) { conn.textContent = 'Polling'; conn.className = 'conn down'; }
+      },
       renderCloud);
   }
   // Supabase backup status from the hub; the board never talks to Supabase directly.
@@ -1516,21 +1540,31 @@ import './hub-client.js';
   }
   function renderCloud(s) {
     const el = $('cloud-conn'), btn = $('cloud-sync');
-    el.textContent = cloudLabel(s);
-    el.className = 'conn ' + (s.configured && s.state !== 'error' && !s.rejected ? 'live' : 'down');
-    el.title = s.message || (s.lastSuccessAt ? `Last cloud sync ${new Date(s.lastSuccessAt).toLocaleTimeString()}` : 'Supabase cloud backup');
-    btn.hidden = !s.configured;
-    btn.disabled = s.state === 'syncing';
+    if (el) {
+      el.textContent = cloudLabel(s);
+      el.className = 'conn ' + (s.configured && s.state !== 'error' && !s.rejected ? 'live' : 'down');
+      el.title = s.message || (s.lastSuccessAt ? `Last cloud sync ${new Date(s.lastSuccessAt).toLocaleTimeString()}` : 'Supabase cloud backup');
+    }
+    if (btn) {
+      btn.hidden = !s.configured;
+      btn.disabled = s.state === 'syncing';
+    }
   }
   function loadCloud() {
     VanguardApi.request('/api/cloud/status').then((r) => r.json()).then(renderCloud)
-      .catch(() => { $('cloud-conn').textContent = 'Cloud: unknown'; $('cloud-conn').className = 'conn down'; });
+      .catch(() => {
+        const el = $('cloud-conn');
+        if (el) { el.textContent = 'Cloud: unknown'; el.className = 'conn down'; }
+      });
   }
-  $('cloud-sync').addEventListener('click', () => {
-    $('cloud-sync').disabled = true;
-    VanguardApi.request('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
-      .then((r) => r.json()).then(renderCloud).catch(loadCloud);
-  });
+  const cloudSyncBtn = $('cloud-sync');
+  if (cloudSyncBtn) {
+    cloudSyncBtn.addEventListener('click', () => {
+      cloudSyncBtn.disabled = true;
+      VanguardApi.request('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
+        .then((r) => r.json()).then(renderCloud).catch(loadCloud);
+    });
+  }
 
   readUrl();
   render();
