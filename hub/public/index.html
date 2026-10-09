@@ -292,6 +292,22 @@
   .skel { height: 14px; border-radius: 4px; background: var(--panel-2); animation: pulse 1.4s ease-in-out infinite; }
   .skel-row { display: grid; gap: var(--s3); padding: var(--s2) 0; }
   .note { color: var(--dim); font-size: 0.8125rem; max-width: 72ch; }
+  /* ---------- local AI panel (Qwen extraction assistant) ---------- */
+  #ai-panel { display: grid; gap: var(--s3); margin-bottom: var(--s4); }
+  #ai-panel textarea { width: 100%; font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: var(--s3); resize: vertical; }
+  .ai-label { font-weight: 600; color: var(--head); font-size: 0.875rem; }
+  .ai-row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+  .ai-btn { border: 0; border-radius: 99px; background: var(--sel-bg); color: var(--sel-fg); font-weight: 600; padding: 10px var(--s4); min-height: 44px; }
+  .ai-btn.ghost { background: var(--soft-bg); color: var(--soft-fg); }
+  .ai-btn:disabled { opacity: 0.55; }
+  .ai-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--s2); }
+  .ai-grid label { display: grid; gap: 4px; font-size: 0.875rem; font-weight: 500; }
+  .ai-grid select, .ai-grid input { font: inherit; color: inherit; background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--r-md); padding: 8px 10px; min-height: 44px; width: 100%; }
+  .ai-table { display: grid; gap: 4px; font-size: 0.875rem; }
+  .ai-table div { display: flex; gap: var(--s2); justify-content: space-between; border-bottom: 1px dashed var(--line); padding: 2px 0; }
+  .ai-ev { color: var(--dim); font-size: 0.8125rem; }
+  .ai-warn { color: var(--warn-fg); font-size: 0.875rem; font-weight: 600; }
+  #ai-result[hidden], #ai-review[hidden] { display: none; }
 
   /* ---------- toasts ---------- */
   .toasts { position: fixed; right: var(--s5); bottom: var(--s5); display: grid; gap: var(--s2); z-index: 20; max-width: min(400px, calc(100vw - 32px)); }
@@ -386,6 +402,7 @@
           <button class="x" id="qx" type="button" aria-label="Clear search" hidden>×</button>
         </label>
         <span class="conn down" id="conn" role="status">Connecting</span>
+        <span class="conn down" id="ai-conn" role="status" title="Local Qwen extraction model">AI: checking</span>
         <span class="clock" id="clock" aria-label="Current time"></span>
       </div>
     </header>
@@ -409,6 +426,38 @@
     <p class="sline" id="sline" role="status">Loading reports</p>
     <div class="filters" id="filters"></div>
     <div id="alert"></div>
+    <section class="card" id="ai-panel" aria-labelledby="ai-h">
+      <h2 id="ai-h">Local AI triage assistant</h2>
+      <p class="hint">Qwen runs on the hospital computer and only extracts what the transcript states. Deterministic rules plus your review decide triage — the AI never assigns urgency by itself. Synthetic test data only.</p>
+      <label class="ai-label" for="ai-text">Emergency transcript</label>
+      <textarea id="ai-text" rows="3" maxlength="4000" placeholder="Type or paste what the rescuer reported"></textarea>
+      <div class="ai-row">
+        <button type="button" class="ai-btn" id="ai-extract">Extract with Qwen</button>
+        <button type="button" class="ai-btn ghost" id="ai-assist">Triage assist</button>
+      </div>
+      <p class="hint" id="ai-state" role="status"></p>
+      <div id="ai-result" hidden></div>
+      <div id="ai-review" hidden>
+        <h3>Review and correct</h3>
+        <div class="ai-grid">
+          <label>Breathing <select id="ai-obs-breathing"><option value="normal">normal</option><option value="abnormal">abnormal</option><option value="absent">absent</option><option value="unknown">unknown</option></select></label>
+          <label>Consciousness <select id="ai-obs-consciousness"><option value="alert">alert</option><option value="unresponsive">unresponsive</option><option value="unknown">unknown</option></select></label>
+          <label>Severe bleeding <select id="ai-obs-bleeding"><option value="present">present</option><option value="absent">absent</option><option value="unknown">unknown</option></select></label>
+          <label>Walking <select id="ai-obs-walking"><option value="able">able</option><option value="unable">unable</option><option value="unknown">unknown</option></select></label>
+        </div>
+        <div class="ai-grid">
+          <label>Pickup location <input id="ai-location" type="text" maxlength="200" placeholder="Barangay"></label>
+          <label>Patients <input id="ai-count" type="number" min="1" max="99" value="1"></label>
+          <label>Age group <select id="ai-age"><option>Infant</option><option>Child</option><option>Adult</option><option>Elderly</option><option selected>Unspecified</option></select></label>
+          <label>ETA (min) <input id="ai-eta" type="number" min="1" max="720" placeholder="—"></label>
+        </div>
+        <label class="ck"><input type="checkbox" id="ai-confirm"> <span>I reviewed the extraction and evidence — save as an inbound report</span></label>
+        <div class="ai-row">
+          <button type="button" class="ai-btn" id="ai-save">Save reviewed report</button>
+        </div>
+        <p class="hint" id="ai-save-state" role="status"></p>
+      </div>
+    </section>
 
     <div id="view-panel" role="tabpanel" aria-labelledby="tab-inbound">
       <section id="soon-sec" aria-labelledby="soon-h" hidden>
@@ -1193,6 +1242,162 @@
   connect();
   setInterval(load, 10000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
+</script>
+<script>
+  // Local AI triage assistant: talks to the hub's Qwen endpoints, never to Ollama directly.
+  // All rendering uses textContent (safe). The board keeps working when the AI is down.
+  (function () {
+    'use strict';
+    var panel = document.getElementById('ai-panel');
+    if (!panel) return;
+    function $(id) { return document.getElementById(id); }
+    var textEl = $('ai-text'), stateEl = $('ai-state'), resultEl = $('ai-result'), reviewEl = $('ai-review');
+    var extractBtn = $('ai-extract'), assistBtn = $('ai-assist'), saveBtn = $('ai-save');
+    var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
+    var busy = false;
+    var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
+    function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
+    async function refreshStatus() {
+      try {
+        var s = await (await fetch('/api/ai/status')).json();
+        if (s && s.available) { setConn(true, 'AI ready'); return; }
+        setConn(false, 'AI unavailable');
+        stateEl.textContent = (s && s.error === 'model-missing')
+          ? 'Qwen model is missing on the hospital computer. The board still works.'
+          : 'Local AI is unreachable. The board still works without it.';
+      } catch (e) { setConn(false, 'AI unavailable'); }
+    }
+    function errText(data, res) {
+      var map = {
+        'ollama-unreachable': 'Local AI is unreachable; is Ollama running on the hospital computer?',
+        'ollama-timeout': 'Local AI timed out; try a shorter transcript.',
+        'model-missing': 'Qwen model is missing on the hospital computer.',
+        'invalid-model-json': 'Qwen returned an unusable reply; nothing was saved.',
+        'invalid-model-schema': 'Qwen returned an unusable reply; nothing was saved.',
+        'invalid-transcript': 'Type a transcript first.',
+        'transcript-too-long': 'Transcript is too long; shorten it.'
+      };
+      if (data && data.error && map[data.error]) return map[data.error];
+      return 'Local AI failed' + (res ? ' (HTTP ' + res.status + ')' : '') + '; nothing was saved.';
+    }
+    function rowOf(box, k, v, cls) {
+      var d = document.createElement('div');
+      var a = document.createElement('span'); a.textContent = k;
+      var b = document.createElement('b'); b.textContent = v;
+      if (cls) b.className = cls;
+      d.append(a, b); box.append(d);
+    }
+    function renderResult(data) {
+      resultEl.replaceChildren();
+      var t = document.createElement('div'); t.className = 'ai-table';
+      var obs = data.processing.observations;
+      Object.keys(OBS_LABEL).forEach(function (k) { rowOf(t, OBS_LABEL[k], obs[k]); });
+      resultEl.append(t);
+      var ev = document.createElement('p'); ev.className = 'ai-ev';
+      var quotes = Object.keys(OBS_LABEL).map(function (k) {
+        return OBS_LABEL[k] + ': ' + (data.evidence && data.evidence[k] ? '\u201C' + data.evidence[k] + '\u201D' : 'not stated');
+      }).join(' · ');
+      ev.textContent = 'Evidence — ' + quotes;
+      resultEl.append(ev);
+      (data.processing.uncertainties || []).forEach(function (u) {
+        var p = document.createElement('p'); p.className = 'ai-ev'; p.textContent = 'Unknown: ' + u; resultEl.append(p);
+      });
+      (data.warnings || []).forEach(function (w) {
+        var p = document.createElement('p'); p.className = 'ai-warn'; p.textContent = 'Warning: ' + w; resultEl.append(p);
+      });
+      var pr = document.createElement('p');
+      pr.textContent = 'Provisional (deterministic rules, advisory only): ' + data.provisional.triage + ' — ' + data.provisional.reason + '. Verify clinically.';
+      resultEl.append(pr);
+      if (data.draft) {
+        var dr = document.createElement('p'); dr.className = 'ai-ev';
+        dr.textContent = 'Draft report: ' + data.draft.injuries + ' · ' + data.draft.triage + ' (provisional)';
+        resultEl.append(dr);
+      }
+      resultEl.hidden = false;
+      $('ai-obs-breathing').value = obs.breathing;
+      $('ai-obs-consciousness').value = obs.consciousness;
+      $('ai-obs-bleeding').value = obs.severeBleeding;
+      $('ai-obs-walking').value = obs.walking;
+      reviewEl.hidden = false;
+    }
+    async function run(kind) {
+      if (busy) return;
+      var transcript = textEl.value;
+      if (!transcript.trim()) { stateEl.textContent = 'Type a transcript first.'; return; }
+      busy = true; extractBtn.disabled = true; assistBtn.disabled = true;
+      stateEl.textContent = 'Working — asking local Qwen…';
+      try {
+        var res = await fetch('/api/ai/' + kind, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcript: transcript, device: 'hospital-browser', sttEngine: 'typed/hub-form', sttRuntime: 'hub-ai-v1' })
+        });
+        var data = await res.json().catch(function () { return null; });
+        if (!res.ok || !data || data.ok !== true) { stateEl.textContent = errText(data, res); return; }
+        setConn(true, 'AI ready');
+        stateEl.textContent = 'Ready — review the extraction below before saving.';
+        renderResult(data);
+      } catch (e) { stateEl.textContent = 'Could not reach the hub; the board still works.'; }
+      busy = false; extractBtn.disabled = false; assistBtn.disabled = false;
+    }
+    extractBtn.onclick = function () { run('extract'); };
+    assistBtn.onclick = function () { run('triage-assist'); };
+    // Mirror of hub/risk.js assessRisk (server stays the source of truth).
+    function aiProvisional(o) {
+      var reasons = [];
+      if (o.breathing === 'abnormal' || o.breathing === 'absent') reasons.push('Breathing: ' + o.breathing);
+      if (o.consciousness === 'unresponsive') reasons.push('Unresponsive');
+      if (o.severeBleeding === 'present') reasons.push('Severe bleeding reported');
+      if (reasons.length) return { triage: 'Immediate', reason: reasons.join('; ') };
+      if (o.walking === 'unable') return { triage: 'Delayed', reason: 'Unable to walk; other critical findings not established' };
+      if (o.walking === 'able' && o.breathing === 'normal' && o.consciousness === 'alert' && o.severeBleeding === 'absent') {
+        return { triage: 'Minor', reason: 'Walking, alert, normal breathing, no severe bleeding reported' };
+      }
+      return { triage: 'Unassessed', reason: 'Insufficient explicit observations; qualified assessment required' };
+    }
+    function injuriesFrom(o) {
+      var out = [];
+      if (o.breathing === 'absent') out.push('Not breathing');
+      else if (o.breathing === 'abnormal') out.push('Difficulty breathing');
+      if (o.consciousness === 'unresponsive') out.push('Unconscious');
+      if (o.severeBleeding === 'present') out.push('Severe bleeding');
+      if (o.walking === 'unable') out.push('Non-ambulatory');
+      if (o.walking === 'able') out.push('Ambulatory');
+      return out.length ? out.join(', ') : 'Unspecified';
+    }
+    saveBtn.onclick = async function () {
+      if (!$('ai-confirm').checked) { saveStateEl.textContent = 'Tick the review box first — nothing was saved.'; return; }
+      var loc = $('ai-location').value.trim();
+      if (!loc) { saveStateEl.textContent = 'Enter a pickup location first.'; return; }
+      var pc = parseInt($('ai-count').value, 10); if (!Number.isInteger(pc) || pc < 1 || pc > 99) pc = 1;
+      var ages = ['Infant', 'Child', 'Adult', 'Elderly', 'Unspecified'];
+      var ag = $('ai-age').value; if (ages.indexOf(ag) === -1) ag = 'Unspecified';
+      var etaRaw = $('ai-eta').value.trim();
+      var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
+      if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
+      var obs = { breathing: $('ai-obs-breathing').value, consciousness: $('ai-obs-consciousness').value, severeBleeding: $('ai-obs-bleeding').value, walking: $('ai-obs-walking').value };
+      var prov = aiProvisional(obs);
+      saveBtn.disabled = true; saveStateEl.textContent = 'Saving…';
+      try {
+        var res = await fetch('/api/sync-triage', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ watchId: 'HUB-AI', reports: [{
+            localId: Date.now() % 1000000000, location: loc.slice(0, 200), injuries: injuriesFrom(obs),
+            triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
+            rawText: textEl.value.slice(0, 1000), createdAt: new Date().toISOString()
+          }] })
+        });
+        var data = await res.json().catch(function () { return null; });
+        if (!res.ok || !data || data.ok !== true) { saveStateEl.textContent = 'Save failed; nothing was stored.'; return; }
+        if (data.rejected && data.rejected.length) { saveStateEl.textContent = 'Hub refused the report: ' + data.rejected[0].reason; return; }
+        saveStateEl.textContent = 'Saved as inbound (' + prov.triage + ', provisional) — verify clinically.';
+        $('ai-confirm').checked = false;
+        if (typeof toast === 'function') toast('AI report saved', prov.triage + ' · verify clinically', prov.triage);
+        if (typeof load === 'function') load();
+      } catch (e) { saveStateEl.textContent = 'Could not reach the hub; nothing was saved.'; }
+      saveBtn.disabled = false;
+    };
+    refreshStatus();
+  })();
 </script>
 </body>
 </html>

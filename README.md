@@ -9,7 +9,7 @@ when they arrive. This describes the implemented prototype, not hardware-verifie
 operation or clinical validation. No speech model is bundled in this checkout.
 
 The approved target adds mobile BLE relay, Supabase sync, local LLM extraction and
-a React/TypeScript/Tailwind dashboard. Qwen and database extensions belong to teammates and are **not implemented**. This branch adds automatic foreground sync, hospital provisional rules, native iPhone STT/recovery library ports and Windows QA; complete Apple apps remain blocked.
+a React/TypeScript/Tailwind dashboard. On-device Qwen weights/runtime and durable processing storage belong to teammates and are **not implemented**. This branch adds automatic foreground sync, hospital provisional rules, native iPhone STT/recovery library ports and Windows QA; complete Apple apps remain blocked.
 The existing watch, hub and plain HTML dashboard remain in their current paths.
 
 ```
@@ -128,6 +128,48 @@ Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
 `HOSPITAL_NAME` and does not auto-load `.env`. Inside Docker, port 3000 and
 `/data/vanguard.db` remain fixed. `HUB_URL` and `VOSK_MODEL` are watch compile-time
 defines; `.env` does not automatically configure Flutter.
+
+## Local AI (Qwen via Ollama, hub-local)
+
+Qwen `qwen3:0.6b` runs on the hospital computer through Ollama. The hub calls it
+from `hub/ai.js` (`GET /api/ai/status`, `POST /api/ai/extract`,
+`POST /api/ai/triage-assist`). The model only extracts what the transcript states
+with evidence; deterministic `hub/risk.js` rules plus your review decide the
+provisional triage. Nothing is saved by the AI routes. See `docs/ai-contract.md`.
+Use synthetic data only. Never expose Ollama to the internet.
+
+From Windows PowerShell at the repository root:
+
+```powershell
+# 1. Start Ollama on the hub computer, then check the model.
+ollama list
+# Must show qwen3:0.6b. If missing: ollama pull qwen3:0.6b
+
+# 2. Configure the hub.
+Copy-Item .env.example .env
+# .env already sets OLLAMA_URL=http://127.0.0.1:11434 and OLLAMA_MODEL=qwen3:0.6b.
+
+# 3. Run the hub with Docker (uses hub/data), then open the board.
+docker compose up --build
+# Board: http://localhost:3000
+
+# 4. In the "Local AI triage assistant" panel: type a transcript, choose
+# Extract with Qwen or Triage assist, review evidence and warnings, correct the
+# fields, tick the review box, then Save reviewed report.
+# Header shows AI ready or AI unavailable. The board works either way.
+
+# 5. Backend tests (Docker, in-memory DB, no demo data touched).
+docker build -t vanguard-hub-ai ./hub
+docker run --rm -e DB_PATH=:memory: vanguard-hub-ai npm test -- --test-name-pattern="AI"
+```
+
+Native Node (needs Node 22+ and build tools for better-sqlite3): `cd hub; npm ci; npm test`.
+Watch AI client: `watch/lib/services/ai_service.dart` posts to `/api/ai/*` and fails
+fast offline so capture stays in SQLite. Apple types: `watch/apple/.../AiContract.swift`.
+`127.0.0.1` on a watch or phone means that device, not the hub PC. For real devices
+use the hub laptop LAN IP as `HUB_URL`, keep phone and hub on the same router, and
+allow the hub port in Windows Firewall. No on-device Qwen, BLE, Supabase, or React
+is claimed in this branch.
 
 ## Watch app
 

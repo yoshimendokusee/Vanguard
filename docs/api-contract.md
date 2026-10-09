@@ -120,5 +120,5 @@ Automatic rules never declare Deceased. ETA sorting applies within each effectiv
 priority, and non-inbound rows follow inbound rows. The dashboard uses effective
 priority for counts/color/order while displaying source category, rule and original
 text. Clinical correction/override audit APIs remain blocked on database integration;
-status PATCH remains available. `assessRisk` and `validateProcessing` provide tested
+status PATCH remains available. See docs/ai-contract.md for the hub-local Qwen routes (GET /api/ai/status, POST /api/ai/extract, POST /api/ai/triage-assist): extraction with evidence plus deterministic provisional triage, advisory only, never writing to SQLite. `assessRisk` and `validateProcessing` provide tested
 structured integration utilities, not persisted structured processing yet.

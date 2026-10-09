@@ -10,7 +10,7 @@ const { createApp } = require('./server');
 
 test('documented LAN example works end to end with the shipped dashboard', async () => {
   const contract = fs.readFileSync(path.join(__dirname, '../docs/api-contract.md'), 'utf8');
-  const examples = [...contract.matchAll(/```json\n([\s\S]*?)\n```/g)].map((m) => JSON.parse(m[1]));
+  const examples = [...contract.matchAll(/```json\r?\n([\s\S]*?)\r?\n```/g)].map((m) => JSON.parse(m[1]));
   const [request, expected] = examples;
   assert.ok(request.watchId && Array.isArray(request.reports));
   const db = openDb(':memory:');
@@ -69,7 +69,7 @@ test('reopening a populated hub database preserves reports, status and deduplica
     db = openDb(file);
     const { ingestBatch } = require('./sync');
     const contract = fs.readFileSync(path.join(__dirname, '../docs/api-contract.md'), 'utf8');
-    const request = JSON.parse(contract.match(/```json\n([\s\S]*?)\n```/)[1]);
+    const request = JSON.parse(contract.match(/```json\r?\n([\s\S]*?)\r?\n```/)[1]);
     ingestBatch(db, request.watchId, request.reports);
     db.prepare("UPDATE triage_reports SET status = 'arrived'").run();
     const before = db.prepare('SELECT * FROM triage_reports').all();
