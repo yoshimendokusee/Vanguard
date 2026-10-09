@@ -5,9 +5,11 @@ import 'package:vibration/vibration.dart';
 
 import 'db/triage_db.dart';
 import 'nlp/triage_parser.dart';
+import 'reports_screen.dart';
 import 'services/speech_service.dart';
 import 'services/sync_service.dart';
 import 'theme.dart';
+import 'watch_layout.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -52,6 +54,7 @@ class _TriageScreenState extends State<TriageScreen>
   String _status = 'LOADING MODEL…';
   TriageRow? _lastSaved;
   int _pending = 0;
+  int _total = 0; // every report saved on this watch
   bool _syncing = false;
 
   @override
@@ -82,6 +85,7 @@ class _TriageScreenState extends State<TriageScreen>
       );
       _sync!.start(_syncFinished);
       _pending = await db.pendingCount();
+      _total = await db.totalCount();
       await _speech.init();
       if (!mounted) return;
       setState(() {
@@ -160,6 +164,7 @@ class _TriageScreenState extends State<TriageScreen>
     final result = _parser.parse(text);
     final row = await _db!.insert(result);
     final pending = await _db!.pendingCount();
+    final total = await _db!.totalCount();
     await _buzz(
       !result.isRecognized
           ? _Buzz.unrecognized
@@ -172,6 +177,7 @@ class _TriageScreenState extends State<TriageScreen>
       _phase = _Phase.idle;
       _lastSaved = row;
       _pending = pending;
+      _total = total;
       _status = result.isRecognized ? 'SAVED' : 'SAVED – CHECK';
     });
     unawaited(_sync!.sync());
@@ -217,6 +223,21 @@ class _TriageScreenState extends State<TriageScreen>
     });
   }
 
+  /// The patients triaged on this watch. The list re-reads while it is open;
+  /// on return the pending count is refreshed in case the hub acknowledged some.
+  Future<void> _openReports() async {
+    final db = _db;
+    if (db == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ReportsScreen(load: () => db.recent()),
+      ),
+    );
+    final pending = await db.pendingCount();
+    if (!mounted) return;
+    setState(() => _pending = pending);
+  }
+
   Future<void> _doSync() async {
     if (_syncing || _sync == null) return;
     setState(() => _syncing = true);
@@ -230,95 +251,91 @@ class _TriageScreenState extends State<TriageScreen>
     return Scaffold(
       backgroundColor: c.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
-          child: Column(
-            children: [
-              GestureDetector(
+        // Round, square and rectangular watches share one set of parts; the
+        // frame decides where they sit so nothing is cut off by the bezel.
+        child: LayoutBuilder(
+          builder: (context, box) {
+            final m = WatchMetrics.of(box.biggest);
+            final u = m.unit;
+            return AdaptiveWatchFrame(
+              metrics: m,
+              compactMic: _lastSaved != null && !listening,
+              sideAction: ReportsButton(
+                count: _total,
+                unit: u,
+                onPressed: _db != null && !listening ? _openReports : null,
+              ),
+              header: GestureDetector(
                 onLongPress: _demoPhrase,
                 child: Text(
                   '${_db?.watchId ?? '…'}  ·  $_pending PENDING',
                   style: TextStyle(
                     color: c.dim,
-                    fontSize: 11,
+                    fontSize: 11 * u,
                     letterSpacing: 1,
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Expanded(
-                flex: 5,
-                child: Center(
-                  child: AspectRatio(
-                    aspectRatio: 1,
-                    child: Semantics(
-                      button: true,
-                      label: listening
-                          ? 'Stop and save report'
-                          : 'Start dictating a patient report',
-                      child: GestureDetector(
-                        onTap: _toggle,
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 150),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            // Idle is teal on purpose: red/amber/green mean
-                            // triage categories on this screen.
-                            color: listening
-                                ? c.listening
-                                : _phase == _Phase.idle
-                                ? c.accent
-                                : c.panel,
-                            border: Border.all(color: c.text, width: 4),
-                          ),
-                          child: Icon(
-                            listening ? Icons.stop_rounded : Icons.mic_rounded,
-                            size: 64,
-                            color: listening
-                                ? c.onListening
-                                : _phase == _Phase.idle
-                                ? c.onAccent
-                                : c.dim,
-                          ),
-                        ),
+              mic: Semantics(
+                button: true,
+                label: listening
+                    ? 'Stop and save report'
+                    : 'Start dictating a patient report',
+                child: GestureDetector(
+                  onTap: _toggle,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      // Idle is teal on purpose: red/amber/green mean
+                      // triage categories on this screen.
+                      color: listening
+                          ? c.listening
+                          : _phase == _Phase.idle
+                          ? c.accent
+                          : c.panel,
+                      border: Border.all(color: c.text, width: 4 * u),
+                    ),
+                    child: LayoutBuilder(
+                      builder: (context, mic) => Icon(
+                        listening ? Icons.stop_rounded : Icons.mic_rounded,
+                        size: mic.biggest.shortestSide * 0.45,
+                        color: listening
+                            ? c.onListening
+                            : _phase == _Phase.idle
+                            ? c.onAccent
+                            : c.dim,
                       ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
+              status: Text(
                 _status,
-                style: const TextStyle(
-                  fontSize: 13,
+                style: TextStyle(
+                  fontSize: 13 * u,
                   fontWeight: FontWeight.w900,
                   letterSpacing: 1,
                 ),
               ),
-              Expanded(
-                flex: 3,
-                child: _lastSaved != null && !listening
-                    ? _SavedCard(row: _lastSaved!)
-                    : SingleChildScrollView(
-                        controller: _scroll,
-                        child: Text(
-                          _transcript,
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 14, height: 1.25),
-                        ),
+              content: _lastSaved != null && !listening
+                  ? SavedCard(row: _lastSaved!, unit: u)
+                  : SingleChildScrollView(
+                      controller: _scroll,
+                      child: Text(
+                        _transcript,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14 * u, height: 1.25),
                       ),
+                    ),
+              action: WatchActionButton(
+                metrics: m,
+                label: 'RETRY NOW',
+                icon: Icons.local_hospital,
+                onPressed: _syncing || listening ? null : _doSync,
               ),
-              SizedBox(
-                width: double.infinity,
-                height: 36,
-                child: FilledButton.icon(
-                  onPressed: _syncing || listening ? null : _doSync,
-                  icon: const Icon(Icons.local_hospital, size: 18),
-                  label: const Text('RETRY NOW'),
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         ),
       ),
     );
@@ -344,9 +361,12 @@ class _TriageScreenState extends State<TriageScreen>
 /// saved = 2 short · immediate = 3 long · unrecognized = 4 rapid · nothing = 1 long
 enum _Buzz { saved, immediate, unrecognized, nothing }
 
-class _SavedCard extends StatelessWidget {
-  const _SavedCard({required this.row});
+/// The report that was just saved. The category chip and pickup line stay on
+/// one line (they shrink on small screens) so nothing important wraps or hides.
+class SavedCard extends StatelessWidget {
+  const SavedCard({super.key, required this.row, this.unit = 1});
   final TriageRow row;
+  final double unit;
 
   @override
   Widget build(BuildContext context) {
@@ -360,32 +380,41 @@ class _SavedCard extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            padding: EdgeInsets.symmetric(
+              horizontal: 10 * unit,
+              vertical: 3 * unit,
+            ),
             decoration: BoxDecoration(
               color: style.background,
               borderRadius: BorderRadius.circular(8),
               border: unassessed ? Border.all(color: style.accent) : null,
             ),
-            child: Text(
-              '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
-              style: TextStyle(
-                color: style.foreground,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
+                style: TextStyle(
+                  color: style.foreground,
+                  fontSize: 17 * unit,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 1),
           Text(
             row.injuries,
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 14),
+            style: TextStyle(fontSize: 14 * unit),
           ),
-          Text(
-            '${row.location}'
-            '${row.etaMinutes != null ? ' · ETA ${row.etaMinutes} min' : ''}',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: c.dim),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              '${row.location}'
+              '${row.etaMinutes != null ? ' · ETA ${row.etaMinutes} min' : ''}',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12 * unit, color: c.dim),
+            ),
           ),
         ],
       ),

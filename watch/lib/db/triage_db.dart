@@ -135,6 +135,19 @@ class TriageDb {
     orderBy: 'id ASC',
   )).map(TriageRow.fromMap).toList();
 
+  /// Newest reports first, for the on-watch list. Read-only.
+  Future<List<TriageRow>> recent({int limit = 50}) async => (await _db.query(
+    'triage_logs',
+    orderBy: 'id DESC',
+    limit: limit,
+  )).map(TriageRow.fromMap).toList();
+
+  Future<int> totalCount() async =>
+      Sqflite.firstIntValue(
+        await _db.rawQuery('SELECT COUNT(*) FROM triage_logs'),
+      ) ??
+      0;
+
   Future<int> pendingCount() async =>
       Sqflite.firstIntValue(
         await _db.rawQuery(

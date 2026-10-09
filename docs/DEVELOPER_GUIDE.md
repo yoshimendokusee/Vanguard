@@ -147,6 +147,8 @@ vanguard-wrist/
 | Feature | Behaviour | Code |
 |---|---|---|
 | **Single-tap dictation** | Large full-screen mic button toggles listening. Idle = cyan, listening = red with a stop icon. Cyan is deliberate: red/yellow/green are reserved for triage categories. | `main.dart` `_toggle` |
+| **Round and box screens** | One screen, laid out for the display: on round watches the header and Retry button are sized to the circle (the button is a pill) and the text is inset; on box watches the whole area is used, side by side when the screen is wider than tall. Sizes scale with the screen. While a saved report shows, the mic shrinks so the findings and pickup point fit without scrolling. Verified by layout tests and a browser preview of the real screen code, not on a watch. | `watch_layout.dart`, `main.dart` `build`, `SavedCard` |
+| **Report list** | A round button beside the mic (a count badge shows every report saved on this watch) opens **Reports**: the patients triaged on this watch, newest first, latest 50. Each row shows the category (named, with its shape and colour), patient count, findings, pickup point, how long ago, and whether the hub has acknowledged it (check mark) or not yet (clock). Tap a row for age group, ETA, reported time and status. The list re-reads every 5 seconds while open, so a report flips to a check mark when the hub acknowledges it. Read-only, no schema change; rescuer transcripts are not shown. Disabled while dictating. The `recent()` and `totalCount()` queries need a device or emulator to exercise; the screen itself is covered by widget tests. | `reports_screen.dart`, `triage_db.dart` `recent`/`totalCount` |
 | **Live transcript** | Vosk *partial* results update a scrolling text area in real time; the view auto-follows the newest words. Final results are appended per utterance. | `speech_service.dart`, `main.dart` |
 | **Parse and save** | On stop: transcript → `TriageParser.parse` → `TriageDb.insert` → haptic → result card (category colour, `×N`, age, findings, location, ETA). | `main.dart` `_process` |
 | **Haptic feedback** | See table below. Lets a rescuer confirm a save without looking at the screen. | `main.dart` `_buzz` |
@@ -399,6 +401,7 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 |---|---|---|---|
 | `HUB_URL` | `--dart-define` (watch) | `http://192.168.8.10:3000` | Where the watch sends reports. **Compile-time**, so rebuild to change it. |
 | `VOSK_MODEL` | `--dart-define` (watch) | `assets/models/vosk-model-small-en-us-0.15.zip` | Which bundled Vosk model zip to load. |
+| `WATCH_SHAPE` | `--dart-define` (watch) | `auto` | `round` or `square` forces the screen layout. `auto` treats a 1:1 screen as round (the round layout is safe on a square display too) and any other proportion as a box. Flutter has no portable round-screen flag, so a square watch that should use the full area needs `square`. |
 | `PORT` | env (hub) | `3000` | Listen port. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
