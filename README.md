@@ -131,6 +131,30 @@ To load root configuration with the legacy entry point, use
 `cd hub && docker compose --env-file ../.env up --build`.
 Do not use `fake-watch.sh` against a database containing real reports.
 
+## Sample data for a busy board
+
+`hub/seed.js` loads one synthetic typhoon-shift scenario into a running hub: 24
+reports from four rescue teams (42 patients, one report with no stated count),
+spread from arriving now to later than an hour, plus four arrivals, two
+cancellations, a clinical override and a corrected transcript. It posts the same
+LAN batches a watch posts and then uses the same dashboard endpoints an operator
+uses, so the hub's validation, duplicate protection, provisional assessment and
+clinical history all behave as they do in a live demo. It never edits the
+database file directly. Synthetic patients only: never point it at a hub holding
+real reports. Restart the hub (or its container) afterwards to clear it; the QA
+hospital is disposable.
+
+```bash
+cd hub
+node seed.js                               # hub on http://127.0.0.1:3000
+node seed.js --url http://127.0.0.1:3301   # the isolated QA hospital
+node seed.js --dry-run                     # validate the scenario, send nothing
+node seed.js --force                       # load another wave on purpose
+```
+
+The scenario is plain data at the top of `hub/seed.js`: edit the places, findings,
+counts and arrival times to match your own barangays.
+
 Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
 `HUB_BIND_ADDRESS` for Compose; native Node uses `PORT`, `DB_PATH` and
 `HOSPITAL_NAME` and does not auto-load `.env`. Inside Docker, port 3000 and
