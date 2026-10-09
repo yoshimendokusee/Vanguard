@@ -1,5 +1,11 @@
 # Qwen implementation handoff for the teammate's agent
 
+> Backend integration update, 2026-10-09: the current request supersedes the
+> database deferral below. Structured intake, SQLite v2, corrections/overrides and
+> patient/encounter history are now implemented. Read `api-contract.md` and
+> `backend-completion.md` for the live contract; remaining Apple/Qwen runtime work
+> is still unimplemented. The material below records the earlier handoff.
+
 User ownership decision, 2026-10-09: your teammate owns **all Qwen runtime/model
 implementation**. A separate teammate owns **database implementation**. This
 branch implements surrounding application behavior and integration contracts.

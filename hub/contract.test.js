@@ -10,7 +10,7 @@ const { createApp } = require('./server');
 
 test('documented LAN example works end to end with the shipped dashboard', async () => {
   const contract = fs.readFileSync(path.join(__dirname, '../docs/api-contract.md'), 'utf8');
-  const examples = [...contract.matchAll(/```json\n([\s\S]*?)\n```/g)].map((m) => JSON.parse(m[1]));
+  const examples = [...contract.matchAll(/```json\r?\n([\s\S]*?)\r?\n```/g)].map((m) => JSON.parse(m[1]));
   const [request, expected] = examples;
   assert.ok(request.watchId && Array.isArray(request.reports));
   const db = openDb(':memory:');
@@ -69,7 +69,7 @@ test('reopening a populated hub database preserves reports, status and deduplica
     db = openDb(file);
     const { ingestBatch } = require('./sync');
     const contract = fs.readFileSync(path.join(__dirname, '../docs/api-contract.md'), 'utf8');
-    const request = JSON.parse(contract.match(/```json\n([\s\S]*?)\n```/)[1]);
+    const request = JSON.parse(contract.match(/```json\r?\n([\s\S]*?)\r?\n```/)[1]);
     ingestBatch(db, request.watchId, request.reports);
     db.prepare("UPDATE triage_reports SET status = 'arrived'").run();
     const before = db.prepare('SELECT * FROM triage_reports').all();
@@ -96,4 +96,16 @@ test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor rep
   const urgent = { id: 2, triage: 'Minor', effective_triage: 'Immediate', eta_minutes: null };
   assert.equal(pick([minor, urgent]).id, urgent.id);
   assert.equal(urgent.triage, 'Minor', 'Original category must remain intact');
+});
+
+test('dashboard excludes unknown counts and invalidated findings from readiness suggestions', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const count = html.match(/  const countOf = .*;/)[0];
+  const sum = html.match(/  const patients = .*;/)[0];
+  const checkCounts = vm.runInNewContext(`${count}\n${sum}\npatients`, {});
+  assert.equal(checkCounts([{ patient_count: 1, patient_count_known: false }, { patient_count: 2, patient_count_known: true }]), 2);
+  const readiness = html.match(/  const readyItems = \(r\) => \{[\s\S]*?\n  \};/)[0];
+  const checkReadiness = vm.runInNewContext(`${readiness}\nreadyItems`, { needsOf: () => ['Blood / OR'] });
+  assert.equal(checkReadiness({ source_findings_current: false, age_group: 'Child' }).length, 0);
+  assert.equal(checkReadiness({ source_findings_current: true, age_group: 'Child' }).length, 2);
 });

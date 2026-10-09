@@ -55,7 +55,7 @@ test('missing application configuration fails validation', () => withFixture((te
 
 test('acceptance gate fails for failed, skipped, cancelled or missing jobs', () => {
   const workflow = fs.readFileSync(path.join(root, '.github/workflows/pr-ci.yml'), 'utf8');
-  const script = workflow.match(/node <<'JS'\n([\s\S]*?)\n          JS/)[1].replace(/^          /gm, '');
+  const script = workflow.match(/node <<'JS'\r?\n([\s\S]*?)\r?\n          JS/)[1].replace(/^          /gm, '');
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'vanguard-gate-'));
   try {
     for (const result of ['success', 'failure', 'skipped', 'cancelled', undefined]) {

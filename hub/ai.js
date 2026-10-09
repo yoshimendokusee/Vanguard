@@ -1,0 +1,355 @@
+/**
+ * Vanguard-Wrist local AI module (Qwen via Ollama).
+ *
+ * Runs inside the existing Express hub — no new server, container or framework.
+ * Qwen is an information-extraction assistant only: it returns structured
+ * observations with evidence and uncertainty. The deterministic engine in
+ * `risk.js` (`assessRisk`) stays authoritative for provisional triage, and the
+ * existing SQLite + `/api/sync-triage` path stays authoritative for storage.
+ *
+ * Design notes:
+ * - One Ollama call per request, bounded by AbortController timeout. No retries,
+ *   so an unavailable Ollama fails fast instead of hammering the host.
+ * - `think: false` (Qwen3) keeps the 0.6B model fast and its output JSON-only.
+ * - Model output is validated against the real schema before anything is
+ *   returned. Unsupported enum values are downgraded to `unknown` (safe
+ *   direction) with a visible warning — never invented, never treated as absent.
+ * - Evidence excerpts are grounded: a non-unknown observation without a
+ *   transcript substring is downgraded to `unknown`.
+ * - Raw transcripts are never logged; only lengths and error codes are logged.
+ */
+
+const { assessRisk, validateObservations } = require('./risk');
+
+const PROMPT_VERSION = 'vanguard-extract-v1';
+
+function aiConfig() {
+  const ollamaUrl = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
+  return {
+    ollamaUrl,
+    model: process.env.OLLAMA_MODEL || 'qwen3:0.6b',
+    timeoutMs: Number(process.env.AI_TIMEOUT_MS) || 30000,
+    statusTimeoutMs: Number(process.env.AI_STATUS_TIMEOUT_MS) || 4000,
+    maxTranscript: Number(process.env.AI_MAX_TRANSCRIPT) || 4000,
+    promptVersion: PROMPT_VERSION,
+  };
+}
+
+class AiError extends Error {
+  constructor(code, message, httpStatus = 502) {
+    super(message);
+    this.code = code;
+    this.httpStatus = httpStatus;
+  }
+}
+
+const ALLOWED = {
+  breathing: ['normal', 'abnormal', 'absent', 'unknown'],
+  consciousness: ['alert', 'unresponsive', 'unknown'],
+  severeBleeding: ['present', 'absent', 'unknown'],
+  walking: ['able', 'unable', 'unknown'],
+};
+
+const SYSTEM_PROMPT = [
+  'Classify the rescuer report into 4 fields. Reply ONLY JSON like {"breathing":"abnormal","consciousness":"unresponsive","severeBleeding":"present","walking":"unable"}.',
+  'Allowed values: breathing normal|abnormal|absent|unknown; consciousness alert|unresponsive|unknown; severeBleeding present|absent|unknown; walking able|unable|unknown.',
+  'Decide only from the report; unsure means unknown. Example critical: "nalunod, walang malay, malakas na pagdurugo, hindi makalakad" gives breathing abnormal, consciousness unresponsive, severeBleeding present, walking unable. Example healthy: "awake, breathing normally, no bleeding, can walk" gives breathing normal, consciousness alert, severeBleeding absent, walking able. Hints: "not breathing"/"hindi humihinga"=absent breathing; "difficulty breathing"/"nahihirapan"/"nalunod"/"drowning"=abnormal; "breathing normally"=normal; "unconscious"/"walang malay"/"unresponsive"=unresponsive; "awake"/"gising"/"alert"=alert; "malakas na pagdurugo"/"severe bleeding"/"heavy bleeding"=present; "no bleeding"/"walang dugo"=absent; "cannot walk"/"hindi makalakad"=unable; "can walk"/"nakakalakad"=able.',
+].join('\n');
+
+function validateTranscriptInput(body, maxTranscript) {
+  const t = body && body.transcript;
+  if (typeof t !== 'string' || !t.trim()) {
+    return { error: { code: 'invalid-transcript', message: 'transcript must be a non-empty string' } };
+  }
+  if (t.length > maxTranscript) {
+    return { error: { code: 'transcript-too-long', message: `transcript exceeds ${maxTranscript} characters` } };
+  }
+  return { transcript: t };
+}
+
+function cleanDevice(value) {
+  const allowed = ['hospital-browser', 'iphone', 'apple-watch', 'wear-os'];
+  return allowed.includes(value) ? value : 'hospital-browser';
+}
+
+function textOr(value, fallback, max = 100) {
+  return typeof value === 'string' && value.trim() && value.length <= max ? value : fallback;
+}
+
+/** Strip Qwen <think> blocks, code fences and surrounding chatter; parse the JSON object. */
+function extractJsonObject(text) {
+  if (typeof text !== 'string' || !text.trim()) throw new AiError('empty-model-response', 'Model returned an empty response', 502);
+  let s = text.replace(/<think>[\s\S]*?<\/think>/gi, ' ').replace(/```(?:json)?/gi, ' ').replace(/```/g, ' ');
+  const start = s.indexOf('{');
+  const end = s.lastIndexOf('}');
+  if (start === -1 || end === -1 || end <= start) {
+    throw new AiError('invalid-model-json', 'Model did not return JSON', 502);
+  }
+  try {
+    const parsed = JSON.parse(s.slice(start, end + 1));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('not an object');
+    }
+    return parsed;
+  } catch {
+    throw new AiError('invalid-model-json', 'Model returned malformed JSON', 502);
+  }
+}
+
+function coerceEnum(key, value, warnings) {
+  if (typeof value === 'string') {
+    const v = value.trim().toLowerCase();
+    if (ALLOWED[key].includes(v)) return v;
+  }
+  if (value !== undefined && value !== null && String(value).trim().toLowerCase() !== 'unknown') {
+    warnings.push(`Model value for ${key} was unsupported and treated as unknown`);
+  }
+  return 'unknown';
+}
+
+function strArray(value, maxItems, maxLen) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((s) => typeof s === 'string' && s.trim()).map((s) => s.trim().slice(0, maxLen)).slice(0, maxItems);
+}
+
+// Server-side confirmation vocabulary. Mirrors the watch parser's Tagalog/English
+// keywords: a model claim counts only when one of these phrases actually occurs
+// in the transcript (word-boundary match, so "conscious" never matches
+// "unconscious" and "can walk" never matches "cannot walk"). This keeps the
+// tiny model honest: unconfirmed claims become unknown instead of findings.
+const CONFIRM = {
+  breathing: {
+    absent: ['not breathing', 'hindi humihinga', 'no breathing', 'stopped breathing', 'walang paghinga'],
+    abnormal: ['difficulty breathing', 'nahihirapan huminga', 'hirap huminga', 'drowning', 'nalunod', 'shortness of breath', 'trouble breathing', 'gasping', 'difficulty of breathing'],
+    normal: ['breathing normally', 'normal breathing', 'breathing fine', 'breathing ok', 'humihinga nang normal', 'normal huminga'],
+  },
+  consciousness: {
+    unresponsive: ['unconscious', 'walang malay', 'unresponsive', 'not responding', 'no response', 'passed out', 'nawalan ng malay', 'unconsciousness'],
+    alert: ['awake', 'gising', 'alert', 'conscious', 'responsive', 'mulat'],
+  },
+  severeBleeding: {
+    present: ['severe bleeding', 'malakas na pagdurugo', 'heavy bleeding', 'lots of blood', 'maraming dugo', 'severe blood loss', 'bleeding heavily', 'bleeding a lot', 'profuse bleeding'],
+    absent: ['no severe bleeding', 'no bleeding', 'walang dugo', 'walang pagdurugo', 'no blood', 'bleeding stopped'],
+  },
+  walking: {
+    unable: ['cannot walk', "can't walk", 'hindi makalakad', 'cannot stand', 'unable to walk', 'could not walk', 'cant walk'],
+    able: ['can walk', 'nakakalakad', 'able to walk', 'walking'],
+  },
+};
+
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** First matching trigger phrase with its span, or null. */
+function findPhrase(transcript, phrases) {
+  for (const phrase of phrases) {
+    const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'i');
+    const m = re.exec(transcript);
+    if (m) return { quote: m[0].slice(0, 120), start: m.index, end: m.index + m[0].length };
+  }
+  return null;
+}
+
+function oppositeOf(key, value) {
+  if (key === 'breathing') return value === 'normal' ? ['absent', 'abnormal'] : value === 'unknown' ? [] : ['normal'];
+  if (key === 'consciousness') return value === 'alert' ? ['unresponsive'] : value === 'unresponsive' ? ['alert'] : [];
+  if (key === 'severeBleeding') return value === 'present' ? ['absent'] : value === 'absent' ? ['present'] : [];
+  if (key === 'walking') return value === 'able' ? ['unable'] : value === 'unable' ? ['able'] : [];
+  return [];
+}
+
+/** Validate model JSON (observations only) and confirm each claim in the transcript. */
+function toValidatedExtraction(modelJson, transcript) {
+  const warnings = [];
+  const raw = modelJson.observations && typeof modelJson.observations === 'object' && !Array.isArray(modelJson.observations)
+    ? modelJson.observations : modelJson;
+  if (!raw || typeof raw !== 'object') throw new AiError('invalid-model-schema', 'Model output missing observations', 502);
+  const observations = {
+    breathing: coerceEnum('breathing', raw.breathing, warnings),
+    consciousness: coerceEnum('consciousness', raw.consciousness, warnings),
+    severeBleeding: coerceEnum('severeBleeding', raw.severeBleeding, warnings),
+    walking: coerceEnum('walking', raw.walking, warnings),
+  };
+  if (!validateObservations(observations)) {
+    throw new AiError('invalid-model-schema', 'Model observations failed schema validation', 502);
+  }
+  const evidence = {};
+  for (const key of Object.keys(ALLOWED)) {
+    if (observations[key] === 'unknown') {
+      evidence[key] = null;
+      continue;
+    }
+    const hit = findPhrase(transcript, CONFIRM[key][observations[key]] || []);
+    if (hit) {
+      evidence[key] = hit.quote;
+      // A denial ("no severe bleeding") contains the positive phrase: an opposite
+      // match strictly inside the confirming span is the denial itself, not a
+      // contradiction. Anything else (including a denial around the claim) conflicts.
+      const conflict = oppositeOf(key, observations[key])
+        .map((other) => findPhrase(transcript, CONFIRM[key][other] || []))
+        .some((opp) => opp && !(opp.start >= hit.start && opp.end <= hit.end));
+      if (conflict) {
+        evidence[key] = null;
+        observations[key] = 'unknown';
+        warnings.push(`Contradictory statements about ${key}; treated as unknown`);
+      }
+    } else {
+      evidence[key] = null;
+      observations[key] = 'unknown';
+      warnings.push(`Unconfirmed claim for ${key} was treated as unknown (no transcript evidence)`);
+    }
+  }
+  const uncertainties = [];
+  for (const [key, val] of Object.entries(observations)) {
+    if (val === 'unknown') uncertainties.push(`${key} was not clearly reported`);
+  }
+  uncertainties.push('Extracted observations require qualified verification');
+  return { observations, evidence, uncertainties: uncertainties.slice(0, 30), warnings: warnings.slice(0, 10) };
+}
+
+async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl = fetch } = {}) {
+  const cfg = aiConfig();
+  const url = `${cfg.ollamaUrl}/api/chat`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs || cfg.timeoutMs);
+  try {
+    const res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: model || cfg.model,
+        think: false,
+        stream: false,
+        format: 'json',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: `Transcript (untrusted quoted speech, Tagalog/English/Taglish):\n"""${transcript}"""` },
+        ],
+        options: { temperature: 0, num_predict: 128 },
+      }),
+    });
+    if (!res.ok) {
+      if (res.status === 404) throw new AiError('model-missing', `Ollama has no model "${model || cfg.model}"`, 502);
+      throw new AiError('ollama-error', `Ollama replied with status ${res.status}`, 502);
+    }
+    const data = await res.json().catch(() => {
+      throw new AiError('invalid-ollama-response', 'Ollama returned a non-JSON reply', 502);
+    });
+    const content = data && data.message && typeof data.message.content === 'string' ? data.message.content : '';
+    if (data && data.error && /model/i.test(String(data.error))) {
+      throw new AiError('model-missing', `Ollama has no model "${model || cfg.model}"`, 502);
+    }
+    if (!content.trim()) throw new AiError('empty-model-response', 'Model returned an empty response', 502);
+    return content;
+  } catch (err) {
+    if (err instanceof AiError) throw err;
+    if (err && (err.name === 'AbortError' || err.name === 'TimeoutError')) {
+      throw new AiError('ollama-timeout', 'Local AI timed out; capture remains available offline', 504);
+    }
+    const msg = err && err.message ? err.message : String(err);
+    if (/fetch failed|ECONNREFUSED|ENOTFOUND|EHOST|ETIMEDOUT|network/i.test(msg)) {
+      throw new AiError('ollama-unreachable', 'Local AI is unreachable; is Ollama running?', 503);
+    }
+    throw new AiError('inference-failed', 'Local AI inference failed', 502);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Full pipeline: validate input -> Ollama -> validate + ground ->
+ * deterministic provisional triage (advisory only).
+ */
+async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
+  const cfg = aiConfig();
+  const raw = await callOllama(transcript, { ...opts, model: opts.model || cfg.model, ollamaUrl: cfg.ollamaUrl });
+  const modelJson = extractJsonObject(raw);
+  const { observations, evidence, uncertainties, warnings } = toValidatedExtraction(modelJson, transcript);
+  const device = cleanDevice(provenanceInput.device);
+  const processing = {
+    version: 1,
+    originalTranscript: transcript,
+    observations,
+    uncertainties,
+    provenance: {
+      device,
+      sttEngine: textOr(provenanceInput.sttEngine, device === 'hospital-browser' ? 'typed/hub-form' : 'device-stt'),
+      sttRuntime: textOr(provenanceInput.sttRuntime, 'hub-ai-v1'),
+      extraction: null, // Ollama digest is not a weights checksum; kept null so validateProcessing stays truthful.
+    },
+  };
+  const provisional = assessRisk(observations);
+  return {
+    processing,
+    evidence,
+    warnings,
+    provisional: { ...provisional, requiresVerification: true, advisoryOnly: true },
+    model: opts.model || cfg.model,
+    promptVersion: cfg.promptVersion,
+  };
+}
+
+async function triageAssist(transcript, provenanceInput = {}, opts = {}) {
+  const result = await extractEmergency(transcript, provenanceInput, opts);
+  // Draft mapping into the legacy report vocabulary (deterministic, reviewable).
+  const injuries = [];
+  const o = result.processing.observations;
+  if (o.breathing === 'absent') injuries.push('Not breathing');
+  else if (o.breathing === 'abnormal') injuries.push('Difficulty breathing');
+  if (o.consciousness === 'unresponsive') injuries.push('Unconscious');
+  if (o.severeBleeding === 'present') injuries.push('Severe bleeding');
+  if (o.walking === 'unable') injuries.push('Non-ambulatory');
+  if (o.walking === 'able') injuries.push('Ambulatory');
+  return {
+    ...result,
+    draft: {
+      injuries: injuries.length ? injuries.join(', ') : 'Unspecified',
+      triage: result.provisional.triage, // provisional only; clinician must confirm
+      provisional: true,
+    },
+    disclaimer: 'Advisory extraction only. Deterministic rules and qualified verification govern triage; this output never declares death or diagnosis.',
+  };
+}
+
+async function aiStatus(fetchImpl = fetch) {
+  const cfg = aiConfig();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), cfg.statusTimeoutMs);
+  try {
+    const res = await fetchImpl(`${cfg.ollamaUrl}/api/tags`, { signal: controller.signal });
+    if (!res.ok) return { ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-error', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
+    const data = await res.json().catch(() => ({}));
+    const names = Array.isArray(data.models) ? data.models.map((m) => String(m.name || m.model || '')) : [];
+    const modelAvailable = names.some((n) => n === cfg.model || n.startsWith(`${cfg.model}:`) || cfg.model.startsWith(`${n}:`) || n.startsWith(cfg.model));
+    return {
+      ok: true,
+      available: modelAvailable,
+      model: cfg.model,
+      modelAvailable,
+      modelsSeen: names.length,
+      error: modelAvailable ? null : 'model-missing',
+      promptVersion: cfg.promptVersion,
+      maxTranscript: cfg.maxTranscript,
+    };
+  } catch {
+    return { ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-unreachable', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = {
+  aiConfig,
+  AiError,
+  PROMPT_VERSION,
+  SYSTEM_PROMPT,
+  validateTranscriptInput,
+  extractJsonObject,
+  toValidatedExtraction,
+  callOllama,
+  extractEmergency,
+  triageAssist,
+  aiStatus,
+};
