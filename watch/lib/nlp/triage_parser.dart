@@ -44,15 +44,20 @@ class TriageResult {
       injuries.isEmpty ? TriageParser.unspecified : injuries.join(', ');
 
   @override
-  String toString() => 'TriageResult($triage ×$patientCount $ageGroup, '
+  String toString() =>
+      'TriageResult($triage ×$patientCount $ageGroup, '
       '$injuriesText, $location, eta: $etaMinutes)';
 }
 
 enum _Tier { immediate, delayed, minor, deceased }
 
 class _Injury {
-  const _Injury(this.name, this.tier, this.variants,
-      {this.supersedes = const []});
+  const _Injury(
+    this.name,
+    this.tier,
+    this.variants, {
+    this.supersedes = const [],
+  });
   final String name;
   final _Tier tier;
   final List<String> variants;
@@ -117,27 +122,33 @@ class TriageParser {
       'unconscious',
       'unresponsive',
     ]),
-    _Injury('Severe bleeding', _Tier.immediate, [
-      'malakas na pagdurugo',
-      'maraming dugo',
-      'sobrang dugo',
-      'duguan',
-      'severe bleeding',
-      'massive bleeding',
-      'heavy bleeding',
-      'hemorrhage',
-    ], supersedes: [
-      'Bleeding'
-    ]),
-    _Injury('Head injury', _Tier.immediate, [
-      'nabagok',
-      'sugat sa ulo',
-      'bukas ang ulo',
-      'head injury',
-      'head trauma',
-    ], supersedes: [
-      'Wound'
-    ]),
+    _Injury(
+      'Severe bleeding',
+      _Tier.immediate,
+      [
+        'malakas na pagdurugo',
+        'maraming dugo',
+        'sobrang dugo',
+        'duguan',
+        'severe bleeding',
+        'massive bleeding',
+        'heavy bleeding',
+        'hemorrhage',
+      ],
+      supersedes: ['Bleeding'],
+    ),
+    _Injury(
+      'Head injury',
+      _Tier.immediate,
+      [
+        'nabagok',
+        'sugat sa ulo',
+        'bukas ang ulo',
+        'head injury',
+        'head trauma',
+      ],
+      supersedes: ['Wound'],
+    ),
     _Injury('Chest pain', _Tier.immediate, [
       'masakit ang dibdib',
       'sakit sa dibdib',
@@ -170,21 +181,20 @@ class TriageParser {
       'broken leg',
       'broken arm',
     ]),
-    _Injury('Laceration', _Tier.delayed, [
-      'malalim na sugat',
-      'nahiwa',
-      'hiwa',
-      'laceration',
-      'deep cut',
-      'deep wound',
-    ], supersedes: [
-      'Wound'
-    ]),
-    _Injury('Bleeding', _Tier.delayed, [
-      'dumudugo',
-      'pagdurugo',
-      'bleeding',
-    ]),
+    _Injury(
+      'Laceration',
+      _Tier.delayed,
+      [
+        'malalim na sugat',
+        'nahiwa',
+        'hiwa',
+        'laceration',
+        'deep cut',
+        'deep wound',
+      ],
+      supersedes: ['Wound'],
+    ),
+    _Injury('Bleeding', _Tier.delayed, ['dumudugo', 'pagdurugo', 'bleeding']),
     _Injury('Wound', _Tier.delayed, [
       'sugat',
       'sugatan',
@@ -220,33 +230,38 @@ class TriageParser {
       'dehydrated',
       'weak',
     ]),
-    _Injury('Non-ambulatory', _Tier.delayed, [
-      'hindi makalakad',
-      'di makalakad',
-      'hindi nakakalakad',
-      'di nakakalakad',
-      'cannot walk',
-      'can t walk',
-      'cant walk',
-      'unable to walk',
-    ], supersedes: [
-      'Ambulatory'
-    ]),
+    _Injury(
+      'Non-ambulatory',
+      _Tier.delayed,
+      [
+        'hindi makalakad',
+        'di makalakad',
+        'hindi nakakalakad',
+        'di nakakalakad',
+        'cannot walk',
+        'can t walk',
+        'cant walk',
+        'unable to walk',
+      ],
+      supersedes: ['Ambulatory'],
+    ),
 
     // --- Minor (green): walking wounded ----------------------------------------
-    _Injury('Abrasion', _Tier.minor, [
-      'gasgas',
-      'galos',
-      'maliit na sugat',
-      'minor cut',
-      'abrasion',
-      'scratch',
-      'scratches',
-      'minor',
-    ], supersedes: [
-      'Wound',
-      'Bleeding'
-    ]),
+    _Injury(
+      'Abrasion',
+      _Tier.minor,
+      [
+        'gasgas',
+        'galos',
+        'maliit na sugat',
+        'minor cut',
+        'abrasion',
+        'scratch',
+        'scratches',
+        'minor',
+      ],
+      supersedes: ['Wound', 'Bleeding'],
+    ),
     _Injury('Ambulatory', _Tier.minor, [
       'nakakalakad',
       'makalakad',
@@ -273,34 +288,90 @@ class TriageParser {
   };
 
   static const Map<String, int> _numberWords = {
-    'isa': 1, 'isang': 1, 'one': 1,
-    'dalawa': 2, 'dalawang': 2, 'two': 2,
-    'tatlo': 3, 'tatlong': 3, 'three': 3,
-    'apat': 4, 'four': 4,
-    'lima': 5, 'limang': 5, 'five': 5,
-    'anim': 6, 'six': 6,
-    'pito': 7, 'pitong': 7, 'seven': 7,
-    'walo': 8, 'walong': 8, 'eight': 8,
-    'siyam': 9, 'nine': 9,
-    'sampu': 10, 'sampung': 10, 'ten': 10,
-    'labinlima': 15, 'fifteen': 15,
-    'dalawampu': 20, 'dalawampung': 20, 'twenty': 20,
-    'tatlumpu': 30, 'tatlumpung': 30, 'thirty': 30,
-    'apatnapu': 40, 'forty': 40,
-    'limampu': 50, 'fifty': 50,
-    'animnapu': 60, 'sixty': 60,
+    'isa': 1,
+    'isang': 1,
+    'one': 1,
+    'dalawa': 2,
+    'dalawang': 2,
+    'two': 2,
+    'tatlo': 3,
+    'tatlong': 3,
+    'three': 3,
+    'apat': 4,
+    'four': 4,
+    'lima': 5,
+    'limang': 5,
+    'five': 5,
+    'anim': 6,
+    'six': 6,
+    'pito': 7,
+    'pitong': 7,
+    'seven': 7,
+    'walo': 8,
+    'walong': 8,
+    'eight': 8,
+    'siyam': 9,
+    'nine': 9,
+    'sampu': 10,
+    'sampung': 10,
+    'ten': 10,
+    'labinlima': 15,
+    'fifteen': 15,
+    'dalawampu': 20,
+    'dalawampung': 20,
+    'twenty': 20,
+    'tatlumpu': 30,
+    'tatlumpung': 30,
+    'thirty': 30,
+    'apatnapu': 40,
+    'forty': 40,
+    'limampu': 50,
+    'fifty': 50,
+    'animnapu': 60,
+    'sixty': 60,
   };
 
   static const Set<String> _personWords = {
-    'pasyente', 'biktima', 'tao', 'patient', 'patients', 'victim', 'victims',
-    'casualty', 'casualties', 'sugatan', 'survivor', 'survivors', 'injured',
-    'bata', 'anak', 'child', 'children', 'kids', 'kid', 'sanggol', 'baby',
-    'babies', 'infant', 'matanda', 'lolo', 'lola', 'adult', 'adults',
-    'buntis', 'lalaki', 'babae',
+    'pasyente',
+    'biktima',
+    'tao',
+    'patient',
+    'patients',
+    'victim',
+    'victims',
+    'casualty',
+    'casualties',
+    'sugatan',
+    'survivor',
+    'survivors',
+    'injured',
+    'bata',
+    'anak',
+    'child',
+    'children',
+    'kids',
+    'kid',
+    'sanggol',
+    'baby',
+    'babies',
+    'infant',
+    'matanda',
+    'lolo',
+    'lola',
+    'adult',
+    'adults',
+    'buntis',
+    'lalaki',
+    'babae',
   };
 
   static const Set<String> _minuteWords = {
-    'minuto', 'minuta', 'minute', 'minutes', 'min', 'mins',
+    'minuto',
+    'minuta',
+    'minute',
+    'minutes',
+    'min',
+    'mins',
   };
   static const Set<String> _hourWords = {'oras', 'hour', 'hours', 'hr', 'hrs'};
 
@@ -380,8 +451,8 @@ class TriageParser {
       final minutes = _minuteWords.contains(unit)
           ? n
           : _hourWords.contains(unit)
-              ? n * 60
-              : null;
+          ? n * 60
+          : null;
       if (minutes != null && minutes <= 720) return minutes;
     }
     return null;
@@ -418,8 +489,8 @@ class TriageParser {
     final allowed = keyword.length >= 10
         ? 2
         : keyword.length >= 7
-            ? 1
-            : 0;
+        ? 1
+        : 0;
     if (allowed == 0 || (token.length - keyword.length).abs() > allowed) {
       return false;
     }
@@ -434,8 +505,11 @@ class TriageParser {
       final cur = List<int>.filled(b.length + 1, 0)..[0] = i;
       for (var j = 1; j <= b.length; j++) {
         final cost = a.codeUnitAt(i - 1) == b.codeUnitAt(j - 1) ? 0 : 1;
-        cur[j] = [prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost]
-            .reduce((x, y) => x < y ? x : y);
+        cur[j] = [
+          prev[j] + 1,
+          cur[j - 1] + 1,
+          prev[j - 1] + cost,
+        ].reduce((x, y) => x < y ? x : y);
       }
       prev = cur;
     }

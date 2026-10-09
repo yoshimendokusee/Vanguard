@@ -1,6 +1,7 @@
 # Vanguard-Wrist architecture — source of truth
 
-Reconciled with commit `6ef35c4` on 2026-10-09. This document records both the
+Original prototype reconciled with commit `6ef35c4`; platform scope and CI updated
+on 2026-10-09. This document records both the
 approved target and the implemented prototype. The target is not a claim of
 completion. Keep application paths unchanged until an integration needs a move.
 
@@ -8,14 +9,17 @@ completion. Keep application paths unchanged until an integration needs a move.
 
 Offline-first modular monolith with distributed edge clients; three-tier
 separation; feature-based modules; one monorepo; feature branches, PR review and
-GitHub Actions. Docker Compose supports hospital/server development. Watch and
-mobile applications use Flutter and native SDKs outside Docker.
+GitHub Actions. Product targets are Apple Watch, iPhone and the hospital web app;
+Android is outside the requested implementation scope. Docker Compose supports
+hospital/server development. Apple clients use native SDKs outside Docker; the
+watch-first processing design remains subject to its implementation approval.
+Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 
 | Area | Target | Actual code and gap |
 | --- | --- | --- |
-| Watch | Offline Wear OS triage | `watch/`: Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and manual LAN send. Hardware execution unverified. |
+| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and manual LAN send. No watchOS target. Hardware execution unverified. |
 | Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive is bundled, no LLM runtime or explicit pre-save review/confirmation screen exists. |
-| Mobile | Flutter Android/iOS relay clients | No companion application or iOS project. Watch Android code does not establish mobile support. |
+| Mobile | Paired iPhone offline processing fallback | No companion application or iOS project. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
 | Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta`; hub `triage_reports` with WAL. No migration runner, encryption or retention policy. |
 | Hospital LAN | Offline receiving API + dashboard | `hub/`: Express, SQLite, static HTML/CSS/JS dashboard, SSE + polling. No external dashboard assets. HTTP without auth/TLS. |
@@ -109,7 +113,11 @@ Both entry points share that data directory; run only one at a time.
 
 Schema ownership and reserved migration paths are in
 `database/migrations/README.md`; no migration is applied by this foundation.
-CI runs existing hub/parser tests, Flutter analysis, syntax checks, Compose
-validation and container build/tests. It does not establish native builds,
-speech quality, clinical correctness, BLE reliability or hosted branch protection.
+The local `pr-ci.yml` adds repository/policy validation, formatting, secret scans,
+documented HTTP/dashboard contract tests, existing hub/parser tests, Flutter
+analysis, syntax checks and Compose/container checks. It adds no Android build.
+Apple native targets are absent; Apple builds, speech quality, clinical correctness
+and hardware behavior remain unverified. Main protection was applied and verified
+through GitHub APIs; publication/hosted execution of the new workflow is pending.
+See `GITHUB_WORKFLOW.md` and `../.github/branch-policy.md` for the current gate.
 See `reverse-engineering.md` for dated evidence, gaps and the next work order.
