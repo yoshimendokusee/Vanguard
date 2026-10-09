@@ -1292,6 +1292,21 @@ import './hub-client.js';
     if (pagerNav && totalItems > 0) {
       renderPagerControls(pagerNav, totalItems, totalPages);
     }
+
+    // Next
+    const nextBtn = el('button', 'pager-btn', 'Next ›');
+    nextBtn.disabled = currentPage === totalPages;
+    nextBtn.onclick = () => { currentPage = Math.min(totalPages, currentPage + 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(nextBtn);
+
+    // Last
+    const lastBtn = el('button', 'pager-btn', '»');
+    lastBtn.title = 'Last Page';
+    lastBtn.disabled = currentPage === totalPages;
+    lastBtn.onclick = () => { currentPage = totalPages; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
+    btns.append(lastBtn);
+
+    container.append(info, btns);
   }
 
   function renderPagerControls(container, totalItems, totalPages) {
