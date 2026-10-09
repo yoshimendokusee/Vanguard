@@ -232,6 +232,8 @@ function createApp(db, {
     app.post(`/api/${plural}/:id/revisions`, (req, res) => res.json(saveRecord(db, kind, req.params.id, req.body)));
   }
 
+  // The draft file lives in public/ which the Vite build does not copy into dist/.
+  app.get('/setups.json', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'setups.json')));
   const dashboard = existsSync(path.join(__dirname, 'dist/index.html')) ? 'dist' : 'public';
   app.use(express.static(path.join(__dirname, dashboard)));
   app.use((error, _req, res, _next) => {
