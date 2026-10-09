@@ -17,12 +17,12 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 
 | Area | Target | Actual code and gap |
 | --- | --- | --- |
-| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and manual LAN send. No watchOS target. Hardware execution unverified. |
-| Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive is bundled, no LLM runtime or explicit pre-save review/confirmation screen exists. |
-| Mobile | Paired iPhone offline processing fallback | No companion application or iOS project. Legacy Android code does not establish iPhone support. |
+| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. No watchOS target. Hardware execution unverified. |
+| Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive or LLM runtime is bundled. Qwen implementation belongs to a teammate; automatic reporting does not require pre-send review. |
+| Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; no complete companion application/iOS project or durable adapter exists. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
 | Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta`; hub `triage_reports` with WAL. No migration runner, encryption or retention policy. |
-| Hospital LAN | Offline receiving API + dashboard | `hub/`: Express, SQLite, static HTML/CSS/JS dashboard, SSE + polling. No external dashboard assets. HTTP without auth/TLS. |
+| Hospital LAN | Offline receiving API + dashboard | `hub/`: Express, SQLite, static HTML/CSS/JS dashboard, SSE + polling, deterministic provisional priority and visible rule reasons/source categories. No external dashboard assets; audited clinical corrections await database integration. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One small service: `server.js` routes, `sync.js` validation/ingest, `db.js` persistence. Do not split into services. Add feature modules as features arrive. |
 | Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies or build step. Retain it until a separately tested replacement exists. |
 | Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | No Supabase client, deployment config, schema, RLS or cloud sync. Reserved migration path is documentation only. |
@@ -35,22 +35,21 @@ Presentation: Wear OS Flutter screen                 Hospital HTML board
                         |                                  |
 Application: Vosk -> keyword parser -> report        Express routes + ingest
                         |                                  |
-Data:        watch SQLite -> manual HTTP LAN POST -> hospital SQLite
+Data:        watch SQLite -> automatic HTTP LAN POST -> hospital SQLite
                                       <- ACK IDs --        |
                                                    SSE event / poll
 ```
 
 `watch/lib/main.dart` opens SQLite and the speech engine, records a transcript,
 parses it, saves a row, then shows the saved card and haptic feedback. Empty speech
-is not saved; nonempty unrecognized speech is saved as `Unassessed`. There is no
-network call in capture. Speech needs a separately provisioned Vosk model ZIP.
+is not saved; nonempty unrecognized speech is saved as `Unassessed`. After SQLite save, automatic transport is attempted independently; an unreachable hub retains the queue. Speech needs a separately provisioned Vosk model ZIP.
 The default asset path selects the English model; model language accuracy,
 watch RAM, permissions and startup behavior require real-device testing.
 
-`watch/lib/services/sync_service.dart` sends all pending rows to
+`watch/lib/services/sync_service.dart` sends pending rows in bounded batches to
 `POST /api/sync-triage`, with an eight-second timeout. Only returned `ackLocalIds`
 are marked synced. `hub/sync.js` validates each report and ingests valid rows in
-a transaction. Duplicate reports are also acknowledged. `hub/db.js` deduplicates
+a transaction. Identical duplicate reports are also acknowledged; different immutable originals under the same identity are rejected without acknowledgment. `hub/db.js` deduplicates
 on watch identity and normalized UTC creation timestamp. Invalid reports stay
 pending. The dashboard fetches rows, updates statuses and refreshes through SSE
 with a ten-second polling fallback. See `api-contract.md` for the existing API.
@@ -60,12 +59,12 @@ with a ten-second polling fallback. See `api-contract.md` for the existing API.
 - The watch ID has only four hexadecimal digits. IDs can collide; it is not a
   trusted identity. Timestamp monotonicity is only in memory for one process;
   restart plus clock rollback can collide with an old report. A duplicate with
-  different content is ignored and acknowledged. These are gaps in the target
+  different normalized content is rejected without ACK; identity collisions still require a storage upgrade. These are gaps in the target
   data-integrity guarantee, not solved by the existing replay tests.
 - The server caps batches at 500 reports and JSON bodies at 1 MB. The watch sends
-  the entire queue, with no batching/backoff/rejection details in its UI; a large
-  pending queue can remain unsendable. Failure retains the rows.
-- Watch acknowledgments are not authenticated or scoped to the sent row IDs.
+  batches of at most 100 rows with a 900 KiB body cap and foreground backoff.
+  Long legacy originals remain pending for the teammate storage upgrade. Failure retains the rows.
+- Watch acknowledgments are scoped/validated against sent row IDs but remain unauthenticated.
   Current `sync_status = 1` means the configured LAN endpoint returned an ID;
   it does not prove trusted hospital delivery, arrival or clinical review.
 - The parser is keyword decision support, not a validated implementation of a
@@ -116,8 +115,30 @@ Schema ownership and reserved migration paths are in
 The local `pr-ci.yml` adds repository/policy validation, formatting, secret scans,
 documented HTTP/dashboard contract tests, existing hub/parser tests, Flutter
 analysis, syntax checks and Compose/container checks. It adds no Android build.
-Apple native targets are absent; Apple builds, speech quality, clinical correctness
-and hardware behavior remain unverified. Main protection was applied and verified
+Complete Apple app targets are absent. The native library builds and recovery state tests have been run on simulators locally; speech/model execution, clinical correctness and physical hardware behavior remain unverified. Main protection was applied and verified
 through GitHub APIs; publication/hosted execution of the new workflow is pending.
 See `GITHUB_WORKFLOW.md` and `../.github/branch-policy.md` for the current gate.
 See `reverse-engineering.md` for dated evidence, gaps and the next work order.
+
+
+## Implementation boundary update — 2026-10-09
+
+The user assigned Qwen and database implementation to teammates. This branch adds
+no database/schema/migration change, model, runtime dependency, application framework
+or inference container. `hub/risk.js` owns deterministic priority; `hub/processing.js`
+validates the planned extraction envelope. Existing Express/SQLite storage and HTTP
+endpoints remain; priority metadata is computed on read. Extended metadata is refused
+without ACK until durable storage can preserve it. Audited corrections/overrides are
+not implemented yet.
+
+`watch/apple` is a native Swift library inside the existing watch application boundary.
+`OnDeviceTranscriber` requires local speech support and on-device requests; no network
+fallback exists. `FallbackProcessor` separates application recovery from the teammate's
+`FallbackRepository` and Qwen/STT processor. A failed commit leaves pending input intact.
+These are real library features, not complete native apps or paired Watch transfer.
+The watchOS SDK lacks Speech.framework; local Watch STT requires a different proven
+runtime. No continuous background execution or physical-device claim is made.
+
+See `implementation-report.md` for current checks/blockers, `qwen-agent-handoff.md`
+and `database-team-handoff.md` for integration ownership, and `windows-qa.md` for
+isolated hospital QA. The original target remains approved but incomplete.

@@ -3,6 +3,7 @@ const os = require('os');
 const path = require('path');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
+const { riskForRow } = require('./risk');
 
 const STATUSES = new Set(['inbound', 'arrived', 'cancelled']);
 
@@ -48,7 +49,7 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
     const result = ingestBatch(db, watchId.trim().slice(0, 64), reports);
     if (result.inserted.length) broadcast('triage', { inserted: result.inserted.length });
     console.log(
-      `[sync] ${watchId}: ${result.inserted.length} new, ${result.duplicates} duplicate, ${result.rejected.length} rejected`
+      `[sync] ${result.inserted.length} new, ${result.duplicates} duplicate, ${result.rejected.length} rejected`
     );
     res.json({
       ok: true,
@@ -61,20 +62,22 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
 
   // --- ED dashboard API ------------------------------------------------------
   app.get('/api/triage', (_req, res) => {
-    // Still-inbound first; Immediate > Unassessed (unknown could be critical)
-    // > Delayed > Minor > Deceased; then soonest expected arrival.
+    // Establish ETA/time order first; stable sort below adds hospital risk priority.
     const rows = db
       .prepare(
         `SELECT * FROM triage_reports
          ORDER BY (status != 'inbound'),
-                  CASE triage WHEN 'Immediate' THEN 0 WHEN 'Unassessed' THEN 1
-                              WHEN 'Delayed' THEN 2 WHEN 'Minor' THEN 3 ELSE 4 END,
                   (eta_minutes IS NULL),
                   strftime('%s', created_at) + COALESCE(eta_minutes, 0) * 60,
                   created_at`
       )
       .all();
-    res.json(rows);
+    const rank = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
+    const assessed = rows.map((row) => ({ ...row, ...riskForRow(row) }));
+    // Preserve the SQL ETA/time order inside each provisional risk group.
+    assessed.sort((a, b) => Number(a.status !== 'inbound') - Number(b.status !== 'inbound')
+      || rank[a.effective_triage] - rank[b.effective_triage]);
+    res.json(assessed);
   });
 
   app.patch('/api/triage/:id', (req, res) => {

@@ -9,7 +9,7 @@ when they arrive. This describes the implemented prototype, not hardware-verifie
 operation or clinical validation. No speech model is bundled in this checkout.
 
 The approved target adds mobile BLE relay, Supabase sync, local LLM extraction and
-a React/TypeScript/Tailwind dashboard. Those components are **not implemented**.
+a React/TypeScript/Tailwind dashboard. Qwen and database extensions belong to teammates and are **not implemented**. This branch adds automatic foreground sync, hospital provisional rules, native iPhone STT/recovery library ports and Windows QA; complete Apple apps remain blocked.
 The existing watch, hub and plain HTML dashboard remain in their current paths.
 
 ```
@@ -80,8 +80,7 @@ for your area.
 - Live transcript scrolls as you speak. Stopping parses, saves to `triage_logs`
   (`sync_status = false`), and shows the parsed card.
 - **Haptics:** saved = 2 short · **Immediate = 3 long** · heard-but-not-understood = 4 rapid · silence = 1 long.
-- **SEND TO HOSPITAL** pushes the unsent queue; a report is only marked sent when the hub
-  acknowledges it. Safe to tap repeatedly.
+- Reports automatically attempt sync after SQLite save, at startup/resume and on foreground retries. **RETRY NOW** is optional; only validated ACKs for transmitted rows mark them synced.
 - Long-press the `W-XXXX · N PENDING` header to run a sample report with no microphone
   (demo fail-safe).
 
@@ -90,7 +89,7 @@ for your area.
 - `POST /api/sync-triage` accepts `{ watchId, reports: [...] }`.
 - **Duplicate protection:** unique on `(watch_id, created_at)`. A re-sent batch is skipped
   but still acknowledged, so a double sync can't make the ED prepare for patients who don't exist.
-- Board (teal dashboard): a rail with status tabs (On the way, Arrived, Cancelled, All reports); the "Next to arrive" card with a countdown,
+- Board (teal dashboard): a rail with status tabs (On the way, Arrived, Cancelled, All reports); the "Priority patient" card with a countdown,
   a readiness checklist and **Mark arrived**; "Due within 30 minutes" and "Teams to alert"; a category filter, "Coming up" cards and an
   arrivals curve; the patient list sorted Immediate → Unassessed → Delayed → Minor → Deceased, then soonest ETA. Live updates (SSE),
   light/dark/auto theme, no CDN dependencies.
@@ -108,7 +107,7 @@ docker compose up --build        # build while online; runtime needs no internet
 # Or native Node, from the repository root:
 cd hub
 npm ci
-npm test                         # 9 tests, synthetic in-memory/temporary databases
+npm test                         # synthetic in-memory/temporary databases
 node --env-file=../.env server.js # .env must exist; npm start uses defaults/shell env
 # Separate terminal, repository root, against a disposable synthetic demo database:
 ./fake-watch.sh http://localhost:3000
@@ -136,7 +135,7 @@ defines; `.env` does not automatically configure Flutter.
 cd watch
 flutter pub get --enforce-lockfile
 flutter analyze
-flutter test                     # 12 parser tests
+flutter test                     # parser and transport regressions
 flutter run --dart-define=HUB_URL=http://192.168.8.10:3000
 ```
 
@@ -167,7 +166,7 @@ watch. A companion phone is a target fallback requiring implementation/testing.
 2. **Edge compute:** tap, say the sentence above, tap again. 3 long buzzes; the watch shows
    `IMMEDIATE ×2 · Child · Drowning, Unconscious · ETA 10 min`.
 3. **Reconnect:** power the router; join the watch and laptop to it.
-4. **Handoff:** tap **SEND TO HOSPITAL**. The red card appears on the ED board, "Prepare for"
+4. **Handoff:** foreground retry sends automatically (or tap **RETRY NOW**). The red card appears on the ED board, "Prepare for"
    updates, and the 10-minute countdown starts.
 5. **Resilience:** tap send again: no duplicate.
 
@@ -180,20 +179,28 @@ watch. A companion phone is a target fallback requiring implementation/testing.
   or other identifying information. HTTP has no auth/TLS and SQLite is unencrypted.
   Use synthetic development data; access controls and protected storage/transport
   are required before real patient use.
-- Watch sync sends the entire queue; the hub rejects over 500 reports or over 1 MB.
-  No automatic batching, background sync, cloud or BLE exists.
+- Watch sync batches at 100 rows, with bounded bodies and foreground retry/backoff.
+  Background delivery, cloud and BLE remain unimplemented; long transcripts await the storage upgrade.
 - A four-hex-digit watch ID and process-local timestamp ordering can collide across
-  devices/restarts/clock rollback. Returned ACK IDs are not authenticated/scoped.
+  devices/restarts/clock rollback. Returned ACK IDs are scoped to sent rows but remain unauthenticated.
 - No migrations are applied by this foundation; current schemas are unchanged.
 - Air-gapped devices have no NTP: ETA countdowns depend on the watch clock and are approximate.
 - This is a hackathon prototype, not a validated clinical triage tool.
 
 The supported product targets are Apple Watch, iPhone and the hospital web app.
-The current watch code is a legacy Wear OS prototype; Apple targets do not exist
-yet. CI runs hub/API/dashboard tests, existing Dart analysis/parser regressions,
+The current watch code is a legacy Wear OS prototype; Complete Apple applications do not exist yet; native library modules are under `watch/apple`. CI runs hub/API/dashboard tests, existing Dart analysis/parser regressions,
 formatting, secret scanning, workflow/configuration validation and Docker tests.
 There is no Android build or Apple native/hardware validation in this workflow.
 See [the team workflow](docs/GITHUB_WORKFLOW.md) and
 [the main protection policy](.github/branch-policy.md) for the six required checks,
 review requirements and verified GitHub settings. The new workflow still needs
 to be committed, pushed and integrated. `AGENTS.md` is guidance, not enforcement.
+
+
+Current delivery and teammate instructions:
+[implementation report](docs/implementation-report.md),
+[Qwen agent handoff](docs/qwen-agent-handoff.md),
+[database handoff](docs/database-team-handoff.md), and
+[Windows hospital QA](docs/windows-qa.md).
+For an isolated synthetic QA hospital use `hub/compose.qa.yaml` (localhost:3301);
+normal root and legacy Compose data paths remain unchanged.
