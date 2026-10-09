@@ -22,7 +22,16 @@ async function check() {
     // Teammate without Git LFS: only a pointer, never cached real weights.
     fs.writeFileSync(path.join(directory, 'models/qwen3-0.6b/qwen3-0.6b-q4_k_m.gguf'), 'version https://git-lfs.github.com/spec/v1\n');
     started = true;
-    compose('up', '-d', '--build');
+    // Registry pulls intermittently time out on fresh runners; converge with retries.
+    for (let attempt = 1; ; attempt++) {
+      try { compose('up', '-d', '--build'); break; }
+      catch (error) {
+        if (attempt === 3) throw error;
+        console.error(`compose up attempt ${attempt} failed; retrying after cleanup`);
+        try { compose('down', '--remove-orphans'); } catch {}
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, attempt * 5000);
+      }
+    }
     const base = 'http://' + compose('port', 'frontend', '3301').trim();
     const get = async route => {
       const response = await fetch(base + route, { signal: AbortSignal.timeout(130000) });
