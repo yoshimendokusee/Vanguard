@@ -5,6 +5,8 @@ const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
 const { riskForRow } = require('./risk');
 const { aiConfig, aiStatus, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
+const { reportView, listReports, reviseReport } = require('./clinical');
+const { getRecord, saveRecord, isId, fail } = require('./records');
 
 const STATUSES = new Set(['inbound', 'arrived', 'cancelled']);
 
@@ -41,13 +43,13 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
 
   app.post('/api/sync-triage', (req, res) => {
     const { watchId, reports } = req.body || {};
-    if (typeof watchId !== 'string' || !watchId.trim() || !Array.isArray(reports)) {
+    if (typeof watchId !== 'string' || !watchId.trim() || watchId.trim().length > 64 || !Array.isArray(reports)) {
       return res.status(400).json({ ok: false, error: 'Expected { watchId, reports: [] }' });
     }
     if (reports.length > MAX_BATCH) {
       return res.status(413).json({ ok: false, error: `Max ${MAX_BATCH} reports per batch` });
     }
-    const result = ingestBatch(db, watchId.trim().slice(0, 64), reports);
+    const result = ingestBatch(db, watchId.trim(), reports);
     if (result.inserted.length) broadcast('triage', { inserted: result.inserted.length });
     console.log(
       `[sync] ${result.inserted.length} new, ${result.duplicates} duplicate, ${result.rejected.length} rejected`
@@ -63,29 +65,21 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
 
   // --- ED dashboard API ------------------------------------------------------
   app.get('/api/triage', (_req, res) => {
-    // Establish ETA/time order first; stable sort below adds hospital risk priority.
-    const rows = db
-      .prepare(
-        `SELECT * FROM triage_reports
-         ORDER BY (status != 'inbound'),
-                  (eta_minutes IS NULL),
-                  strftime('%s', created_at) + COALESCE(eta_minutes, 0) * 60,
-                  created_at`
-      )
-      .all();
-    const rank = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
-    const assessed = rows.map((row) => ({ ...row, ...riskForRow(row) }));
-    // Preserve the SQL ETA/time order inside each provisional risk group.
-    assessed.sort((a, b) => Number(a.status !== 'inbound') - Number(b.status !== 'inbound')
-      || rank[a.effective_triage] - rank[b.effective_triage]);
-    res.json(assessed);
+    res.json(listReports(db));
   });
 
   app.patch('/api/triage/:id', (req, res) => {
     const { status } = req.body || {};
     if (!STATUSES.has(status)) return res.status(400).json({ ok: false, error: 'Bad status' });
-    const info = db.prepare('UPDATE triage_reports SET status = ? WHERE id = ?').run(status, req.params.id);
-    if (info.changes === 0) return res.status(404).json({ ok: false, error: 'Not found' });
+    if (!/^[1-9]\d*$/.test(req.params.id) || !Number.isSafeInteger(Number(req.params.id))) return res.status(400).json({ ok: false, error: 'Bad report ID' });
+    db.transaction(() => {
+      const row = db.prepare('SELECT status FROM triage_reports WHERE id = ?').get(req.params.id);
+      if (!row) fail(404, 'Not found');
+      if (row.status === status) return;
+      db.prepare('UPDATE triage_reports SET status = ? WHERE id = ?').run(status, req.params.id);
+      db.prepare("INSERT INTO report_events (report_id, event, detail, created_at) VALUES (?, 'status', ?, ?)")
+        .run(req.params.id, `${row.status} -> ${status}; dashboard operator (unauthenticated)`, new Date().toISOString());
+    }).immediate();
     broadcast('triage', { updated: Number(req.params.id) });
     res.json({ ok: true });
   });
@@ -145,8 +139,32 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
       aiFailure(res, err, parsed.transcript.length);
     }
   });
+  app.get('/api/triage/:id', (req, res) => res.json(reportView(db, req.params.id, true)));
+  app.post('/api/triage/:id/revisions', (req, res) => {
+    const result = reviseReport(db, req.params.id, req.body);
+    broadcast('triage', { updated: result.id });
+    res.json(result);
+  });
+
+  for (const [plural, kind] of [['patients', 'patient'], ['encounters', 'encounter']]) {
+    app.post(`/api/${plural}`, (req, res) => {
+      const id = req.body?.[`${kind}Id`];
+      res.json(saveRecord(db, kind, id, req.body, true));
+    });
+    app.get(`/api/${plural}/:id`, (req, res) => {
+      if (!isId(req.params.id)) fail(400, 'Invalid record ID');
+      res.json(getRecord(db, kind, req.params.id));
+    });
+    app.post(`/api/${plural}/:id/revisions`, (req, res) => res.json(saveRecord(db, kind, req.params.id, req.body)));
+  }
 
   app.use(express.static(path.join(__dirname, 'public')));
+  app.use((error, _req, res, _next) => {
+    const status = error.type === 'entity.too.large' ? 413 : error.type === 'entity.parse.failed' ? 400 : error.status || 503;
+    const message = error.type === 'entity.too.large' ? 'JSON body exceeds 1 MB'
+      : error.type === 'entity.parse.failed' ? 'Malformed JSON' : error.status ? error.message : 'Database unavailable; retain and retry';
+    res.status(status).json({ ok: false, error: message });
+  });
   return app;
 }
 
