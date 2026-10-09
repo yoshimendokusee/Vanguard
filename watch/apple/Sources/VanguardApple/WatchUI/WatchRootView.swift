@@ -64,7 +64,7 @@ public struct WatchRootView: View {
 
     private var transcribingDetail: String {
         #if os(watchOS)
-        "Sent to your iPhone. Offline, no cloud"
+        "On this Watch, offline; iPhone is optional"
         #else
         "Processing on device"
         #endif

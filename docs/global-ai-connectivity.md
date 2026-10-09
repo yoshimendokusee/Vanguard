@@ -98,6 +98,7 @@ Native packaging uses:
 ```sh
 ./scripts/qwen-setup.sh --model-only
 ./scripts/qwen-native-build.sh
+./scripts/whisper-watch-build.sh
 open watch/apple/Vanguard.xcodeproj
 ```
 
@@ -162,9 +163,9 @@ Failures encountered and their disposition:
   pull was not independently verified on this host. GitHub's first hosted run
   subsequently passed the full Docker test with an uncached runner.
 
-Watch offline speech recognition is still unimplemented. Qwen is not STT. Watch
-audio is preserved for the existing paired-iPhone fallback; complete autonomous
-Watch voice processing cannot be marked accepted. The simulator's ~0.8–1 GB process
+Watch voice processing now starts locally with a bundled Whisper tiny multilingual
+model; Qwen remains text-only. A failed local run preserves audio and can use the
+paired-iPhone fallback. The simulator's ~0.8–1 GB process
 RSS does not establish feasibility on a physical Watch. iOS on-device speech
 availability/permissions/language assets and background Watch Connectivity need
 actual devices. HTTP transport and ordinary local storage are prototype protections,

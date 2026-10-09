@@ -208,6 +208,31 @@ final class VoiceReportControllerTests: XCTestCase {
         XCTAssertEqual(StubHospital.requests, 1)
     }
 
+    func testWatchLocalTranscriptionFinishesWithoutWaitingForThePairedPhone() async throws {
+        transcribeHook = { [workflow = workflow!, store = store!] capture in
+            try await store.saveTranscription(id: capture.id,
+                transcript: "Awake, can walk. Barangay Uno.", engine: "whisper.cpp/tiny-q5_1")
+            _ = try await workflow.process(capture, device: .appleWatch)
+            return .processed
+        }
+        await record()
+        XCTAssertEqual(controller.state, .delivered)
+        XCTAssertEqual(controller.snapshot?.currentTranscript, "Awake, can walk. Barangay Uno.")
+        XCTAssertEqual(controller.snapshot?.processing?.provenance.device, AiDevice.appleWatch.rawValue)
+        XCTAssertEqual(StubHospital.requests, 1)
+    }
+
+    func testLocalSpeechRecognitionFailureRetainsTheRecording() async throws {
+        transcribeHook = { _ in throw TranscriptionFailure.empty }
+        await record()
+        XCTAssertEqual(controller.state, .failed(.transcriptionUnavailable))
+        let pending = try await store.captures(pendingOnly: true)
+        XCTAssertEqual(pending.count, 1)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: try XCTUnwrap(pending[0].audioPath)))
+        let processing = try await store.processing(id: pending[0].id)
+        XCTAssertNil(processing)
+    }
+
     func testSendingAgainAfterDeliveryNeverCreatesADuplicate() async throws {
         await record()
         let before = StubHospital.requests

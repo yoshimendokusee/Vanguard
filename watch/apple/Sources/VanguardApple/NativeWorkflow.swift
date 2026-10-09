@@ -88,19 +88,34 @@ public actor NativeWorkflow {
         return processing
     }
 
-    #if os(iOS) || os(macOS)
+    #if os(iOS) || os(macOS) || os(watchOS)
     public func processAudio(_ capture: NativeCapture) async throws -> NativeProcessing {
         try await store.save(capture)
         if try await store.transcription(id: capture.id) == nil {
-            guard let path = capture.audioPath, await OnDeviceTranscriber.requestPermission() else { throw TranscriptionFailure.permissionRequired }
+            guard let path = capture.audioPath else { throw TranscriptionFailure.empty }
             let file = URL(fileURLWithPath: path)
+            #if os(watchOS)
+            guard let model = Bundle.main.url(forResource: "ggml-tiny-q5_1", withExtension: "bin",
+                                              subdirectory: "whisper-tiny-q5_1") else {
+                throw TranscriptionFailure.onDeviceUnavailable
+            }
+            let transcript = try await WatchAudioTranscriber(modelURL: model).transcribe(file: file)
+            try await store.saveTranscription(id: capture.id, transcript: transcript.originalText, engine: transcript.engine)
+            return try await process(capture, device: .appleWatch)
+            #else
+            guard await OnDeviceTranscriber.requestPermission() else { throw TranscriptionFailure.permissionRequired }
             // English and Filipino are both tried on-device; the more confident transcript is kept (never the cloud).
             let (transcript, locale) = try await LocaleSelection.best(locales: LocaleSelection.defaultLocales) { locale in
                 try await OnDeviceTranscriber().transcribe(file: file, locale: locale)
             }
             try await store.saveTranscription(id: capture.id, transcript: transcript.originalText, engine: "\(transcript.engine)/\(locale.identifier)")
+            #endif
         }
+        #if os(watchOS)
+        return try await process(capture, device: .appleWatch)
+        #else
         return try await process(capture, device: .iphone)
+        #endif
     }
     #endif
 
