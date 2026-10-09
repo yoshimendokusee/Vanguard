@@ -8,6 +8,12 @@ services:
       OLLAMA_URL: "http://ollama:11434"
       QWEN_MODEL_DIR: /models/qwen3-0.6b
       AI_TIMEOUT_MS: "${AI_TIMEOUT_MS:-60000}"
+      # Optional Supabase backup; empty values keep the hub LAN-only.
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
+      SUPABASE_HUB_EMAIL: "${SUPABASE_HUB_EMAIL:-}"
+      SUPABASE_HUB_PASSWORD: "${SUPABASE_HUB_PASSWORD:-}"
+      CLOUD_SYNC_INTERVAL_MS: "${CLOUD_SYNC_INTERVAL_MS:-30000}"
     volumes:
       - ./data:/data
       - ../models:/models:ro

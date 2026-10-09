@@ -8,6 +8,10 @@ build/
 .env
 .env.*
 !.env.example
+# Flutter --dart-define-from-file values; commit only env.json.example.
+env.json
+# Xcode per-machine build settings; commit only Secrets.xcconfig.example.
+Secrets.xcconfig
 *.db
 *.db-*
 *.sqlite
@@ -29,6 +33,15 @@ coverage/
 # Downloaded speech/LLM model weights; retain the asset directory placeholder.
 watch/assets/models/*
 !watch/assets/models/.gitkeep
+*.gguf
+*.safetensors
+*.onnx
+*.onnx_data
+*.bin
+*.pt
+*.pth
+*.mlpackage/
+*.mlmodelc/
 
 # Native Apple build output and local QA records.
 .build/

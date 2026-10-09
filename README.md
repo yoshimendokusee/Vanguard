@@ -183,6 +183,17 @@ and native clients are unchanged. HTTP/storage remain unauthenticated/unencrypte
 use synthetic data on isolated networks. Native Apple apps still require Xcode
 outside Docker. See [performed Docker checks and limits](docs/docker-development.md).
 
+To build the hub address into the Apple apps instead of typing it on each device,
+copy `watch/apple/Config/Secrets.xcconfig.example` to `Secrets.xcconfig` (git-ignored)
+and set `HUB_URL = http:/$()/<computer-lan-ip>:3000`. The `$()` is needed because
+`//` starts an xcconfig comment. The project's base configuration is
+`Config/Vanguard.xcconfig`, and `Config/Info.plist` passes the value to
+`AppConfiguration.load()`. A URL typed in the app still takes precedence. Optional
+`SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` stay empty when the hub uploads to Supabase.
+Info.plist is readable from the installed app, so it holds public values only:
+never the hub password, `sb_secret_*` or service-role keys. Values are fixed at build
+time; rebuild after changing them.
+
 Optional native hub development (Node 22.12+):
 
 ```sh
@@ -238,6 +249,29 @@ Configuration: `.env.example` documents Compose host binding, hospital label and
 watch build settings. Inside Docker the API uses port 3000 and `/data/vanguard.db`.
 Watch build-time settings are independent; root `.env` does not configure Flutter
 or Apple devices automatically. Do not run `fake-watch.sh` against existing reports.
+
+### Supabase cloud backup (hub)
+
+The hub is the only component that needs Supabase settings. Watch, iPhone and
+dashboard clients talk to the hub over the LAN. The hub uploads to Supabase
+whenever it has internet. `.env` is git-ignored, but the hub reads it from disk on
+the hospital computer, so it connects without the file being in Git.
+
+1. In Supabase: apply `supabase/migrations/` (see its README), then go to
+   **Authentication → Users → Add user** and create a dedicated hub account
+   (email + password, auto-confirm).
+2. In the root `.env` (copy `.env.example`): set `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY` (publishable key), `SUPABASE_HUB_EMAIL` and
+   `SUPABASE_HUB_PASSWORD`. Never use a secret/service-role key. Quote values
+   that contain `$` or `#` in single quotes.
+3. Start the hub: `docker compose up --build` from the root, or natively
+   `cd hub && node --env-file=../.env server.js`. The board header shows
+   `Cloud synced`, `Cloud · N queued`, `Cloud offline` or `Cloud off`, plus a
+   **Sync to cloud** button.
+
+Reports always save to hub SQLite first. Offline, they stay queued and upload
+automatically once online. Leaving any value empty keeps the hub LAN-only. Use
+synthetic data only: the LAN API and SQLite are unauthenticated and unencrypted.
 
 ## Local Qwen inference
 

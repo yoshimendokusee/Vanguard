@@ -975,13 +975,42 @@
     const es = new EventSource('/api/events');
     es.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; };
     es.addEventListener('triage', () => load());
+    es.addEventListener('cloud', (e) => { try { renderCloud(JSON.parse(e.data)); } catch { /* keep last state */ } });
     es.onerror = () => { $('conn').textContent = 'Reconnecting'; $('conn').className = 'conn down'; };
   }
+  // Supabase backup status from the hub; the board never talks to Supabase directly.
+  function cloudLabel(s) {
+    if (!s.configured) return 'Cloud off';
+    if (s.state === 'syncing') return 'Cloud syncing';
+    const queued = (s.pending ? ` · ${s.pending} queued` : '') + (s.rejected ? ` · ${s.rejected} rejected` : '');
+    if (s.state === 'error') return `Cloud offline${queued}`;
+    return queued ? `Cloud${queued}` : 'Cloud synced';
+  }
+  function renderCloud(s) {
+    const el = $('cloud-conn'), btn = $('cloud-sync');
+    el.textContent = cloudLabel(s);
+    el.className = 'conn ' + (s.configured && s.state !== 'error' && !s.rejected ? 'live' : 'down');
+    el.title = s.message || (s.lastSuccessAt ? `Last cloud sync ${new Date(s.lastSuccessAt).toLocaleTimeString()}` : 'Supabase cloud backup');
+    btn.hidden = !s.configured;
+    btn.disabled = s.state === 'syncing';
+  }
+  function loadCloud() {
+    fetch('/api/cloud/status').then((r) => r.json()).then(renderCloud)
+      .catch(() => { $('cloud-conn').textContent = 'Cloud: unknown'; $('cloud-conn').className = 'conn down'; });
+  }
+  $('cloud-sync').addEventListener('click', () => {
+    $('cloud-sync').disabled = true;
+    fetch('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
+      .then((r) => r.json()).then(renderCloud).catch(loadCloud);
+  });
+
   readUrl();
   render();
   load();
+  loadCloud();
   connect();
   setInterval(load, 10000);
+  setInterval(loadCloud, 30000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 
   // Local AI triage assistant: talks to the hub's Qwen endpoints, never to Ollama directly.

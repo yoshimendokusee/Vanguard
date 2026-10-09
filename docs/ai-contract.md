@@ -106,6 +106,14 @@ Rules every client can rely on:
   assigns urgency, declares death, or diagnoses.
 - `processing.provenance.extraction` records the verified repository artifact and imported local Ollama blob. `processing.evidence` carries source/excerpt/contradiction references labeled model-inferred; the older top-level evidence strings stay compatible.
 - Preview routes remain advisory. Save with exact original processing through `/api/sync-triage`, or invoke `/api/triage/:id/ai-extract` for a current persisted report. No review checkbox gates storage; generated claims remain unverified in clinical assessment.
+- The Flutter client (`AiService`) re-validates every reply and rejects it as AI
+  unavailable if any of these hold: an observation is outside the enums above, the
+  `provisional.triage` is not `Immediate|Unassessed|Delayed|Minor`, either
+  `requiresVerification` or `advisoryOnly` is not true, `originalTranscript`
+  differs from the sent transcript, or a non-null `extraction` lacks nonblank
+  model/revision/runtime, a 64-lowercase-hex `artifactSha256` and
+  `execution: "local"`. Missing observation keys stay `unknown`. Swift
+  `AiContract` types do not perform these checks yet.
 
 ## Status response
 

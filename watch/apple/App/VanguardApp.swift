@@ -43,7 +43,8 @@ final class CaptureModel: ObservableObject {
             #endif
             deviceID = defaults.string(forKey: "vanguard-device") ?? prefix + UUID().uuidString.lowercased()
             defaults.set(deviceID, forKey: "vanguard-device")
-            hub = defaults.string(forKey: "vanguard-hub") ?? ""
+            // A hub URL typed in the app wins; otherwise use the build-time HUB_URL from Info.plist.
+            hub = defaults.string(forKey: "vanguard-hub") ?? ((try? AppConfiguration.load())?.hubURL.absoluteString ?? "")
             status = "Capture ready; model loads on first request"
             if ProcessInfo.processInfo.arguments.contains("--qwen-smoke") { smoke() }
             else { recover() }
