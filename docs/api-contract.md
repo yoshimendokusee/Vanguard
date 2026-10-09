@@ -123,10 +123,13 @@ is retained in `effective_triage`, including source Unassessed above Delayed/Min
 Automatic rules never declare Deceased. ETA sorting applies within each effective
 priority, and non-inbound rows follow inbound rows. The dashboard uses effective
 priority for counts/color/order while displaying source category, rule and original
-text. Clinical correction/override audit APIs remain blocked on database integration;
-status PATCH remains available. See docs/ai-contract.md for the hub-local Qwen routes (GET /api/ai/status, POST /api/ai/extract, POST /api/ai/triage-assist): extraction with evidence plus deterministic provisional triage, advisory only, never writing to SQLite. `assessRisk` and `validateProcessing` provide tested
-structured integration utilities, not persisted structured processing yet.
-text. The Evidence and corrections dialog displays persisted history and allows
+text. Clinical correction/override audit APIs are implemented (see "Clinical history
+endpoints" below) and status PATCH remains available. See docs/ai-contract.md for the
+hub-local Qwen routes (GET /api/ai/status, POST /api/ai/extract, POST
+/api/ai/triage-assist): extraction with evidence plus deterministic provisional triage,
+advisory only; these routes never write to SQLite. Structured `processing` supplied in
+a sync batch or revision is validated by `validateProcessing` and persisted.
+The Evidence and corrections dialog displays persisted history and allows
 transcript corrections and provisional overrides. It preserves an idempotency ID
 while retrying an unchanged edit. Status PATCH remains compatible.
 

@@ -15,6 +15,12 @@ supabase link --project-ref <your-project-ref>
 supabase db push
 ```
 
+Migrations apply in filename order. `20261009120000_widen_triage_reports_raw_text.sql`
+widens `raw_text` to 16,000 characters so it matches the watch queue and hub; apply
+it before syncing transcripts longer than 1,000 characters. Reports always save to
+local SQLite first; the watch retries the upload with backoff and on app resume,
+and unsent rows stay queued until Supabase acknowledges them.
+
 Review the migration and confirm the linked project before applying it. The
 watch uses only the project's URL and publishable/anon key; never put a
 service-role key in the app or source control. Authenticated users can access
