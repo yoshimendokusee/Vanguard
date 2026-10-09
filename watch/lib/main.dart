@@ -7,6 +7,7 @@ import 'db/triage_db.dart';
 import 'nlp/triage_parser.dart';
 import 'services/speech_service.dart';
 import 'services/sync_service.dart';
+import 'theme.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,21 +19,14 @@ class VanguardWristApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-        title: 'Vanguard-Wrist',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark(useMaterial3: true),
-        home: const TriageScreen(),
-      );
+    title: 'Vanguard-Wrist',
+    debugShowCheckedModeBanner: false,
+    theme: buildTheme(Brightness.light),
+    darkTheme: buildTheme(Brightness.dark),
+    themeMode: ThemeMode.system,
+    home: const TriageScreen(),
+  );
 }
-
-/// START colours.
-Color triageColor(String triage) => switch (triage) {
-      TriageParser.immediate => const Color(0xFFFF1744),
-      TriageParser.delayed => const Color(0xFFFFD600),
-      TriageParser.minor => const Color(0xFF00E676),
-      TriageParser.deceased => const Color(0xFFB0BEC5),
-      _ => Colors.white, // Unassessed
-    };
 
 enum _Phase { loading, idle, listening, error }
 
@@ -134,11 +128,13 @@ class _TriageScreenState extends State<TriageScreen> {
     final result = _parser.parse(text);
     final row = await _db!.insert(result);
     final pending = await _db!.pendingCount();
-    await _buzz(!result.isRecognized
-        ? _Buzz.unrecognized
-        : result.triage == TriageParser.immediate
-            ? _Buzz.immediate
-            : _Buzz.saved);
+    await _buzz(
+      !result.isRecognized
+          ? _Buzz.unrecognized
+          : result.triage == TriageParser.immediate
+          ? _Buzz.immediate
+          : _Buzz.saved,
+    );
     setState(() {
       _phase = _Phase.idle;
       _lastSaved = row;
@@ -151,7 +147,8 @@ class _TriageScreenState extends State<TriageScreen> {
   /// full parse/save pipeline without using the microphone.
   Future<void> _demoPhrase() async {
     if (_phase != _Phase.idle) return;
-    const phrase = 'Dalawang bata, nalunod at walang malay, sa Barangay '
+    const phrase =
+        'Dalawang bata, nalunod at walang malay, sa Barangay '
         'Arnaldo, sampung minuto papunta sa ospital.';
     setState(() => _transcript = phrase);
     await _process(phrase);
@@ -171,9 +168,9 @@ class _TriageScreenState extends State<TriageScreen> {
       _pending = pending;
       _status = outcome.ok
           ? (outcome.sent + outcome.duplicates == 0
-              ? 'NOTHING TO SEND'
-              : 'SENT ${outcome.sent}'
-                  '${outcome.duplicates > 0 ? ' (${outcome.duplicates} dup)' : ''}')
+                ? 'NOTHING TO SEND'
+                : 'SENT ${outcome.sent}'
+                      '${outcome.duplicates > 0 ? ' (${outcome.duplicates} dup)' : ''}')
           : outcome.error!.toUpperCase();
     });
   }
@@ -181,8 +178,9 @@ class _TriageScreenState extends State<TriageScreen> {
   @override
   Widget build(BuildContext context) {
     final listening = _phase == _Phase.listening;
+    final c = Theme.of(context).extension<AppColors>()!;
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: c.background,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 8),
@@ -192,8 +190,11 @@ class _TriageScreenState extends State<TriageScreen> {
                 onLongPress: _demoPhrase,
                 child: Text(
                   '${_db?.watchId ?? '…'}  ·  $_pending PENDING',
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 11, letterSpacing: 1),
+                  style: TextStyle(
+                    color: c.dim,
+                    fontSize: 11,
+                    letterSpacing: 1,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
@@ -213,19 +214,23 @@ class _TriageScreenState extends State<TriageScreen> {
                           duration: const Duration(milliseconds: 150),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            // Idle is cyan on purpose: red/yellow/green mean
+                            // Idle is teal on purpose: red/amber/green mean
                             // triage categories on this screen.
                             color: listening
-                                ? const Color(0xFFFF1744)
+                                ? c.listening
                                 : _phase == _Phase.idle
-                                    ? const Color(0xFF00E5FF)
-                                    : Colors.grey.shade800,
-                            border: Border.all(color: Colors.white, width: 4),
+                                ? c.accent
+                                : c.panel,
+                            border: Border.all(color: c.text, width: 4),
                           ),
                           child: Icon(
                             listening ? Icons.stop_rounded : Icons.mic_rounded,
                             size: 64,
-                            color: listening ? Colors.white : Colors.black,
+                            color: listening
+                                ? c.onListening
+                                : _phase == _Phase.idle
+                                ? c.onAccent
+                                : c.dim,
                           ),
                         ),
                       ),
@@ -237,7 +242,10 @@ class _TriageScreenState extends State<TriageScreen> {
               Text(
                 _status,
                 style: const TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: 1),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1,
+                ),
               ),
               Expanded(
                 flex: 3,
@@ -259,10 +267,6 @@ class _TriageScreenState extends State<TriageScreen> {
                   onPressed: _syncing || listening ? null : _doSync,
                   icon: const Icon(Icons.local_hospital, size: 18),
                   label: const Text('SEND TO HOSPITAL'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                  ),
                 ),
               ),
             ],
@@ -298,26 +302,42 @@ class _SavedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = Theme.of(context).extension<AppColors>()!;
+    final style = triageStyle(row.triage, Theme.of(context).brightness);
+    final unassessed = row.triage == TriageParser.unassessed;
     final age = row.ageGroup == TriageParser.unspecified
         ? ''
         : ' · ${row.ageGroup}';
     return SingleChildScrollView(
       child: Column(
         children: [
-          Text(
-            '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
-            style: TextStyle(
-                color: triageColor(row.triage),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: style.background,
+              borderRadius: BorderRadius.circular(8),
+              border: unassessed ? Border.all(color: style.accent) : null,
+            ),
+            child: Text(
+              '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
+              style: TextStyle(
+                color: style.foreground,
                 fontSize: 17,
-                fontWeight: FontWeight.w900),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
           ),
-          Text(row.injuries,
-              textAlign: TextAlign.center, style: const TextStyle(fontSize: 14)),
+          const SizedBox(height: 2),
+          Text(
+            row.injuries,
+            textAlign: TextAlign.center,
+            style: const TextStyle(fontSize: 14),
+          ),
           Text(
             '${row.location}'
             '${row.etaMinutes != null ? ' · ETA ${row.etaMinutes} min' : ''}',
             textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: Colors.white70),
+            style: TextStyle(fontSize: 12, color: c.dim),
           ),
         ],
       ),
