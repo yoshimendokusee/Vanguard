@@ -70,34 +70,43 @@ class SyncService {
   Future<SyncOutcome> _sendPending() async {
     try {
       final pendingRows = await pending();
-      // Preserve long originals for the storage teammate; other reports can proceed.
-      final rows = pendingRows.where((r) => r.rawText.length <= 1000).toList();
+      // Reject oversize originals locally while other reports can proceed.
+      final rows = pendingRows.where((r) => r.rawText.length <= 16000).toList();
       final longOriginals = rows.length != pendingRows.length;
       var inserted = 0;
       var duplicates = 0;
       var incomplete = false;
-      for (var offset = 0; offset < rows.length; offset += 100) {
-        final batch = rows.skip(offset).take(100).toList();
-        final body = jsonEncode({
-          'watchId': watchId,
-          'reports': [
-            for (final r in batch)
-              {
-                'localId': r.id,
-                'location': r.location,
-                'injuries': r.injuries,
-                'triage': r.triage,
-                'patientCount': r.patientCount,
-                'ageGroup': r.ageGroup,
-                'etaMinutes': r.etaMinutes,
-                'rawText': r.rawText,
-                'createdAt': r.createdAt,
-              },
-          ],
-        });
-        if (utf8.encode(body).length > 900 * 1024) {
-          return const SyncOutcome.failed('Batch exceeds transport limit');
+      for (var offset = 0; offset < rows.length;) {
+        final batch = <TriageRow>[];
+        final wireReports = <Map<String, Object?>>[];
+        var bytes = utf8
+            .encode(jsonEncode({'watchId': watchId, 'reports': []}))
+            .length;
+        while (offset < rows.length && batch.length < 100) {
+          final r = rows[offset];
+          final wire = <String, Object?>{
+            'localId': r.id,
+            'location': r.location,
+            'injuries': r.injuries,
+            'triage': r.triage,
+            'patientCount': r.patientCount,
+            'ageGroup': r.ageGroup,
+            'etaMinutes': r.etaMinutes,
+            'rawText': r.rawText,
+            'createdAt': r.createdAt,
+          };
+          final size =
+              utf8.encode(jsonEncode(wire)).length + (batch.isEmpty ? 0 : 1);
+          if (bytes + size > 900 * 1024) break;
+          bytes += size;
+          batch.add(r);
+          wireReports.add(wire);
+          offset++;
         }
+        if (batch.isEmpty) {
+          return const SyncOutcome.failed('Report exceeds transport limit');
+        }
+        final body = jsonEncode({'watchId': watchId, 'reports': wireReports});
         final res = await _client
             .post(
               Uri.parse('$hubUrl/api/sync-triage'),
@@ -135,7 +144,7 @@ class SyncService {
       }
       if (longOriginals) {
         return const SyncOutcome.failed(
-          'Long transcript pending storage upgrade',
+          'Transcript exceeds 16000 characters; retained locally',
         );
       }
       return incomplete

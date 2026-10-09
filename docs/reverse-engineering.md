@@ -1,25 +1,36 @@
 # Vanguard repository audit and foundation
 
+> Backend update, 2026-10-09: `backend-completion.md` supersedes the database and
+> structured-processing gaps below for the current working tree. It records the
+> new workflows, performed checks and remaining clinical/platform limitations.
+> Earlier dated observations below are historical evidence.
+
 Date: 2026-10-09, Asia/Manila. Repository: `/Users/baronjoya/Vanguard`.
 Baseline: `6ef35c4` (`Initial commit: Vanguard-Wrist offline medical triage MVP`).
 Initial state: clean `main`, tracking `origin/main`. Work is uncommitted on
 `docs/repository-foundation`. The separate `Vanguard copy` directory was not used.
 
+This is a historical baseline audit, not a description of the current migration
+state. Subsequent database work added the watch SQLite v1-to-v2 upgrade, the
+transactional hub migration runner and baseline, and the Supabase report/RLS
+migration. The Supabase migration has been applied to the configured project.
+
 ## Result
 
 The existing implementation is a Flutter Wear OS-oriented Android app plus a
 Node/Express/SQLite hospital hub serving a plain HTML dashboard. It is already
-a small monorepo and has a local-first LAN report path. The approved target is
-broader than the implementation: mobile BLE relay, Supabase, local LLM extraction,
-React/TypeScript/Tailwind and authenticated delivery do not exist yet.
+a small monorepo and has a local-first LAN report path. At audit time, the
+approved target was broader than the implementation: mobile BLE relay, Supabase,
+local LLM extraction, React/TypeScript/Tailwind and authenticated delivery were
+not yet implemented.
 
-The foundation preserves all application code, tests, schema definitions, watch
-dependencies and paths. No database was reset, schema migration applied, commit
-created, branch pushed, PR opened or remote setting changed. Checks used in-memory
-databases or disposable temporary databases; `hub/data` still contains only its
-original `.gitkeep`. Dependency installation generated ignored local build/cache
-files. Docker checks created local images/build cache; temporary test containers
-and the dedicated test project's network were removed.
+The foundation preserved all application code, tests, schema definitions, watch
+dependencies and paths. At audit time, no database had been reset or migration
+applied, and no commit, push, PR or remote setting change was made. Checks used
+in-memory databases or disposable temporary databases; `hub/data` still contains
+only its original `.gitkeep`. Dependency installation generated ignored local
+build/cache files. Docker checks created local images/build cache; temporary test
+containers and the dedicated test project's network were removed.
 
 ## Actual application and dependencies
 
@@ -28,20 +39,21 @@ and the dedicated test project's network were removed.
 | Watch presentation | `watch/lib/main.dart`, Android manifest | High-contrast dictation/stop control, transcript, pending count, saved report, haptics, manual send and header demo phrase. Wear OS standalone declaration, mic/internet/vibration permissions; cleartext HTTP allowed. |
 | Offline speech | `watch/lib/services/speech_service.dart`, `watch/assets/models/.gitkeep` | Vosk asset loader, 16 kHz recognizer, partial/final transcript streams. Model ZIP absent. Normal recording and demo header flow require successful speech initialization. |
 | Triage extraction | `watch/lib/nlp/triage_parser.dart`, 12 parser tests | Deterministic Taglish keywords/fuzzy matching; findings, count, age, four mapped pickup locations, ETA and provisional category. Unrecognized nonempty speech remains Unassessed. |
-| Watch persistence | `watch/lib/db/triage_db.dart` | sqflite schema version 1, `triage_logs`, `meta` watch ID, pending rows and sync flag. No upgrade callback. Persistence on native hardware has not been run. |
+| Watch persistence | `watch/lib/db/triage_db.dart` | sqflite schema version 2 with an in-place v1 upgrade adding stable report UUIDs and separate cloud-sync ownership/state while preserving LAN queue state. Persistence on native hardware has not been run. |
 | LAN sender | `watch/lib/services/sync_service.dart:35–74` | Sends all pending rows, eight-second timeout; sets returned IDs synced. No batching, automatic retry scheduler, cloud or BLE. |
 | Hub application | `hub/server.js`, `hub/sync.js` | Express JSON routes, input caps/validation, transactional ingest, duplicate ACKs, status updates, SSE and static files. API exposes health/config/list/sync/status/events. |
-| Hub persistence | `hub/db.js` | better-sqlite3, WAL, `triage_reports`, status/triage/count constraints and unique `(watch_id, created_at)`. Startup creates missing schema; no versioned migrations. |
+| Hub persistence | `hub/db.js`, `hub/migrations/0001_initial_schema.sql` | better-sqlite3, WAL, numbered transactional migrations using `PRAGMA user_version`; compatible legacy databases are adopted without dropping reports. |
 | Hospital dashboard | `hub/public/index.html` | Surge totals, provisional acuity/ETA ordering, preparation hints, Arrived/Cancel/Reopen controls, SSE + polling, no CDN. Uses `textContent` for untrusted transcripts. |
 | Docker/demo | `hub/Dockerfile`, `hub/docker-compose.yml`, `fake-watch.sh` | One container for API + dashboard; `hub/data` bind mount; synthetic curl sender. No separate dashboard or AI service. |
 
 Hub manifests contain only Express `^4.21.0` and better-sqlite3 `^13.0.3`, with
 Node's built-in test runner. The lockfile fixes better-sqlite3 at 13.0.3; dependency
 versions were not upgraded. The Node engine declaration was corrected from >=20
-to >=22 to match that locked native dependency. Watch dependencies remain Flutter,
-cupertino_icons, vosk_flutter, sqflite, path, vibration, http and permission_handler;
-dev dependencies are flutter_test and flutter_lints. No BLE, Supabase, React,
-TypeScript, Tailwind or LLM dependency exists.
+to >=22 to match that locked native dependency. Current watch dependencies include
+Flutter, cupertino_icons, vosk_flutter, sqflite, path, supabase_flutter, uuid,
+vibration, http and permission_handler; dev dependencies include flutter_test,
+sqflite_common_ffi and flutter_lints. No BLE, React, TypeScript, Tailwind or LLM
+dependency exists.
 
 Local tooling: Node 24.20.0, npm 11.19.0, Flutter 3.47.5 / Dart 3.13.4,
 Docker Compose 5.5.1 and Docker Engine 29.8.2 on arm64. Container checks used
@@ -58,9 +70,9 @@ Android test device; no native watch build or install was attempted.
 | First | Sender loads every pending row (`sync_service.dart:36–55`); server caps 500 reports/1 MB (`server.js:11,45–46`). | Add bounded batching, rejection visibility and durable retry semantics. Test >500 pending reports, large transcripts, interrupted sends and partial rejections without discarding rows. |
 | First | ACK IDs are accepted directly (`sync_service.dart:68–70`); `markSynced` updates any returned IDs (`triage_db.dart:139–144`). | Authenticate the receiver, validate response structure/counts and scope IDs to the sent batch before changing delivery state. Distinguish persisted LAN receipt, relay receipt, cloud upload and trusted hospital delivery. |
 | Next | Capture auto-saves then shows a card (`main.dart:135–149`); no local LLM or explicit review flow. | Implement measured on-device extraction only if needed, preserve uncertainty, and add user/qualified-person review with deterministic provisional triage. Parser tests are not clinical validation; negation/mixed-group limits remain. |
-| Next | No executable migrations or runner; version-1 schemas unchanged. | Integrate versioned transactional upgrades before the first schema change, with populated database upgrade/reopen/rollback tests. Reserved folders alone do not migrate anything. |
+| Resolved | At audit time, there was no executable hub migration runner. | Hub now applies the baseline transactionally and tests fresh creation, compatible legacy adoption, incompatible schema rejection and rollback. |
 | Next | No companion app, BLE permissions/dependency/protocol or relay queue. | Implement the smallest foreground Android relay first, then target iOS and Wear OS interoperability; test encrypted fragments, retries, dedupe, hops/expiry and hospital ACK return on actual devices. |
-| Next | No Supabase code/config/schema/RLS. | Introduce Auth, RLS, migrations, durable IDs and conflict/sync semantics together; verify offline capture and hospital LAN operation when cloud access fails. |
+| Resolved | At audit time, there was no Supabase code/config/schema/RLS. | Auth-backed report sync and an RLS migration now exist; the migration has been applied to the configured project. Verify offline capture and hospital LAN operation independently of cloud access. |
 | Later | Dashboard is plain HTML; backend is three small CommonJS modules. | Implement React/TypeScript/Tailwind as a tested replacement when needed; preserve the current board and LAN API. Add actual feature modules without splitting the monolith or moving all paths for appearance. |
 | Team setup | No hosted CI execution or branch-protection inspection/change. | Push/open a PR when authorized; verify `Hub tests`, `Watch analysis and parser tests`, and `Compose and container tests` on GitHub, then have administrators require those checks/review. Add CODEOWNERS when actual reviewers are agreed. |
 

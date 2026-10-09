@@ -78,10 +78,16 @@
   body { margin: 0; background: var(--bg); color: var(--text); font: 1rem/1.5 var(--font); font-variant-numeric: tabular-nums; }
   h1, h2, h3 { letter-spacing: -0.01em; margin: 0; }
   p { margin: 0; }
-  button, input { font: inherit; color: inherit; }
+  button, input, textarea, select { font: inherit; color: inherit; }
   button { cursor: pointer; }
   button:disabled { cursor: not-allowed; }
-  :where(button, input, a, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  :where(button, input, textarea, select, a, summary):focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .evidence-dialog { width: min(42rem, 94vw); max-height: 90vh; overflow: auto; background: var(--panel); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--s5); }
+  .evidence-dialog::backdrop { background: rgba(0, 0, 0, 0.45); }
+  .evidence-dialog form, .evidence-dialog label { display: grid; gap: var(--s2); margin-block: var(--s3); }
+  .evidence-dialog [hidden] { display: none; }
+  .evidence-dialog input, .evidence-dialog textarea, .evidence-dialog select { width: 100%; background: var(--bg); border: 1px solid var(--border); padding: var(--s2); }
+  .evidence-dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; font: inherit; }
   [tabindex="-1"]:focus { outline: none; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .skip { position: absolute; inset-inline-start: var(--s4); top: var(--s2); transform: translateY(-300%); }
@@ -439,7 +445,7 @@
     <p class="note">
       Provisional priority uses exact structured findings and preserves higher source urgency. Verify clinically.
       "Not sure" includes unknown findings and unconfirmed death; the hub never declares death automatically.
-      Original categories and notes remain visible. Audited corrections/overrides await database integration.
+      Original categories and notes remain visible. Evidence and corrections preserves original notes, assessment history and provisional operator overrides.
       Readiness ticks are saved in this browser only.
       ETAs use the watch clock, so treat countdowns and the curve as approximate.
     </p>
@@ -532,12 +538,15 @@
   const minsLeft = (r) => { const t = etaAt(r); return t === null ? null : Math.round((t - Date.now()) / 60000); };
   const needsOf = (r) => [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
   const readyItems = (r) => {
+    if (r.source_findings_current === false) return [];
     const set = new Set(needsOf(r));
     if (r.age_group === 'Child' || r.age_group === 'Infant') set.add('Paediatrics');
     return [...set];
   };
-  const patients = (list) => list.reduce((s, r) => s + r.patient_count, 0);
+  const countOf = (r) => r.patient_count_known === false ? 0 : r.patient_count;
+  const patients = (list) => list.reduce((s, r) => s + countOf(r), 0);
   const noun = (r) => {
+    if (r.patient_count_known === false) return 'Patient count unknown';
     const o = { Child: ['child', 'children'], Infant: ['infant', 'infants'], Elderly: ['elderly patient', 'elderly patients'], Adult: ['adult', 'adults'] }[r.age_group] || ['patient', 'patients'];
     return `${num(r.patient_count)} ${o[r.patient_count === 1 ? 0 : 1]}`;
   };
@@ -609,7 +618,7 @@
     setTimeout(() => t.remove(), 7000);
   }
   function announce(r) {
-    toast(`New ${LABEL[category(r)]} ×${r.patient_count}: ${r.injuries}`,
+    toast(`New ${LABEL[category(r)]} · ${noun(r)}: ${r.injuries}`,
           `From ${r.location}${r.eta_minutes ? `, ETA ${r.eta_minutes} min` : ''}`, category(r));
     if (soundOn && category(r) === 'Immediate') beep();
   }
@@ -639,7 +648,7 @@
   function visible() {
     const q = query.trim().toLowerCase();
     return inView().filter((r) => (!cat || category(r) === cat) &&
-      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q)));
+      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.current_transcript, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q)));
   }
   function priorityPatient(list) {
     const live = list.filter((r) => category(r) !== 'Deceased');
@@ -808,7 +817,7 @@
     const b = el('button', `btn ${kind || ''}`, label);
     b.type = 'button';
     b.dataset.fk = `act:${scope}:${r.id}:${status}`;
-    b.setAttribute('aria-label', `${label}: ${LABEL[category(r)]} ×${r.patient_count}, ${r.injuries}, from ${r.location}`);
+    b.setAttribute('aria-label', `${label}: ${LABEL[category(r)]}, ${noun(r)}, ${r.injuries}, from ${r.location}`);
     b.onclick = () => setStatus(r, status, b);
     return b;
   }
@@ -831,13 +840,16 @@
     badge.setAttribute('role', 'img');
     badge.setAttribute('aria-label', LABEL[category(r)]);
     badge.append(shape(category(r)));
-    box.append(h, badge, el('h3', 'who', r.injuries), el('p', 'where', `${noun(r)} · From ${r.location}`), timeBlock(r, 'big'));
+    box.append(h, badge, el('h3', 'who', (r.source_findings_current === false ? 'Original: ' : '') + r.injuries), el('p', 'where', `${noun(r)} · From ${r.location}`), timeBlock(r, 'big'));
     const stats = el('div', 'stats');
     const stat = (k, v) => { const d = el('div', 'stat'); d.append(el('small', '', k), el('b', '', v)); return d; };
-    stats.append(stat('Patients', '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[category(r)]));
+    stats.append(stat('Patients', r.patient_count_known === false ? 'Unknown' : '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[category(r)]));
     box.append(stats);
     box.append(el('p', 'note', `Provisional · verify clinically · source category: ${r.triage}`));
     if (r.risk_reason) box.append(el('p', 'note', `${r.rule_version}: ${r.risk_reason}`));
+    if (r.clinician_override) box.append(el('p', 'note', `Operator override: ${r.clinician_override} · computed: ${r.computed_triage} · identity unverified`));
+    for (const uncertainty of r.uncertainties || []) box.append(el('p', 'warn', uncertainty));
+    if (r.current_transcript !== r.raw_text) box.append(el('p', 'r-raw', 'Current corrected transcript: ' + r.current_transcript));
 
     // readiness checklist (kept in this browser only)
     const items = r.status === 'inbound' && category(r) !== 'Deceased' ? readyItems(r) : [];
@@ -892,6 +904,78 @@
     if (r.status === 'inbound') act.append(actionBtn(r, 'Mark arrived', 'arrived', 'primary', 'hero'), actionBtn(r, 'Cancel report', 'cancelled', 'quiet', 'hero'));
     else act.append(actionBtn(r, 'Reopen', 'inbound', '', 'hero'));
     box.append(act);
+    const evidence = el('button', 'btn quiet', 'Evidence and corrections');
+    evidence.type = 'button';
+    evidence.onclick = () => openEvidence(r);
+    box.append(evidence);
+  }
+
+  async function openEvidence(r) {
+    const dialog = el('dialog', 'evidence-dialog');
+    dialog.setAttribute('aria-label', 'Report evidence and corrections');
+    const close = el('button', 'btn quiet', 'Close');
+    close.type = 'button'; close.onclick = () => dialog.close();
+    const content = el('div', '', 'Loading evidence…');
+    dialog.append(close, content);
+    dialog.addEventListener('close', () => dialog.remove());
+    document.body.append(dialog); dialog.showModal();
+    try {
+      const response = await fetch(`/api/triage/${r.id}`);
+      if (!response.ok) throw new Error('Could not load evidence');
+      const detail = await response.json();
+      content.replaceChildren(el('h2', '', 'Original evidence'), el('pre', '', detail.raw_text));
+      content.append(el('p', 'note', `Encounter: ${detail.encounter_id} · hospital receipt recorded · clinical verification required`));
+      for (const revision of detail.history) {
+        const item = el('details', 'rnote');
+        item.append(el('summary', '', `Revision ${revision.revision} · ${revision.kind} · ${revision.actor} · ${fmt(revision.created_at)}`),
+          el('p', '', revision.reason), el('pre', '', revision.state.transcript),
+          el('p', 'note', `${revision.assessment.rule_version}: ${revision.assessment.risk_reason}`));
+        if (revision.state.processing) item.append(el('pre', '', JSON.stringify(revision.state.processing, null, 2)));
+        content.append(item);
+      }
+      const form = el('form');
+      const field = (title, control) => { const label = el('label', '', title); label.append(control); form.append(label); return control; };
+      const kind = field('Change', el('select'));
+      for (const [value, title] of [['correction', 'Correct transcript'], ['override', 'Set or clear provisional priority']]) {
+        const option = el('option', '', title); option.value = value; kind.append(option);
+      }
+      const transcript = field('Corrected transcript', el('textarea')); transcript.rows = 5; transcript.maxLength = 16000; transcript.value = detail.current_transcript;
+      const priority = field('Provisional priority', el('select'));
+      for (const value of ['', 'Immediate', 'Unassessed', 'Delayed', 'Minor']) {
+        const option = el('option', '', value || 'Use computed priority'); option.value = value; priority.append(option);
+      }
+      priority.value = detail.clinician_override || '';
+      const actor = field('Your name or operator label', el('input')); actor.required = true; actor.maxLength = 100;
+      const reason = field('Reason for change', el('textarea')); reason.required = true; reason.maxLength = 500;
+      const toggle = () => { transcript.parentElement.hidden = kind.value !== 'correction'; priority.parentElement.hidden = kind.value !== 'override'; };
+      kind.onchange = toggle; toggle();
+      form.append(el('p', 'note', 'Corrections preserve the original and clear stale extraction and overrides. Operator labels are not authenticated.'));
+      const status = el('p', 'warn'); status.setAttribute('role', 'status');
+      const save = el('button', 'btn primary', 'Save revision'); save.type = 'submit';
+      form.append(save, status); content.append(form);
+      let attempt;
+      form.onsubmit = async (event) => {
+        event.preventDefault();
+        const change = { baseRevision: detail.revision, kind: kind.value, actor: actor.value, reason: reason.value,
+          ...(kind.value === 'correction' ? { transcript: transcript.value } : { override: priority.value || null }) };
+        // Keep the same request ID after a lost response; changing the edit starts another request.
+        const signature = JSON.stringify(change);
+        if (!attempt || attempt.signature !== signature) {
+          const bytes = crypto.getRandomValues(new Uint8Array(16)); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+          const hex = [...bytes].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+          attempt = { signature, requestId: `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}` };
+        }
+        save.disabled = true;
+        try {
+          const response = await fetch(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...change, requestId: attempt.requestId }) });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Could not save revision');
+          dialog.close(); await load();
+        } catch (error) { status.textContent = error.message + '. Your edit is retained; retry or close and reload current evidence.'; }
+        finally { save.disabled = false; }
+      };
+    } catch (_) { content.textContent = 'Could not load evidence. Check the hub connection and reopen.'; }
   }
 
   // Short "when" text for compact cards
@@ -945,18 +1029,19 @@
     const box = $('curve'), legend = $('curve-legend');
     box.replaceChildren();
     if (loadState === 'loading') { box.append(el('div', 'skel')); legend.hidden = true; return; }
+    if (inbound.some((r) => r.patient_count_known === false)) box.append(el('p', 'hint', 'Unknown patient counts are excluded from this chart.'));
     const N = 12, step = range / N;
     const all = Array(N).fill(0), imm = Array(N).fill(0);
     let later = 0, unknown = 0, past = 0;
     for (const r of inbound) {
       if (category(r) === 'Deceased') continue;
       const m = minsLeft(r);
-      if (m === null) { unknown += r.patient_count; continue; }
-      if (m > range) { later += r.patient_count; continue; }
-      if (m <= 0) past += r.patient_count;
+      if (m === null) { unknown += countOf(r); continue; }
+      if (m > range) { later += countOf(r); continue; }
+      if (m <= 0) past += countOf(r);
       const i = m <= 0 ? 0 : Math.min(N, Math.ceil(m / step)) - 1; // anyone due or past ETA counts in the first bin
-      all[i] += r.patient_count;
-      if (category(r) === 'Immediate') imm[i] += r.patient_count;
+      all[i] += countOf(r);
+      if (category(r) === 'Immediate') imm[i] += countOf(r);
     }
     const total = all.reduce((a, b) => a + b, 0), immTotal = imm.reduce((a, b) => a + b, 0);
     $('curve-note').textContent = [past ? `${num(past)} already past ETA, shown at Now` : '', later ? `${plural(later, 'patient')} later than this window` : '', unknown ? `${plural(unknown, 'patient')} with no ETA` : ''].filter(Boolean).join(' · ');
@@ -1066,12 +1151,13 @@
   function renderDue(inbound) {
     const box = $('due');
     box.replaceChildren(el('h2', '', 'Due within 30 minutes'));
+    if (inbound.some((r) => r.patient_count_known === false)) box.append(el('p', 'hint', 'Known patient counts only; some report counts are unknown.'));
     if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
     let soon = 0, late = 0;
     for (const r of inbound) {
       if (category(r) === 'Deceased') continue;
       const m = minsLeft(r);
-      if (m !== null && m <= 30) { soon += r.patient_count; if (m < -2) late += r.patient_count; }
+      if (m !== null && m <= 30) { soon += countOf(r); if (m < -2) late += countOf(r); }
     }
     const n = el('div', 'due-n', num(soon));
     n.append(el('small', '', soon === 1 ? 'patient' : 'patients'));
@@ -1085,11 +1171,11 @@
     const needs = {};
     for (const r of inbound) {
       if (category(r) === 'Deceased') continue;
-      for (const n of readyItems(r)) needs[n] = (needs[n] || 0) + r.patient_count;
+      for (const n of readyItems(r)) needs[n] = (needs[n] || 0) + countOf(r);
     }
     const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);
     if (!sorted.length) { box.append(el('p', 'hint', 'No teams needed right now.')); return; }
-    box.append(el('p', 'hint', 'For everyone still on the way.'));
+    box.append(el('p', 'hint', 'Known patient counts for everyone still on the way; unknown counts are excluded.'));
     box.lastChild.style.marginBottom = '12px';
     const max = sorted[0][1];
     const wrap = el('div', 'mini-rows');

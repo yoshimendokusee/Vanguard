@@ -1,5 +1,11 @@
 # Database teammate integration contract
 
+> Backend integration update, 2026-10-09: the current request supersedes the
+> database deferral below. Structured intake, SQLite v2, corrections/overrides and
+> patient/encounter history are now implemented. Read `api-contract.md` and
+> `backend-completion.md` for the live contract; remaining Apple/Qwen runtime work
+> is still unimplemented. The material below records the earlier handoff.
+
 Database implementation was removed from this agent's scope at the user's request
 on 2026-10-09. This branch leaves `hub/db.js`, `watch/lib/db/triage_db.dart`,
 existing schema/migration files and persistent data unchanged. No migration runner

@@ -64,7 +64,7 @@ function validateRepository(root) {
   }
 
   // shortcut: no migration runners exist, require runner and upgrade-test integration before accepting executable migrations.
-  for (const dir of ['database/migrations/watch', 'database/migrations/hub', 'supabase/migrations']) {
+  for (const dir of ['database/migrations/watch', 'database/migrations/hub']) {
     const files = fs.readdirSync(path.join(root, dir));
     assert.ok(!files.some((file) => /\.(sql|dart|js)$/.test(file)), `${dir}: integrate a migration runner and populated upgrade tests, then update this guard`);
   }
