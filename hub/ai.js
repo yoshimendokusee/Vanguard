@@ -20,6 +20,8 @@
  */
 
 const { assessRisk, validateObservations } = require('./risk');
+const { verifyModel } = require('./model');
+const { isIP } = require('node:net');
 
 const PROMPT_VERSION = 'vanguard-extract-v1';
 
@@ -210,7 +212,7 @@ function toValidatedExtraction(modelJson, transcript) {
 
 async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl = fetch } = {}) {
   const cfg = aiConfig();
-  const url = `${cfg.ollamaUrl}/api/chat`;
+  const url = `${ollamaUrl || cfg.ollamaUrl}/api/chat`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || cfg.timeoutMs);
   try {
@@ -242,6 +244,10 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
       throw new AiError('model-missing', `Ollama has no model "${model || cfg.model}"`, 502);
     }
     if (!content.trim()) throw new AiError('empty-model-response', 'Model returned an empty response', 502);
+    if (data.done !== true || data.done_reason !== 'stop' || !Number.isSafeInteger(data.eval_count) || data.eval_count < 1
+      || data.model !== (model || cfg.model)) {
+      throw new AiError('incomplete-model-response', 'Local model did not complete token generation', 502);
+    }
     return content;
   } catch (err) {
     if (err instanceof AiError) throw err;
@@ -264,7 +270,8 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
  */
 async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const cfg = aiConfig();
-  const raw = await callOllama(transcript, { ...opts, model: opts.model || cfg.model, ollamaUrl: cfg.ollamaUrl });
+  const manifest = await localModel(opts.fetchImpl || fetch, opts);
+  const raw = await callOllama(transcript, { ...opts, model: opts.model || cfg.model, ollamaUrl: opts.ollamaUrl || cfg.ollamaUrl });
   const modelJson = extractJsonObject(raw);
   const { observations, evidence, uncertainties, warnings } = toValidatedExtraction(modelJson, transcript);
   const device = cleanDevice(provenanceInput.device);
@@ -272,12 +279,15 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
     version: 1,
     originalTranscript: transcript,
     observations,
+    evidence: Object.fromEntries(Object.entries(evidence).filter(([, quote]) => quote !== null)
+      .map(([key, excerpt]) => [key, { source: 'model-inferred', excerpt, contradictory: false }])),
     uncertainties,
     provenance: {
       device,
       sttEngine: textOr(provenanceInput.sttEngine, device === 'hospital-browser' ? 'typed/hub-form' : 'device-stt'),
       sttRuntime: textOr(provenanceInput.sttRuntime, 'hub-ai-v1'),
-      extraction: null, // Ollama digest is not a weights checksum; kept null so validateProcessing stays truthful.
+      extraction: { model: manifest.model, revision: manifest.revision, runtime: 'ollama',
+        artifactSha256: manifest.sha256, execution: 'local' },
     },
   };
   const provisional = assessRisk(observations);
@@ -313,6 +323,58 @@ async function triageAssist(transcript, provenanceInput = {}, opts = {}) {
   };
 }
 
+async function localModel(fetchImpl = fetch, opts = {}) {
+  const cfg = aiConfig();
+  const base = opts.ollamaUrl || cfg.ollamaUrl;
+  const url = new URL(base);
+  const host = url.hostname;
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+    || !((isIP(host) === 4 && /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(host))
+      || ['localhost', '[::1]', 'ollama', 'host.docker.internal'].includes(host))) {
+    throw new AiError('nonlocal-runtime', 'Configure a local Ollama runtime', 503);
+  }
+  let manifest;
+  try { manifest = await verifyModel(); }
+  catch (error) { throw new AiError(error.message, 'Local Qwen artifact verification failed; run setup', 503); }
+  if ((opts.model || cfg.model) !== manifest.ollamaModel) throw new AiError('model-identity-mismatch', 'Configured model differs from the pinned Qwen artifact', 503);
+  try {
+    const res = await fetchImpl(`${base}/api/show`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: manifest.ollamaModel }),
+      signal: AbortSignal.timeout(cfg.statusTimeoutMs),
+    });
+    if (!res.ok) throw new AiError('model-missing', 'Import the local Qwen artifact with qwen-setup.sh', 503);
+    const data = await res.json();
+    if (data.model_info?.['general.architecture'] !== 'qwen3'
+      || !new RegExp(`^FROM .*sha256[-:]${manifest.sha256}\\s*$`, 'm').test(data.modelfile || '')) {
+      throw new AiError('model-identity-mismatch', 'Ollama weights differ from the verified repository artifact', 503);
+    }
+  } catch (error) {
+    if (error instanceof AiError) throw error;
+    throw new AiError('ollama-unreachable', 'Local Ollama model verification failed', 503);
+  }
+  return manifest;
+}
+
+async function aiHealth(fetchImpl = fetch) {
+  const cfg = aiConfig();
+  const result = { status: 'unavailable', model: cfg.model, runtime: 'ollama', model_loaded: false, inference_available: false };
+  try {
+    await localModel(fetchImpl);
+    // Readiness requires fresh completed tokens, not merely a tag or an allocated runner.
+    const res = await fetchImpl(`${cfg.ollamaUrl}/api/generate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: cfg.model, prompt: 'Reply OK. /no_think', think: false, stream: false, options: { num_predict: 8 } }),
+      signal: AbortSignal.timeout(cfg.timeoutMs),
+    });
+    const data = await res.json();
+    if (!res.ok || data.model !== cfg.model || data.done !== true || data.done_reason !== 'stop'
+      || !Number.isSafeInteger(data.eval_count) || data.eval_count < 1
+      || typeof data.response !== 'string' || !data.response.trim()) throw new AiError('inference-failed', 'Readiness generation failed');
+    return { ...result, status: 'ready', model_loaded: true, inference_available: true };
+  } catch (error) { return { ...result, error: error.code || 'ollama-unreachable' }; }
+}
+
 async function aiStatus(fetchImpl = fetch) {
   const cfg = aiConfig();
   const controller = new AbortController();
@@ -322,7 +384,7 @@ async function aiStatus(fetchImpl = fetch) {
     if (!res.ok) return { ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-error', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript };
     const data = await res.json().catch(() => ({}));
     const names = Array.isArray(data.models) ? data.models.map((m) => String(m.name || m.model || '')) : [];
-    const modelAvailable = names.some((n) => n === cfg.model || n.startsWith(`${cfg.model}:`) || cfg.model.startsWith(`${n}:`) || n.startsWith(cfg.model));
+    const modelAvailable = names.includes(cfg.model);
     return {
       ok: true,
       available: modelAvailable,
@@ -352,4 +414,6 @@ module.exports = {
   extractEmergency,
   triageAssist,
   aiStatus,
+  aiHealth,
+  localModel,
 };

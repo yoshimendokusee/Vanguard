@@ -14,8 +14,8 @@ public struct PendingCapture: Sendable {
     }
 }
 
-// Database teammate owns durable SQLite state. Commit must atomically preserve
-// transcript, extraction provenance/uncertainty and the pending hospital outbox.
+// NativeStore preserves transcript, extraction provenance/uncertainty and the
+// pending hospital outbox atomically.
 public protocol FallbackRepository: Sendable {
     func pendingCaptures() async throws -> [PendingCapture]
     func commitProcessed(capture: PendingCapture, transcript: String, processingJSON: Data) async throws

@@ -17,8 +17,8 @@ function withFixture(change) {
     for (const file of ['hub', 'watch']) {
       fs.cpSync(path.join(root, file), path.join(temp, file), {
         recursive: true,
-        filter: (source) => !/(?:^|\/)(?:node_modules|data|build|\.build|\.swiftpm|\.dart_tool|\.gradle)(?:\/|$)/.test(source)
-          && !/\.(?:db|sqlite|zip)$/.test(source),
+        filter: (source) => !/(?:^|\/)(?:node_modules|data|build|DerivedData|\.native|\.build|\.swiftpm|\.dart_tool|\.gradle)(?:\/|$)/.test(source)
+          && !/\.(?:db|sqlite|zip|gguf)$/.test(source),
       });
     }
     for (const file of ['.env.example', 'compose.yaml']) {
