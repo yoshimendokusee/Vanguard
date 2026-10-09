@@ -1,3 +1,5 @@
-# Reuse the existing service and its hub/data path; requires Compose >= 2.20.3.
+# Development reuses the production services/data; requires Compose >= 2.20.3.
 include:
-  - ./hub/docker-compose.yml
+  - path:
+      - ./hub/docker-compose.yml
+      - ./hub/compose.dev.yaml
