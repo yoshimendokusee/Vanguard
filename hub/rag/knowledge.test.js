@@ -215,3 +215,15 @@ test('the pack has grown to 1200+ entries without matching ordinary speech', () 
   for (const text of ['Please call me back tomorrow morning.', 'Salamat po, sige ingat kayo.', 'Si Juan ay nasa bahay po namin at kumakain ng kanin.',
     'Pumunta kami sa palengke kahapon at bumili ng isda.', 'Meeting at three, bring the report.']) assert.deepEqual(ids(text), [], text);
 });
+
+test('everyday Tagalog filler words and "yung" do not stop a phrase from matching', () => {
+  for (const [text, id] of Object.entries({
+    'Nahihirapan siyang huminga': 'shortness-of-breath',
+    'masakit yung dibdib niya': 'chest-pain',
+    'sumasakit po ang dibdib ko': 'chest-pain',
+    'hindi na humihinga ang bata': 'not-breathing',
+    'masakit yong ulo niya': 'headache',
+  })) assert.ok(ids(text).includes(id), `"${text}" should retrieve ${id}, got ${ids(text)}`);
+  // Fillers never turn unrelated speech into a finding.
+  assert.deepEqual(ids('Si Juan ay nasa bahay po namin at kumakain ng kanin.'), []);
+});

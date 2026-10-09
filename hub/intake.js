@@ -113,6 +113,8 @@ function findEta(transcript) {
     // Only a minutes figure next to an arrival cue is an ETA: "unconscious for 10 minutes" is not.
     const around = transcript.slice(Math.max(0, m.index - 60), m.index + m[0].length + 60);
     if (!ETA_CUES.test(around)) continue;
+    // "30 minutes ago" / "mga 30 minutes na" says how long it has been, not when they arrive ("limang minuto na lang" stays an ETA).
+    if (/^\s*(?:ago\b|already\b|na\b(?!\s+lang))/i.test(transcript.slice(m.index + m[0].length, m.index + m[0].length + 14))) continue;
     const minutes = toNumber(m[1]) * (m[3] ? 60 : 1);
     if (Number.isInteger(minutes) && minutes >= 1 && minutes <= 720) return { value: minutes, evidence: m[0] };
   }

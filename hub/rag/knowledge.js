@@ -19,6 +19,22 @@ const MAX_ENTRIES = 5000;
 const MAX_PHRASES = 24;
 const MAX_TEXT = 120;
 const MAX_QUERY_TOKENS = 200;
+// Everyday Tagalog particles and pronouns that may sit between the words of a phrase without changing its
+// meaning ("nahihirapan siyang huminga" is "nahihirapan huminga"). At most one filler is allowed per gap.
+const FILLERS = ['siya', 'siyang', 'niya', 'yung', 'yong', 'ang', 'ng', 'na', 'po', 'ay', 'sa', 'ko', 'mo', 'ka', 'kasi', 'raw', 'daw', 'din', 'rin', 'nga', 'lang', 'naman', 'pa', 'at', 'ni', 'kay', 'yata', 'ba', 'pala', 'muna', 'eh'];
+const GAP = `(?: (?:${FILLERS.join('|')}))?`;
+const phrasePattern = new Map();
+function locate(padded, phrase) {
+  let re = phrasePattern.get(phrase);
+  if (!re) {
+    // "ang" and its spoken forms "yung"/"yong" are interchangeable ("masakit ang dibdib" = "masakit yung dibdib").
+    const word = (t) => (t === 'ang' ? '(?:ang|yung|yong)' : t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    re = new RegExp(` ${phrase.split(' ').map(word).join(`${GAP} `)} `);
+    phrasePattern.set(phrase, re);
+  }
+  const m = re.exec(padded);
+  return m ? { start: m.index, end: m.index + m[0].length } : null;
+}
 // Words that, directly before a matched phrase, deny it ("no severe bleeding", "hindi nahihilo").
 const NEGATORS = new Set(['no', 'not', 'without', 'denies', 'denied', 'never', 'wala', 'walang', 'hindi', 'di', 'hindi po', 'walang po']);
 
@@ -113,17 +129,16 @@ function retrieve(index, text, { limit = 5 } = {}) {
   const padded = ` ${normalized} `;
   const best = new Map();
   for (const row of index.candidates.all(query)) {
-    if (!padded.includes(` ${row.phrase} `)) continue;
+    if (!locate(padded, row.phrase)) continue;
     const previous = best.get(row.entry_id);
     if (!previous || row.phrase.length > previous.length) best.set(row.entry_id, row.phrase);
   }
-  // Longest phrases first; a phrase inside an already accepted longer phrase
-  // ("dibdib" inside "sumasakit ang dibdib") is the same words, not a new finding.
+  // Longest phrases first; a phrase inside an already accepted longer span ("dibdib" inside
+  // "sumasakit ang dibdib") is the same words, not a new finding.
   const accepted = [];
   for (const [id, matched] of [...best.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))) {
-    const start = padded.indexOf(` ${matched} `);
-    const end = start + matched.length + 2;
-    // Only a strictly longer phrase hides this one; entries sharing the same phrase are all kept.
+    const { start, end } = locate(padded, matched);
+    // Only a strictly longer span hides this one; entries sharing the same phrase are all kept.
     if (accepted.some((a) => start >= a.start && end <= a.end && a.end - a.start > end - start)) continue;
     accepted.push({ id, matched, start, end });
   }

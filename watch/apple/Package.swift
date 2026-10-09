@@ -4,10 +4,16 @@ import PackageDescription
 let package = Package(
     name: "VanguardApple",
     platforms: [.iOS(.v17), .watchOS(.v10), .macOS(.v14)],
-    products: [.library(name: "VanguardApple", targets: ["VanguardApple"])],
+    products: [.library(name: "VanguardApple", targets: ["VanguardApple"]),
+               // Development host: the real Watch screens and pipeline in a Mac window. Not a shipping app.
+               .executable(name: "VanguardWatchMac", targets: ["VanguardWatchMac"])],
     targets: [
         .binaryTarget(name: "llama", path: ".native/llama.xcframework"),
-        .target(name: "VanguardApple", dependencies: ["llama"], resources: [.process("Migrations")], linkerSettings: [.linkedLibrary("sqlite3")]),
+        .target(name: "VanguardApple", dependencies: ["llama"], resources: [.process("Migrations"), .copy("Resources/medical_terms.json")], linkerSettings: [.linkedLibrary("sqlite3")]),
+        .executableTarget(name: "VanguardWatchMac", dependencies: ["VanguardApple"], path: "Sources/VanguardWatchMac",
+            exclude: ["Info.plist"],
+            // Embeds usage descriptions so macOS can ask for the microphone and speech permissions.
+            linkerSettings: [.unsafeFlags(["-Xlinker", "-sectcreate", "-Xlinker", "__TEXT", "-Xlinker", "__info_plist", "-Xlinker", "Sources/VanguardWatchMac/Info.plist"])]),
         .testTarget(name: "VanguardAppleTests", dependencies: ["VanguardApple"])
     ]
 )

@@ -169,6 +169,11 @@ endpoints remain; priority metadata is computed on read. Extended metadata is re
 without ACK until durable storage can preserve it. Audited corrections/overrides are
 not implemented in that earlier work.
 
+The native Apple Watch voice-report workflow (ten-screen SwiftUI app, recording, local extraction, deterministic
+triage, persisted delivery states, shared parity fixtures) is documented with its evidence matrix in
+[apple-watch-voice-workflow.md](apple-watch-voice-workflow.md). It is verified on macOS and the iOS simulator only,
+not on Apple hardware.
+
 `watch/apple` is a native Swift library inside the existing watch application boundary.
 `OnDeviceTranscriber` requires local speech support and on-device requests; no network
 fallback exists. `FallbackProcessor` separates application recovery from the teammate's
