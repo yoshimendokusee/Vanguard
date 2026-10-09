@@ -8,17 +8,20 @@ The GGUF embeds tokenizer vocabulary, special tokens, architecture metadata and
 chat template. `config.json` preserves the upstream configuration for reference.
 Inference requires no Transformers/tokenizer downloads or cloud services.
 
-Install Git LFS, Node 22+, Ollama 0.11.4 and (Apple builds) Xcode/CMake during
-initial setup. From the repository root, run `scripts/qwen-setup.sh` with local
-`ollama serve` running. It retrieves Git LFS objects explicitly, verifies actual
-weights (rejecting pointers), then imports this file as `qwen3:0.6b`. Never use
-`ollama pull` at application startup. `scripts/qwen-echo.sh` validates the repository
-artifact and imported blob identity before requesting real generated tokens.
+Docker startup needs Git and Docker Compose, not host Ollama or Git LFS. A one-shot
+initializer copies verified checkout weights or downloads this exact manifest URL
+when only an LFS pointer is present, checks the size/header/SHA-256, and atomically
+installs it into a persistent weights volume. Ollama imports it on its internal-only
+network and preserves imported blobs in a separate volume. Download failure never
+promotes readiness; inspect `model-init` logs and retry initial setup.
 
-Docker binds this directory read-only and imports the same artifact on startup.
-Apple app resource folders package the same bytes; run `scripts/qwen-native-build.sh`
-to prepare the local CPU XCFramework before opening `watch/apple/Vanguard.xcodeproj`.
-No external Swift package or native model download occurs at runtime.
+For Apple packaging, run `scripts/qwen-setup.sh --model-only` with Node 22+ while
+online if weights are absent. Then use Xcode/CMake and `scripts/qwen-native-build.sh`.
+The app build checks SHA-256 before packaging the model. iOS/watchOS runtime never
+downloads a model and never needs Docker or host Ollama. Native CPU build tooling
+currently targets Apple Silicon hosts and arm64/arm64_32 Apple targets; Intel hosts
+and physical execution remain unverified. Optional host Ollama developers can run
+`scripts/qwen-setup.sh host` after starting Ollama 0.11.4.
 
 Attribution: Qwen team, Apache-2.0 (full upstream `LICENSE` included); GGUF conversion
 by [Unsloth](https://huggingface.co/unsloth/Qwen3-0.6B-GGUF/tree/50968a4468ef4233ed78cd7c3de230dd1d61a56b).

@@ -1,0 +1,12 @@
+// Committed defaults for the Vanguard iPhone and Apple Watch app targets.
+// In Xcode: Project > Info > Configurations > set Debug and Release to this file.
+// Values end up in Info.plist inside the installed app: public settings only.
+// "//" starts a comment in xcconfig, so write URLs as http:/$()/host.
+
+HUB_URL =
+SUPABASE_URL =
+SUPABASE_PUBLISHABLE_KEY =
+
+// Per-machine/site values (git-ignored). Optional: builds succeed without it,
+// and AppConfiguration reports HUB_URL as missing at runtime.
+#include? "Secrets.xcconfig"

@@ -3,8 +3,10 @@
 Source: `hub/server.js`, `hub/sync.js`, `hub/db.js` and the callers in
 `watch/lib/services/sync_service.dart`, `hub/public/index.html`, `fake-watch.sh`.
 This is the existing unversioned HTTP API, not a proposed cloud or BLE API.
-There is no authentication, TLS, authorization or pagination. Use synthetic
-data in isolated development networks only.
+Anonymous localhost demos remain compatible. Configured LAN mode requires bearer
+credentials (`HUB_USERS`); devices can submit only assigned watch IDs and cannot read
+hospital records. Operators share authorized hospital records. There is no TLS,
+storage encryption or pagination. Use synthetic data on isolated networks only.
 
 ## Endpoints
 
@@ -15,7 +17,9 @@ data in isolated development networks only.
 | `POST /api/sync-triage` | See below | One SQLite ingest transaction; acknowledges accepted and duplicate reports. |
 | `GET /api/triage` | `200 [<stored row>, ...]` | Includes all statuses; inbound first, then effective hospital priority (Immediate, Unassessed, Delayed, Minor, Deceased); known ETA before unknown, then expected arrival and creation time. Original `triage` is preserved. |
 | `PATCH /api/triage/:id` | `200 {"ok":true}` | Body `{"status":"inbound|arrived|cancelled"}`. `400 {"ok":false,"error":"Bad status"}` or `404 {"ok":false,"error":"Not found"}`. All three statuses remain reversible; each actual change is recorded atomically as a status event. Repeating the same status adds no event. |
-| `GET /api/events` | `200 text/event-stream` | `retry: 2000`; named `triage` events with `{"inserted":n}` or `{"updated":id}`; comments every 20 seconds. Fetch the list on an event; no durable cursor/replay. |
+| `GET /api/events` | `200 text/event-stream` | `retry: 2000`; named `triage` events with `{"inserted":n}` or `{"updated":id}`, and `cloud` events carrying the cloud status object below; comments every 20 seconds. Fetch the list on an event; no durable cursor/replay. |
+| `GET /api/cloud/status` | `200 {"ok":true,"configured":bool,"state":"disabled|idle|syncing|ok|error","message":string|null,"pending":n,"synced":n,"rejected":n,"lastAttemptAt":iso|null,"lastSuccessAt":iso|null}` | Hub-to-Supabase backup state. Counts cover all hub reports. Never includes credentials, tokens or row content. |
+| `POST /api/cloud/sync` | Same body as status, after the attempt | Optional body `{"retryRejected":true}` also retries rejected rows. Joins a running sync. With cloud disabled, returns `disabled` without network access. Unauthenticated, like the rest of this API. |
 | `GET /` | Dashboard HTML | Locally served assets; same-origin API/SSE calls. |
 
 Development dashboard access is `http://localhost:3301`; Vite proxies `/api`
@@ -99,7 +103,9 @@ ETA is minutes after creation, so delayed sync or clock skew affects the countdo
 `status = arrived` is a separate operator action at the hub. Neither is a
 cryptographically verified delivery receipt. Supabase is an independent watch
 sync path, not part of this HTTP API: it uses `report_id` UUID upserts, a separate
-`cloud_sync_status`, and owner-scoped RLS. See
+`cloud_sync_status`, and owner-scoped RLS. The hub separately backs up its
+received source reports as its own Supabase user (`hub/cloud.js`, see
+`architecture.md`); only the status endpoints above expose it. See
 `supabase/migrations/README.md` for the cloud table setup. BLE schemas/endpoints
 are not implemented.
 
@@ -252,3 +258,15 @@ promptVersion, report}`. Processing carries exact originals, source excerpts lab
 machine claims remain excluded until qualified non-model reassessment. Original
 source triage/encounter linkage/correction history remain intact; no approval gate
 is required for saving or relaying the generated extraction.
+
+
+## Connectivity additions — 2026-10-10
+
+All API requests return `X-Request-ID`; a valid incoming UUID is preserved, otherwise
+a new UUID is assigned. AI responses add `contractVersion: 1` and `requestId` without
+changing processing v1 or legacy sync fields. `/api/config` adds the authenticated
+principal's ID/role (never credentials) and contract version. Bearer authentication
+also applies to SSE; the browser central client uses fetch streaming with three
+reconnection attempts, then authenticated polling. The health liveness route remains
+public and contains no records. Read the AI contract and `global-ai-connectivity.md`
+for readiness states, independent native inference and pairing instructions.

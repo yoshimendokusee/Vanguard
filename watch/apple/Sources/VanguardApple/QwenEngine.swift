@@ -16,7 +16,8 @@ public struct ModelArtifact: Codable, Sendable {
     public let revision: String
 
     public static func verify(directory: URL) throws -> ModelArtifact {
-        let manifest = try JSONDecoder().decode(Self.self, from: Data(contentsOf: directory.appendingPathComponent("manifest.json")))
+        guard let data = try? Data(contentsOf: directory.appendingPathComponent("manifest.json")) else { throw QwenFailure.missingModel }
+        let manifest = try JSONDecoder().decode(Self.self, from: data)
         guard manifest.model == "Qwen3-0.6B", manifest.sizeBytes > 8,
             manifest.file == URL(fileURLWithPath: manifest.file).lastPathComponent,
             manifest.sha256.range(of: "^[a-f0-9]{64}$", options: .regularExpression) != nil else { throw QwenFailure.invalidManifest }
@@ -47,6 +48,7 @@ public struct QwenGeneration: Codable, Sendable {
 
 /// Serialized CPU inference on this actor's executor; the UI never runs decoding.
 public actor QwenEngine {
+    public private(set) var state: AiReadiness = .initializing
     private let directory: URL
     private var model: OpaquePointer?
     private var context: OpaquePointer?
@@ -62,6 +64,11 @@ public actor QwenEngine {
     public func manifest() throws -> ModelArtifact {
         try load()
         return artifact!
+    }
+
+    public func readiness() throws -> AiReadiness {
+        _ = try generate(system: "Reply briefly.", prompt: "Reply OK.", maxTokens: 16)
+        return state
     }
 
     private func load() throws {
@@ -96,6 +103,15 @@ public actor QwenEngine {
     }
 
     public func generate(system: String, prompt: String, maxTokens: Int = 160, timeout: TimeInterval = 60) throws -> QwenGeneration {
+        do { return try generateTokens(system: system, prompt: prompt, maxTokens: maxTokens, timeout: timeout) }
+        catch {
+            state = error as? QwenFailure == .missingModel ? .modelMissing : .error
+            throw error
+        }
+    }
+
+    private func generateTokens(system: String, prompt: String, maxTokens: Int, timeout: TimeInterval) throws -> QwenGeneration {
+        state = .modelLoading
         try Task.checkCancellation()
         guard !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
             prompt.utf8.count <= 16_000, system.utf8.count <= 8_000,
@@ -146,6 +162,7 @@ public actor QwenEngine {
         guard generated > 0, let text = String(data: output, encoding: .utf8), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw QwenFailure.emptyOutput }
         var usage = rusage()
         getrusage(RUSAGE_SELF, &usage)
+        state = .ready
         return QwenGeneration(text: text, generatedTokens: generated,
             initializationSeconds: initializationSeconds, completionSeconds: Date().timeIntervalSince(start),
             tokensPerSecond: Double(generated) / max(0.001, Date().timeIntervalSince(generationStart)),

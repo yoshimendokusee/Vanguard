@@ -1,8 +1,57 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:vanguard_wrist/db/triage_db.dart';
 import 'package:vanguard_wrist/services/cloud_sync_service.dart';
 
+String _syntheticJwt(Map<String, Object> claims) =>
+    'e30.${base64Url.encode(utf8.encode(jsonEncode(claims))).replaceAll('=', '')}.sig';
+
 void main() {
+  test(
+    'missing, non-HTTPS or secret Supabase values disable cloud sync only',
+    () {
+      expect(cloudConfigurationError('', ''), 'Cloud sync is not configured');
+      expect(
+        cloudConfigurationError('https://example.supabase.co', ''),
+        'Cloud sync is not configured',
+      );
+      expect(
+        cloudConfigurationError('', 'sb_publishable_synthetic'),
+        'Cloud sync is not configured',
+      );
+      for (final url in [
+        'http://example.supabase.co',
+        'example.supabase.co',
+        'https://',
+        'ftp://example.supabase.co',
+      ]) {
+        expect(
+          cloudConfigurationError(url, 'sb_publishable_synthetic'),
+          'SUPABASE_URL must use HTTPS',
+        );
+      }
+      for (final key in [
+        'sb_secret_synthetic',
+        _syntheticJwt({'role': 'service_role'}),
+      ]) {
+        expect(
+          cloudConfigurationError('https://example.supabase.co', key),
+          contains('not a secret key'),
+        );
+      }
+      for (final key in [
+        'sb_publishable_synthetic',
+        _syntheticJwt({'role': 'anon'}),
+      ]) {
+        expect(
+          cloudConfigurationError('https://example.supabase.co', key),
+          isNull,
+        );
+      }
+    },
+  );
+
   test('cloud payload preserves the stable ID and SQLite report fields', () {
     final row = TriageRow.fromMap({
       'id': 7,

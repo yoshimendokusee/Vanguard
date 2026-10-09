@@ -19,13 +19,13 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 | --- | --- | --- |
 | Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. Native SwiftUI watchOS target, local CPU Qwen and SQLite now exist in `watch/apple`; simulator generation passed. Physical inference and offline Watch STT remain unverified/unimplemented respectively. |
 | Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. Pinned repository GGUF, local Ollama and vendored CPU llama.cpp are integrated; machine claims stay unverified and deterministic rules remain authoritative; automatic reporting does not require pre-send review. |
-| Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; native SwiftUI iPhone target, SQLite adapter, Qwen runtime and bounded Watch Connectivity job/result transfer now exist; physical speech/paired transfer are unverified. Legacy Android code does not establish iPhone support. |
+| Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; native SwiftUI iPhone target, SQLite adapter, Qwen runtime and bounded Watch Connectivity job/result transfer now exist; physical speech/paired transfer are unverified. Build-time `HUB_URL` (and optional publishable-only Supabase values) flow from `watch/apple/Config/*.xcconfig` through `Config/Info.plist` to `AppConfiguration`; a saved in-app hub URL overrides it. Package tests and both simulator builds passed on macOS on 2026-10-10; see [Apple hub URL verification](apple-hub-url-verification.md). Apple app Supabase settings remain empty for hub-owned backup. The configured shared hub uses the Mac's Wi-Fi hostname; see [shared hub setup](shared-hub-setup.md) for current binding, credential and signed simulator evidence. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
 | Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta` with sqflite v1→v2 upgrade; hub `triage_reports` with WAL and numbered transactional migrations. Hub v2 stores patient/encounter revisions, original processing and assessment/receipt history. Neither database is encrypted; no retention policy. |
 | Hospital LAN | Offline receiving API + dashboard | Express, SQLite, local HTML/CSS/JS, SSE + polling and deterministic provisional priority. Structured evidence, encounter links, immutable corrections and provisional overrides are persisted through hub v2. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One service: `server.js` HTTP, `sync.js` ingest, `db.js` migrations, `processing.js`/`risk.js` validation and rules, `clinical.js` report history and `records.js` patient/encounter workflows. Do not split into services. Add feature modules as features arrive. |
 | Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies. Docker development now adds Vite for its vanilla CSS/JavaScript; production assets are built and served by Express. Retain it until a separately tested replacement exists. |
-| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
+| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. The hub (`hub/cloud.js`) backs up received source reports to the same table as its own Supabase Auth user, using the publishable key and RLS; the dashboard shows its status through the hub. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
 | Repository | Monorepo + Compose + CI | Existing `watch/` and `hub/` form a small monorepo. Foundation adds root Compose, documentation and checks for those applications only. |
 
 ## Implemented three-tier flow
@@ -62,6 +62,21 @@ Reports created while signed out and pre-upgrade rows have no cloud owner.
 Uploading those rows requires explicit confirmation to assign them to the
 current account. An upload is acknowledged only after Supabase returns the
 upserted report IDs.
+
+`hub/cloud.js` is the hub's optional Supabase backup. Devices and the dashboard
+never hold Supabase credentials. The hub reads `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_HUB_EMAIL` and `SUPABASE_HUB_PASSWORD` from
+its git-ignored `.env`, then signs in as a dedicated Supabase Auth user, so RLS
+scopes its rows to that account. Secret/service-role keys are refused. Each
+received report is queued in `cloud_sync` (migration 0003) with a UUID generated
+once and reused for every retry. Only UUIDs that Supabase returns are marked
+synced. Offline, timeout, sign-in or server failures keep everything queued with
+backoff (interval doubling up to 10 minutes). A row-level 400/409/RLS refusal is
+isolated, recorded as rejected and retried only on an explicit dashboard sync.
+The immutable source report is uploaded. Hub revisions, overrides and status are
+not uploaded. This UUID is distinct from the watch's own cloud UUID, so a report
+sent by both routes appears twice in Supabase, once per owning account. A cloud
+upload is a backup, not hospital delivery or clinical review.
 
 The hub applies `hub/migrations/0001_initial_schema.sql` transactionally and
 tracks its schema with SQLite `PRAGMA user_version`. Version 2 adds related clinical history and backfills every existing report atomically. Existing compatible
@@ -154,6 +169,11 @@ endpoints remain; priority metadata is computed on read. Extended metadata is re
 without ACK until durable storage can preserve it. Audited corrections/overrides are
 not implemented in that earlier work.
 
+The native Apple Watch voice-report workflow (ten-screen SwiftUI app, recording, local extraction, deterministic
+triage, persisted delivery states, shared parity fixtures) is documented with its evidence matrix in
+[apple-watch-voice-workflow.md](apple-watch-voice-workflow.md). It is verified on macOS and the iOS simulator only,
+not on Apple hardware.
+
 `watch/apple` is a native Swift library inside the existing watch application boundary.
 `OnDeviceTranscriber` requires local speech support and on-device requests; no network
 fallback exists. `FallbackProcessor` separates application recovery from the teammate's
@@ -223,3 +243,34 @@ do not prove physical Watch memory, speech, thermals, background transfer or del
 See `QWEN_INTEGRATION.md`, `QWEN_AUDIT.md` and `QWEN_RESULTS.md` for exact status,
 resource measurements, setup and scripts. The system remains a synthetic prototype
 with unauthenticated HTTP and unencrypted storage, not a real-patient deployment.
+
+
+## Global connectivity update — 2026-10-10
+
+See `global-ai-connectivity.md` for current verification and remaining acceptance
+blockers. Root and legacy Compose now initialize a named verified-weights volume
+from existing GGUF bytes or a pinned first-time download, without host Ollama/LFS.
+Ollama retains its internal network and imported-model volume; SQLite paths and
+clinical schema remain compatible; main's cloud backup migration is preserved. Earlier statements above that require prior checkout
+weights for Docker startup are historical.
+
+The web central client uses same-origin requests, UUID request headers, token-aware
+SSE/polling and an account-scoped durable outbox with one atomic key per report.
+Original capture is saved before inference; generated metadata is validated and
+hospital transmission is automatic. Failed extraction can submit an Unassessed
+original. Only an explicit scoped receipt removes an outbox entry.
+
+Apple Qwen stays entirely local. Shared readiness states measure token generation;
+LAN URL validation, device credentials, bounded foreground retries and receipt
+validation are separate. Native tokens use Keychain. iPhone transcribes locally
+when the Speech runtime/locale supports it; Watch audio uses the existing paired
+fallback because Watch offline STT is still unimplemented. Hardware execution is
+unverified. Manual URL/token pairing is the reliable LAN configuration fallback;
+automatic Bonjour discovery is not implemented across Docker/native networks.
+
+LAN binding now requires server-side per-user/device credentials. Device principals
+can submit only their assigned watch IDs and cannot read hospital records; operators
+share the hospital board intentionally. Existing anonymous synthetic localhost use
+remains compatible. Authenticated status/correction events record the operator ID.
+HTTP and local storage remain unencrypted; credentials alone do not establish
+patient-data safety or clinical validity.
