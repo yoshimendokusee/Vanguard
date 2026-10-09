@@ -97,3 +97,25 @@ test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor rep
   assert.equal(pick([minor, urgent]).id, urgent.id);
   assert.equal(urgent.triage, 'Minor', 'Original category must remain intact');
 });
+
+test('dashboard board puts every inbound report in exactly one time column and never hides Not sure', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const place = html.match(/  function colOf\(r\) \{[\s\S]*?\n  \}/)[0];
+  const sandbox = { range: 60, minsLeft: (row) => row.m };
+  const colOf = vm.runInNewContext(`${place}\ncolOf`, sandbox);
+  const columns = [0, 1, 2, 3, 4, 5, 'later', 'noeta'];
+  for (const m of [null, -90, -3, 0, 1, 9, 10, 59, 60, 61, 500]) assert.ok(columns.includes(colOf({ m })), `minutes ${m}`);
+  assert.equal(colOf({ m: null }), 'noeta', 'A report without an ETA keeps its own column');
+  assert.equal(colOf({ m: -90 }), 0, 'A report past its ETA counts in the first block');
+  assert.equal(colOf({ m: 9 }), 0);
+  assert.equal(colOf({ m: 10 }), 1);
+  assert.equal(colOf({ m: 59 }), 5);
+  assert.equal(colOf({ m: 60 }), 'later');
+  sandbox.range = 180;
+  assert.equal(colOf({ m: 29 }), 0);
+  assert.equal(colOf({ m: 30 }), 1);
+  assert.equal(colOf({ m: 179 }), 5);
+  assert.equal(colOf({ m: 180 }), 'later');
+  const urgent = vm.runInNewContext(html.match(/  const URGENT = (\[.*?\]);/)[1]);
+  assert.deepEqual([...urgent], ['Immediate', 'Unassessed'], 'Needs attention must keep unassessed reports in view');
+});

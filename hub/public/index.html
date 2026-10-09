@@ -146,8 +146,6 @@
   .rnote .r-raw { color: var(--dim); overflow-wrap: anywhere; padding-bottom: var(--s1); }
   .r-meta { margin-top: var(--s2); color: var(--dim); font-size: 0.8125rem; overflow-wrap: anywhere; text-align: left; }
   .hero-act { display: grid; gap: var(--s1); margin-top: var(--s3); }
-  .due-n { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px var(--s2); font-size: 2.25rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1.1; overflow-wrap: anywhere; }
-  .due-n small { font-size: 0.9375rem; font-weight: 400; color: var(--dim); letter-spacing: 0; }
   .mini-rows { display: grid; gap: var(--s3); }
   .mini { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px var(--s3); align-items: baseline; }
   .mini .name { font-weight: 500; overflow-wrap: anywhere; } .mini .v { font-weight: 600; }
@@ -179,6 +177,8 @@
   /* Settings is its own page: only the header and the settings show, and the patient cards step aside */
   .app[data-view="settings"] :is(.catbar, #sline, #filters, #alert, #view-panel, .note, .search, .left) { display: none; }
   .app:not([data-view="settings"]) #settings { display: none; }
+  /* On the way filters by level inside the board, so the category tab row steps aside there */
+  .app[data-view="inbound"] .catbar { display: none; }
   .settings { padding: var(--s5); gap: var(--s5); }
   @media (min-width: 1181px) { .app[data-view="settings"] .panel-main { grid-column: 2 / -1; } }
   .foot-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dim); margin-bottom: var(--s1); }
@@ -224,29 +224,46 @@
   /* ---------- sections in the main panel ---------- */
   #view-panel { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s5); }
   section[hidden] { display: none; }
-  .cards3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(12.5rem, 100%), 1fr)); gap: var(--s4); margin-top: var(--s3); }
-  .soon-card { position: relative; text-align: left; border: 0; background: transparent; border-radius: var(--r-md); padding: var(--s2) var(--s3) var(--s2) var(--s5); min-height: 88px; display: grid; align-content: center; gap: 2px; }
-  .soon-card::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 6px; border-radius: 3px; background: var(--cac); }
-  .soon-card:hover { background: var(--panel-2); } .soon-card:active { background: var(--line); }
-  .soon-card .t { font-size: 0.8125rem; color: var(--dim); font-weight: 500; }
-  .soon-card .t.late { color: var(--danger); } .soon-card .t.soon { color: var(--warn-fg); }
-  .soon-card b { font-size: 1.0625rem; font-weight: 500; line-height: 1.25; overflow-wrap: anywhere; }
-  .soon-card span.s { color: var(--dim); font-size: 0.875rem; overflow-wrap: anywhere; }
-  .sec-row { display: flex; justify-content: space-between; align-items: center; gap: var(--s3); flex-wrap: wrap; }
-  .ranges { display: flex; flex-wrap: wrap; gap: var(--s2); }
-  .rb { min-width: 56px; min-height: 44px; padding: 0 var(--s3); border: 0; border-radius: var(--r-md); background: var(--soft-bg); color: var(--soft-fg); font-weight: 500; }
+  /* On the way: one row per level, one column per time block, one block per patient */
+  .insight { display: block; width: 100%; min-height: 44px; text-align: left; border: 0; background: var(--panel-2); border-radius: var(--r-lg); padding: var(--s3) var(--s4); font-size: 1.0625rem; line-height: 1.4; overflow-wrap: anywhere; }
+  .insight:hover { background: var(--soft-bg); }
+  .insight b { font-weight: 600; }
+  .insight small { display: block; margin-top: 2px; font-size: 0.8125rem; color: var(--dim); }
+  .insight[hidden] { display: none; }
+  .bctl { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--s3); margin-top: var(--s3); }
+  .bgrp { display: flex; align-items: center; flex-wrap: wrap; gap: var(--s2); }
+  .bgrp .foot-label { margin: 0; }
+  .rb { min-width: 56px; min-height: 44px; padding: 0 var(--s4); border: 0; border-radius: 99px; background: var(--soft-bg); color: var(--soft-fg); font-weight: 500; }
   .rb:hover { filter: brightness(0.96); } .rb:active { transform: scale(0.97); }
   .rb[aria-pressed="true"] { background: var(--sel-bg); color: var(--sel-fg); }
-  .chart { margin-top: var(--s3); min-height: 120px; }
-  .chart svg { display: block; width: 100%; height: auto; overflow: visible; }
-  .chart .ax { fill: var(--dim); font-size: 12px; font-family: inherit; }
-  .chart .gl { stroke: var(--line); stroke-width: 1; }
-  .empty-chart { padding: var(--s6) var(--s4); text-align: center; color: var(--dim); background: var(--panel-2); border-radius: var(--r-lg); }
-  .legend2 { display: flex; flex-wrap: wrap; gap: var(--s2) var(--s5); align-items: center; margin-top: var(--s2); font-size: 0.875rem; color: var(--dim); }
-  .legend2 span { display: inline-flex; align-items: center; gap: var(--s2); }
-  .legend2 .ln { display: inline-block; width: 28px; height: 0; border-top: 3px solid var(--head); }
-  .legend2 .ln.imm { border-top: 3px dashed var(--danger); }
-  .legend2[hidden] { display: none; }
+  .bscroll { margin-top: var(--s3); overflow-x: auto; border-radius: var(--r-lg); }
+  .board { display: grid; grid-template-columns: 8.5rem repeat(var(--cols, 6), minmax(4.25rem, 1fr)); gap: 6px; min-width: min-content; background: var(--panel-2); border-radius: var(--r-lg); padding: var(--s3); }
+  .hc { border: 0; background: transparent; border-radius: var(--r-sm); min-height: 32px; font-size: 0.8125rem; font-weight: 500; color: var(--dim); text-align: center; }
+  .hc:hover { background: var(--soft-bg); }
+  .hc[aria-pressed="true"] { background: var(--panel); color: var(--text); font-weight: 700; }
+  .hu { align-self: end; padding-bottom: 6px; font-size: 0.75rem; color: var(--dim); }
+  .hu, .rlab { position: sticky; left: 0; z-index: 1; background: var(--panel-2); } /* level names stay visible while the board scrolls sideways */
+  .rlab { display: grid; align-content: center; min-width: 0; padding-right: var(--s2); }
+  .rlab .r { display: flex; align-items: center; gap: 7px; font-size: 0.875rem; font-weight: 600; line-height: 1.3; color: var(--cfg, var(--text)); }
+  .rlab .r .shape { color: var(--cac, var(--text)); }
+  .rlab small { padding-left: 17px; font-size: 0.75rem; line-height: 1.3; color: var(--dim); }
+  .rlab.tot small { padding-left: 0; }
+  .bcell { min-height: 60px; padding: 6px; border: 2px solid transparent; border-radius: var(--r-md); background: var(--panel); display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 3px; color: var(--dim); }
+  .bcell:hover { filter: brightness(0.96); }
+  .bcell.z { background: transparent; border: 2px dashed var(--line); }
+  .bcell[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--panel-2), 0 0 0 5px var(--accent); }
+  .bcell.t { min-height: 36px; border-color: transparent; background: transparent; font-size: 1.125rem; font-weight: 700; color: var(--text); align-content: center; }
+  .bcell.t.z { border: 0; font-weight: 400; color: var(--dim); }
+  .bcell.t[aria-pressed="true"] { background: var(--panel); box-shadow: none; }
+  .blk { flex: none; width: 16px; height: 16px; display: grid; place-items: center; border: 2px solid var(--cac); border-radius: 5px; background: var(--cbg); color: var(--cfg); }
+  .blk .shape { width: 7px; height: 7px; }
+  .blk.Unassessed { border-style: dashed; }
+  .plus { align-self: center; padding-left: 2px; font-size: 0.75rem; font-weight: 700; color: var(--dim); }
+  .fold { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s3); padding: var(--s1) var(--s1) var(--s1) var(--s4); background: var(--panel-2); border-radius: var(--r-md); color: var(--dim); font-size: 0.875rem; }
+  .fold[hidden] { display: none; }
+  .bkey { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s4); margin-top: var(--s2); font-size: 0.8125rem; color: var(--dim); }
+  .bkey > span { display: inline-flex; align-items: center; gap: 6px; }
+  .item[aria-current="true"] { box-shadow: inset 0 0 0 2px var(--accent); }
 
   /* ---------- buttons ---------- */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 44px; padding: var(--s2) var(--s4); border-radius: var(--r-md); font-weight: 600; border: 1px solid var(--dim); background: transparent; color: var(--text); white-space: nowrap; }
@@ -260,7 +277,7 @@
   .btn:disabled { background: var(--panel-2); border-color: var(--panel-2); color: var(--dim); transform: none; }
   .btn.loading { pointer-events: none; }
   .btn.loading::before { content: ""; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin .7s linear infinite; }
-  .railbtn, .link, .search input, .search .x, .tab, .fchip, .btn, .seg button, .switch, .item, .ck, .rnote summary, .soon-card, .rb {
+  .railbtn, .link, .search input, .search .x, .tab, .fchip, .btn, .seg button, .switch, .item, .ck, .rnote summary, .rb, .insight, .hc, .bcell {
     transition: background-color var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
   }
   @keyframes spin { to { transform: rotate(360deg); } }
@@ -311,15 +328,14 @@
     .railbtn svg { width: 26px; height: 26px; }
     .hero { order: 1; margin: var(--s3) var(--s3) 0; }
     .panel-main { order: 2; margin: var(--s3); padding: var(--s4); }
-    #due { order: 3; margin: 0 var(--s3); }
-    #prep { order: 4; margin: 0 var(--s3) var(--s3); }
+    #prep { order: 3; margin: 0 var(--s3) var(--s3); }
   }
   @media (max-width: 1180px) and (min-width: 600px) and (orientation: landscape) {
     .app, .app[data-view="settings"] { grid-template-columns: 6.75rem minmax(0, 1fr); align-content: normal; }
     .rail { justify-content: center; position: sticky; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-y: auto; order: 0; grid-column: 1; grid-row: 1 / span 12; flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: var(--s3); border-radius: var(--r-2xl); padding: var(--s5) var(--s2); gap: var(--s5); }
     .vtabs { order: 0; flex: none; grid-template-columns: none; }
     .railbtn { min-height: 88px; border-radius: 999px; }
-    .hero, .panel-main, #due, #prep { grid-column: 2; }
+    .hero, .panel-main, #prep { grid-column: 2; }
   }
   @media (max-height: 720px) and (min-width: 600px) and (orientation: landscape) {
     .vtabs { gap: var(--s2); }
@@ -369,7 +385,6 @@
 
   <aside class="left" aria-label="Next patient and teams">
     <section class="card hero" id="hero" aria-labelledby="hero-h"></section>
-    <section class="card" id="due"></section>
     <section class="card" id="prep"></section>
   </aside>
 
@@ -411,24 +426,24 @@
     <div id="alert"></div>
 
     <div id="view-panel" role="tabpanel" aria-labelledby="tab-inbound">
-      <section id="soon-sec" aria-labelledby="soon-h" hidden>
-        <h2 class="sec-title" id="soon-h">Coming up</h2>
-        <div class="cards3" id="soon"></div>
-      </section>
-      <section id="curve-sec" aria-labelledby="curve-h" hidden>
-        <div class="sec-row">
-          <h2 class="sec-title" id="curve-h">Arrivals curve</h2>
-          <div class="ranges" role="group" aria-label="Chart range">
-            <button class="rb" data-r="15" type="button" aria-pressed="false">15 min</button>
-            <button class="rb" data-r="30" type="button" aria-pressed="false">30 min</button>
-            <button class="rb" data-r="60" type="button" aria-pressed="true">1 h</button>
-            <button class="rb" data-r="180" type="button" aria-pressed="false">3 h</button>
+      <section id="board-sec" aria-labelledby="board-h" hidden>
+        <h2 class="sr-only" id="board-h">Arrivals by level and time</h2>
+        <button class="insight" id="insight" type="button"></button>
+        <div class="bctl">
+          <div class="bgrp" role="group" aria-label="Which patients">
+            <span class="foot-label">Show</span>
+            <button class="rb" data-s="all" type="button" aria-pressed="true">Everyone</button>
+            <button class="rb" data-s="urgent" type="button" aria-pressed="false">Needs attention</button>
+          </div>
+          <div class="bgrp" role="group" aria-label="Look ahead">
+            <span class="foot-label">Look ahead</span>
+            <button class="rb" data-r="60" type="button" aria-pressed="true">1 hour</button>
+            <button class="rb" data-r="180" type="button" aria-pressed="false">3 hours</button>
           </div>
         </div>
-        <div class="chart" id="curve"></div>
-        <div class="legend2" id="curve-legend" hidden>
-          <span><i class="ln"></i>All patients</span><span><i class="ln imm"></i>Immediate</span><span id="curve-note"></span>
-        </div>
+        <div class="bscroll"><div class="board" id="board" role="group" aria-label="Patients by level and time. Use the left and right arrow keys to change the time."></div></div>
+        <div class="fold" id="fold" hidden></div>
+        <div class="bkey"><span><i class="blk Immediate"><i class="shape Immediate"></i></i>One block is one patient</span><span id="bnote"></span></div>
       </section>
       <section aria-labelledby="list-h">
         <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
@@ -481,8 +496,9 @@
   let cat = null;
   let query = '';
   let sel = null; // report the user picked; null selects the highest provisional priority
-  let range = 60; // arrivals curve window, in minutes
-  let lastInbound = [], curveW = 0;
+  let range = 60; // board look-ahead, in minutes (60 or 180)
+  let show = 'all'; // On the way board: all | urgent (Immediate and Not sure)
+  let bsel = null; // board column the user picked (0-5, 'later' or 'noeta'); null follows the soonest column with patients
   let loadState = 'loading'; // loading | ok | error
   let retrying = false;
   const PAGE = 50;
@@ -494,6 +510,7 @@
   let ready = {}; // readiness ticks per report id, kept in this browser only
   try {
     soundOn = localStorage.getItem('sound') === '1';
+    show = localStorage.getItem('show') === 'urgent' ? 'urgent' : 'all';
     themePref = localStorage.getItem('theme') || 'auto';
     ready = JSON.parse(localStorage.getItem('ready') || '{}') || {};
   } catch (_) {}
@@ -636,10 +653,15 @@
 
   // ---------- derived data ----------
   const inView = () => rows.filter((r) => view === 'all' || r.status === view);
+  const matches = (r, q) => !q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q);
   function visible() {
     const q = query.trim().toLowerCase();
-    return inView().filter((r) => (!cat || category(r) === cat) &&
-      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q)));
+    return inView().filter((r) => (!cat || category(r) === cat) && matches(r, q));
+  }
+  // On the way ignores the category tabs: the board's own Show control and rows do that job.
+  function inboundList() {
+    const q = query.trim().toLowerCase();
+    return inView().filter((r) => matches(r, q));
   }
   function priorityPatient(list) {
     const live = list.filter((r) => category(r) !== 'Deceased');
@@ -687,17 +709,15 @@
     const inbound = rows.filter((r) => r.status === 'inbound');
     announceStatus(inbound);
     renderNav();
-    const list = loadState === 'loading' ? [] : visible();
+    const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : visible();
     renderSummary(inbound, list);
     renderCats();
     renderFilters();
     renderAlert();
     const hero = heroOf(list);
     renderHero(hero, list);
-    renderSoon(list, hero.r);
-    renderCurve(inbound);
-    renderList(list, hero.r);
-    renderDue(inbound);
+    const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
+    renderList(board || list, hero.r);
     renderPrep(inbound);
     for (const r of rows) seen.add(r.id);
     if (loadState === 'ok') firstLoad = false;
@@ -722,7 +742,7 @@
   function renderSummary(inbound, list) {
     const s = $('sline');
     if (loadState === 'loading') { s.textContent = 'Loading reports'; return; }
-    if (view === 'inbound' && !cat && !query.trim()) {
+    if (view === 'inbound' && !query.trim()) {
       const total = patients(inbound), need = patients(inbound.filter((r) => category(r) === 'Immediate'));
       s.textContent = total
         ? `${plural(total, 'patient')} on the way, ${num(need)} ${need === 1 ? 'needs' : 'need'} care right away`
@@ -731,7 +751,7 @@
     }
     const q = query.trim();
     const bits = [VIEW_TITLE[view]];
-    if (cat) bits.push(LABEL[cat]);
+    if (cat && view !== 'inbound') bits.push(LABEL[cat]);
     if (q) bits.push(`matching “${q.length > 24 ? q.slice(0, 23) + '…' : q}”`);
     s.textContent = `Showing ${bits.join(', ')}: ${plural(list.length, 'report')}, ${plural(patients(list), 'patient')}`;
   }
@@ -905,97 +925,180 @@
   }
   function pick(r) { sel = r.id; render(); $('hero-h').focus({ preventScroll: true }); $('hero').scrollIntoView({ block: 'nearest' }); }
 
-  // Three cards for the patients after the big one, each with a coloured side bar
-  function renderSoon(list, heroReport) {
-    const sec = $('soon-sec'), box = $('soon');
-    const cards = list.filter((r) => r.status === 'inbound' && category(r) !== 'Deceased' && (!heroReport || r.id !== heroReport.id))
-      .sort((a, b) => RANK[category(a)] - RANK[category(b)] || (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity)).slice(0, 3);
-    sec.hidden = view !== 'inbound' || loadState === 'loading' || !cards.length;
-    box.replaceChildren();
-    for (const r of cards) {
-      const w = whenText(r);
-      const b = el('button', `soon-card ${category(r)}`);
-      b.type = 'button';
-      b.dataset.fk = 'soon:' + r.id;
-      b.append(el('span', `t ${w.c}`, `${LABEL[category(r)]} · ${w.t}`), el('b', '', r.injuries), el('span', 's', `${noun(r)} · ${r.location}`));
-      b.onclick = () => pick(r);
-      box.append(b);
+  // ---------- On the way board ----------
+  // One row per level, one column per time block, one block per patient. Choosing a column lists
+  // its reports below. Reports with no ETA, or later than the look-ahead, get their own columns
+  // so nothing falls off the board. Display only: priority and categories are untouched.
+  const URGENT = ['Immediate', 'Unassessed'];
+  const BLOCKS = 8; // patients drawn per cell before "+N"
+  const unit = () => (range === 60 ? 10 : 0.5);
+  const unitName = () => (range === 60 ? 'min' : 'h');
+  // 10-minute blocks read as "10 to 20 min"; 30-minute blocks as "30 min to 1 h"
+  const phrase = (i) => (range === 60 ? `${num(i * 10)} to ${num((i + 1) * 10)} min` : `${i ? fmtDur(i * 30) : '0'} to ${fmtDur((i + 1) * 30)}`);
+  const joinAnd = (a) => (a.length < 2 ? a.join('') : `${a.slice(0, -1).join(', ')} and ${a[a.length - 1]}`);
+  let boardTitle = '';
+  let boardEmpty = { t: 'No one is on the way', p: 'Reports appear here as soon as a rescue watch reaches this network.' };
+  let boardKeys = [], boardCur;
+
+  function colOf(r) {
+    const m = minsLeft(r);
+    if (m === null) return 'noeta';
+    if (m >= range) return 'later';
+    return Math.max(0, Math.min(5, Math.floor(m / (range / 6)))); // anyone due or past ETA counts in the first block
+  }
+  const colLabel = (k) => (k === 'later' ? 'Later' : k === 'noeta' ? 'No ETA' : `${num(k * unit())}–${num((k + 1) * unit())}`);
+  const colPhrase = (k) => (k === 'later' ? `later than ${range === 60 ? '1 hour' : '3 hours'}` : k === 'noeta' ? 'with no ETA' : `in ${phrase(k)}`);
+  function nextText(list) {
+    const m = list.map((r) => minsLeft(r)).filter((x) => x !== null);
+    if (!m.length) return '';
+    const n = Math.min(...m);
+    return n > 1 ? `next in ${fmtDur(n)}` : n >= -2 ? 'next now' : `${fmtDur(-n)} past ETA`;
+  }
+  function selectCol(k) { bsel = k; limit = PAGE; render(); }
+
+  function blocksInto(cell, rs, c) {
+    let left = BLOCKS;
+    for (const r of rs) for (let i = 0; i < r.patient_count && left > 0; i++, left--) {
+      const b = el('span', `blk ${c}`);
+      b.append(shape(c));
+      cell.append(b);
     }
+    const more = patients(rs) - BLOCKS;
+    if (more > 0) cell.append(el('span', 'plus', `+${num(more)}`));
   }
 
-  // Expected arrivals over the next window: a smooth curve for everyone, a dashed one for Immediate
-  const fmtRange = (m) => (m < 60 ? `${Math.round(m)} min` : `${Math.round((m / 60) * 10) / 10} h`);
-  const NS = 'http://www.w3.org/2000/svg';
-  const sv = (tag, attrs, text) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); if (text !== undefined) n.textContent = text; return n; };
-  function smoothPath(pts, floor) {
-    let d = `M${pts[0][0]},${pts[0][1]}`;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
-      const c1y = Math.min(floor, p1[1] + (p2[1] - p0[1]) / 6), c2y = Math.min(floor, p2[1] - (p3[1] - p1[1]) / 6);
-      d += ` C${p1[0] + (p2[0] - p0[0]) / 6},${c1y} ${p2[0] - (p3[0] - p1[0]) / 6},${c2y} ${p2[0]},${p2[1]}`;
-    }
-    return d;
-  }
-  function renderCurve(inbound) {
-    lastInbound = inbound;
-    const sec = $('curve-sec');
+  // Returns the reports in the chosen column for the list below, or null outside On the way.
+  function renderBoard(list) {
+    const sec = $('board-sec');
     sec.hidden = view !== 'inbound';
-    if (sec.hidden) return;
-    document.querySelectorAll('.rb').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.r) === range)));
-    const box = $('curve'), legend = $('curve-legend');
-    box.replaceChildren();
-    if (loadState === 'loading') { box.append(el('div', 'skel')); legend.hidden = true; return; }
-    const N = 12, step = range / N;
-    const all = Array(N).fill(0), imm = Array(N).fill(0);
-    let later = 0, unknown = 0, past = 0;
-    for (const r of inbound) {
-      if (category(r) === 'Deceased') continue;
-      const m = minsLeft(r);
-      if (m === null) { unknown += r.patient_count; continue; }
-      if (m > range) { later += r.patient_count; continue; }
-      if (m <= 0) past += r.patient_count;
-      const i = m <= 0 ? 0 : Math.min(N, Math.ceil(m / step)) - 1; // anyone due or past ETA counts in the first bin
-      all[i] += r.patient_count;
-      if (category(r) === 'Immediate') imm[i] += r.patient_count;
+    if (sec.hidden) return null;
+    document.querySelectorAll('[data-s]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.s === show)));
+    document.querySelectorAll('[data-r]').forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.r) === range)));
+    const insight = $('insight'), board = $('board'), fold = $('fold');
+    board.replaceChildren();
+    fold.hidden = true;
+    $('bnote').textContent = '';
+    if (loadState === 'loading') {
+      insight.hidden = false;
+      insight.replaceChildren(el('span', '', 'Loading reports'));
+      board.append(el('div', 'skel'));
+      return [];
     }
-    const total = all.reduce((a, b) => a + b, 0), immTotal = imm.reduce((a, b) => a + b, 0);
-    $('curve-note').textContent = [past ? `${num(past)} already past ETA, shown at Now` : '', later ? `${plural(later, 'patient')} later than this window` : '', unknown ? `${plural(unknown, 'patient')} with no ETA` : ''].filter(Boolean).join(' · ');
-    legend.hidden = false;
-    if (!total) { box.append(el('div', 'empty-chart', `No arrivals expected in the next ${fmtRange(range)}.`)); return; }
 
-    const W = Math.max(280, Math.floor(box.clientWidth || 600)), H = 220, L = 30, Rt = 12, T = 12, B = 30;
-    curveW = W;
-    const peak = Math.max(...all), ymax = peak <= 4 ? Math.max(2, peak) : Math.ceil(peak / 2) * 2;
-    const x = (i) => L + (i * (W - L - Rt)) / (N - 1), y = (v) => T + (H - T - B) * (1 - v / ymax), floor = y(0);
-    const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H });
-    const bin = (i) => `${i === 0 ? 'Now' : Math.round(i * step)} to ${Math.round((i + 1) * step)} min`;
-    const busiest = all.indexOf(peak);
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', `Expected arrivals over the next ${fmtRange(range)}: ${plural(total, 'patient')}, ${num(immTotal)} Immediate. Busiest window: ${bin(busiest)} with ${plural(peak, 'patient')}.`);
-    for (const v of [0, ymax / 2, ymax]) {
-      svg.append(sv('line', { class: 'gl', x1: L, x2: W - Rt, y1: y(v), y2: y(v) }), sv('text', { class: 'ax', x: L - 8, y: y(v) + 4, 'text-anchor': 'end' }, String(Math.round(v * 10) / 10)));
+    const levels = show === 'urgent' ? URGENT : TRIAGE;
+    const shown = list.filter((r) => levels.includes(category(r)));
+    const hidden = list.filter((r) => !levels.includes(category(r)));
+    const by = new Map([0, 1, 2, 3, 4, 5].map((k) => [k, []]));
+    for (const r of shown) {
+      const k = colOf(r);
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(r);
     }
-    [[0, 'Now', 'start'], [4, `+${fmtRange(range / 3)}`, 'middle'], [8, `+${fmtRange((2 * range) / 3)}`, 'middle'], [N - 1, fmtRange(range), 'end']].forEach(([i, t, a]) => {
-      svg.append(sv('line', { class: 'gl', x1: x(i), x2: x(i), y1: T, y2: H - B }), sv('text', { class: 'ax', x: x(i), y: H - 8, 'text-anchor': a }, t));
-    });
-    const ptsAll = all.map((v, i) => [x(i), y(v)]), ptsImm = imm.map((v, i) => [x(i), y(v)]);
-    const lineAll = smoothPath(ptsAll, floor);
-    svg.append(sv('path', { d: `${lineAll} L${x(N - 1)},${floor} L${x(0)},${floor} Z`, fill: 'var(--soft-bg)', opacity: '0.9' }),
-               sv('path', { d: lineAll, fill: 'none', stroke: 'var(--head)', 'stroke-width': 2.5, 'stroke-linecap': 'round' }));
-    if (immTotal) svg.append(sv('path', { d: smoothPath(ptsImm, floor), fill: 'none', stroke: 'var(--danger)', 'stroke-width': 2.5, 'stroke-dasharray': '7 5', 'stroke-linecap': 'round' }));
-    all.forEach((v, i) => {
-      if (!v) return;
-      const c = sv('circle', { cx: x(i), cy: y(v), r: 4.5, fill: 'var(--head)', stroke: 'var(--panel)', 'stroke-width': 2 });
-      c.append(sv('title', {}, `${bin(i)}: ${plural(v, 'patient')}${imm[i] ? `, ${num(imm[i])} Immediate` : ''}`));
-      svg.append(c);
-    });
-    box.append(svg);
-    const list = el('ul', 'sr-only');
-    all.forEach((v, i) => { if (v) list.append(el('li', '', `${bin(i)}: ${plural(v, 'patient')}${imm[i] ? `, ${num(imm[i])} Immediate` : ''}`)); });
-    box.append(list);
+    boardKeys = [0, 1, 2, 3, 4, 5, 'later', 'noeta'].filter((k) => by.has(k));
+    const filled = (k) => (by.get(k) || []).length > 0;
+    boardCur = boardKeys.includes(bsel) && filled(bsel) ? bsel : boardKeys.find(filled);
+
+    // one sentence: where the busiest block is
+    let bi = null, bt = 0;
+    for (let k = 0; k < 6; k++) { const t = patients(by.get(k)); if (t > bt) { bt = t; bi = k; } }
+    insight.replaceChildren();
+    insight.hidden = !shown.length;
+    if (shown.length) {
+      if (bi === null) {
+        insight.append(el('b', '', `No arrivals in the next ${range === 60 ? 'hour' : '3 hours'}`));
+        insight.append(el('small', '', 'Select to see the rest'));
+        insight.onclick = () => selectCol(boardCur);
+      } else {
+        const imm = patients(by.get(bi).filter((r) => category(r) === 'Immediate'));
+        insight.append('Busiest: ', el('b', '', phrase(bi)), `, ${plural(bt, 'patient')}`);
+        if (imm) insight.append(`, ${num(imm)} ${imm === 1 ? 'needs' : 'need'} care right away`);
+        insight.append(el('small', '', 'Select to jump there'));
+        insight.onclick = () => selectCol(bi);
+      }
+    }
+
+    // empty states
+    if (!list.length) boardEmpty = { t: 'No one is on the way', p: 'Reports appear here as soon as a rescue watch reaches this network.' };
+    else if (!shown.length) boardEmpty = { t: 'No one needs attention right now', p: `${joinAnd(TRIAGE.filter((t) => !levels.includes(t)).map((t) => LABEL[t]))} reports are hidden. Choose Everyone to see them.` };
+    if (!shown.length) {
+      boardTitle = '';
+      if (hidden.length) showFold(fold, hidden, levels);
+      return [];
+    }
+
+    // header row
+    board.style.setProperty('--cols', String(boardKeys.length));
+    board.append(el('span', 'hu', unitName() === 'min' ? 'minutes' : 'hours'));
+    for (const k of boardKeys) {
+      const h = el('button', 'hc', colLabel(k));
+      h.type = 'button';
+      h.dataset.fk = `hc:${k}`;
+      h.dataset.row = 'hc';
+      h.dataset.col = String(k);
+      h.setAttribute('aria-pressed', String(k === boardCur));
+      h.onclick = () => selectCol(k);
+      board.append(h);
+    }
+    // one row per level
+    const cell = (rs, k, rowKey, label, c) => {
+      const n = patients(rs);
+      const b = el('button', `bcell ${c || 't'}${n ? '' : ' z'}`);
+      b.type = 'button';
+      b.dataset.fk = `cell:${rowKey}:${k}`;
+      b.dataset.row = rowKey;
+      b.dataset.col = String(k);
+      b.tabIndex = c && k === boardCur ? 0 : -1; // roving: only the chosen block's cells are tab stops
+      b.setAttribute('aria-pressed', String(k === boardCur));
+      b.setAttribute('aria-label', `${k === 'later' || k === 'noeta' ? colLabel(k) : phrase(k)}, ${label}: ${plural(n, 'patient')}`);
+      if (c) { if (n) blocksInto(b, rs, c); else b.append(el('span', '', '–')); } else b.textContent = n ? num(n) : '–';
+      b.onclick = () => selectCol(k);
+      return b;
+    };
+    for (const lv of levels) {
+      const all = list.filter((r) => category(r) === lv);
+      const lab = el('div', `rlab ${lv}`);
+      const r1 = el('span', 'r');
+      r1.append(shape(lv), document.createTextNode(LABEL[lv]));
+      lab.append(r1, el('small', '', [`${num(patients(all))} in total`, nextText(all)].filter(Boolean).join(' · ')));
+      board.append(lab);
+      for (const k of boardKeys) board.append(cell(by.get(k).filter((r) => category(r) === lv), k, lv, LABEL[lv], lv));
+    }
+    const totLab = el('div', 'rlab tot');
+    totLab.append(el('span', 'r', show === 'all' ? 'Everyone' : 'Shown'), el('small', '', 'patients per block'));
+    board.append(totLab);
+    for (const k of boardKeys) board.append(cell(by.get(k), k, 'tot', 'everyone shown', null));
+
+    if (hidden.length) showFold(fold, hidden, levels);
+    const past = patients(shown.filter((r) => { const m = minsLeft(r); return m !== null && m <= 0; }));
+    if (past) $('bnote').textContent = `${plural(past, 'patient')} past ETA, counted in the first block`;
+
+    // the reports of the chosen column
+    const rs = by.get(boardCur).slice().sort((a, b) => RANK[category(a)] - RANK[category(b)] || (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity));
+    boardTitle = colPhrase(boardCur).replace(/^./, (c) => c.toUpperCase());
+    return rs;
   }
-  // Redraw the curve at the new width (text stays 12 px instead of shrinking with the page)
-  if (window.ResizeObserver) new ResizeObserver(() => { const w = Math.floor($('curve').clientWidth); if (w && Math.abs(w - curveW) > 2) renderCurve(lastInbound); }).observe($('curve'));
+  function showFold(fold, hidden, levels) {
+    fold.hidden = false;
+    fold.replaceChildren(el('span', '', `${joinAnd(TRIAGE.filter((t) => !levels.includes(t)).map((t) => LABEL[t]))} hidden: ${plural(patients(hidden), 'patient')} on the way`));
+    const b = el('button', 'link', 'Show them');
+    b.type = 'button';
+    b.dataset.fk = 'fold';
+    b.onclick = () => setShow('all');
+    fold.append(b);
+  }
+  function setShow(v) { show = v; try { localStorage.setItem('show', v); } catch (_) {} limit = PAGE; render(); }
+  // Arrow keys move between time blocks without leaving the row you are on.
+  $('board').addEventListener('keydown', (e) => {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key) || !e.target.dataset.row) return;
+    const i = boardKeys.findIndex((k) => String(k) === e.target.dataset.col);
+    const n = e.key === 'Home' ? 0 : e.key === 'End' ? boardKeys.length - 1 : Math.max(0, Math.min(boardKeys.length - 1, i + (e.key === 'ArrowRight' ? 1 : -1)));
+    e.preventDefault();
+    const row = e.target.dataset.row;
+    bsel = boardKeys[n];
+    limit = PAGE;
+    render();
+    restoreFocus(row === 'hc' ? `hc:${bsel}` : `cell:${row}:${bsel}`);
+  });
 
   function renderList(list, heroReport) {
     const out = $('list');
@@ -1013,14 +1116,14 @@
 
     if (!list.length) {
       const e = el('div', 'empty');
-      const filtered = cat || query.trim();
+      const filtered = (view !== 'inbound' && cat) || query.trim();
       if (filtered) {
         e.append(el('b', '', 'No reports match'), el('p', '', 'Nothing in this view fits the current filters.'));
         const b = el('button', 'btn', 'Clear filters'); b.type = 'button'; b.dataset.fk = 'clear';
         b.onclick = () => { cat = null; setQuery(''); writeUrl(true); };
         e.append(b);
       } else if (view === 'inbound') {
-        e.append(el('b', '', 'No one is on the way'), el('p', '', 'Reports appear here as soon as a rescue watch reaches this network.'));
+        e.append(el('b', '', boardEmpty.t), el('p', '', boardEmpty.p));
       } else {
         e.append(el('b', '', `No ${view === 'all' ? '' : VIEW_TITLE[view].toLowerCase() + ' '}reports yet`), el('p', '', 'Patients you mark on the On the way view show up here.'));
       }
@@ -1028,10 +1131,11 @@
       return;
     }
 
-    const rest = list.filter((r) => !heroReport || r.id !== heroReport.id);
+    // On the way keeps the card's patient in the list (marked) so the board's counts and the list agree
+    const rest = view === 'inbound' ? list : list.filter((r) => !heroReport || r.id !== heroReport.id);
     const page = rest.slice(0, limit);
     const groups = view === 'inbound'
-      ? [['By provisional priority', () => true]]
+      ? [[boardTitle || 'Patients', () => true]]
       : [[VIEW_TITLE[view], () => true]];
 
     for (const [name, test] of groups) {
@@ -1045,6 +1149,7 @@
         const it = el('button', `item${isNew ? ' fresh' : ''}`);
         it.type = 'button';
         it.dataset.fk = 'item:' + r.id;
+        if (heroReport && r.id === heroReport.id) it.setAttribute('aria-current', 'true');
         const chip = el('span', `chip ${category(r)}`);
         chip.append(shape(category(r)), document.createTextNode(LABEL[category(r)]));
         const who = el('span', 'iw', `${noun(r)}, ${r.injuries}`);
@@ -1061,21 +1166,6 @@
       more.onclick = () => { limit += PAGE; render(); };
       out.append(more);
     }
-  }
-
-  function renderDue(inbound) {
-    const box = $('due');
-    box.replaceChildren(el('h2', '', 'Due within 30 minutes'));
-    if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
-    let soon = 0, late = 0;
-    for (const r of inbound) {
-      if (category(r) === 'Deceased') continue;
-      const m = minsLeft(r);
-      if (m !== null && m <= 30) { soon += r.patient_count; if (m < -2) late += r.patient_count; }
-    }
-    const n = el('div', 'due-n', num(soon));
-    n.append(el('small', '', soon === 1 ? 'patient' : 'patients'));
-    box.append(n, el('p', 'hint', soon ? `${num(late)} past their ETA` : 'No one is due soon'));
   }
 
   function renderPrep(inbound) {
@@ -1143,7 +1233,8 @@
     };
   });
   $('cat-clear').onclick = () => setCat(null);
-  document.querySelectorAll('.rb').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); render(); }; });
+  document.querySelectorAll('.rb[data-r]').forEach((b) => { b.onclick = () => { range = Number(b.dataset.r); bsel = null; render(); }; });
+  document.querySelectorAll('.rb[data-s]').forEach((b) => { b.onclick = () => setShow(b.dataset.s); });
 
   function setQuery(v) { query = v; qInput.value = v; sel = null; limit = PAGE; writeUrl(false); render(); }
   qInput.addEventListener('input', () => { query = qInput.value; sel = null; limit = PAGE; writeUrl(false); render(); });
