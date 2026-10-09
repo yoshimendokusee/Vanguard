@@ -2,7 +2,7 @@ services:
   hub:
     build: .
     ports:
-      - "${HUB_BIND_ADDRESS:-0.0.0.0}:${HUB_PORT:-3000}:3000"
+      - "${HUB_BIND_ADDRESS:-127.0.0.1}:${HUB_PORT:-3000}:3000"
     environment:
       HOSPITAL_NAME: "${HOSPITAL_NAME:-Receiving Hospital · Emergency Department}"
       OLLAMA_URL: "http://ollama:11434"
@@ -12,10 +12,16 @@ services:
       - ./data:/data
       - ../models:/models:ro
     networks: [default, inference]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
     restart: unless-stopped
   ollama:
     image: ollama/ollama:0.11.4@sha256:be17b353bf3cfab0b6980530284e64716a57589ed753a82d9a6a2a5fa9a61a31
-    pull_policy: never
+    pull_policy: missing
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NUM_PARALLEL: "1"
@@ -25,6 +31,12 @@ services:
     entrypoint: ["/bin/sh", "/models/start-ollama.sh"]
     # Internal-only access, with no internet route or host Ollama port.
     networks: [inference]
+    healthcheck:
+      test: ["CMD-SHELL", "ollama show qwen3:0.6b >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 4
     restart: unless-stopped
 networks:
   inference:

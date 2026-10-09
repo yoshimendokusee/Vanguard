@@ -18,6 +18,12 @@ data in isolated development networks only.
 | `GET /api/events` | `200 text/event-stream` | `retry: 2000`; named `triage` events with `{"inserted":n}` or `{"updated":id}`; comments every 20 seconds. Fetch the list on an event; no durable cursor/replay. |
 | `GET /` | Dashboard HTML | Locally served assets; same-origin API/SSE calls. |
 
+Development dashboard access is `http://localhost:3301`; Vite proxies `/api`
+unchanged to the Docker hub on port 3000, including SSE. Legacy/production Express
+serves optimized dashboard assets when `dist` exists, otherwise source assets.
+Native devices keep using the computer's isolated LAN API address/port; their own
+localhost cannot reach the computer. No wire format or acknowledgment changes.
+
 ## Batch request
 
 ```json

@@ -1,15 +1,27 @@
 FROM node:22-bookworm-slim AS dependencies
 WORKDIR /app
-COPY package.json package-lock.json ./
 # The locked better-sqlite3 version compiles a native addon.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends python3 make g++ \
-    && npm ci --omit=dev
+    && rm -rf /var/lib/apt/lists/*
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
 
-FROM node:22-bookworm-slim
+FROM node:22-bookworm-slim AS development
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
+EXPOSE 3301
+CMD ["npm", "run", "dev"]
+
+FROM development AS build
+RUN npm run build && npm prune --omit=dev --no-audit --no-fund
+
+FROM node:22-bookworm-slim AS production
+WORKDIR /app
+COPY --from=build /app/node_modules ./node_modules
+COPY . .
+COPY --from=build /app/dist ./dist
 ENV PORT=3000 DB_PATH=/data/vanguard.db
 VOLUME /data
 EXPOSE 3000

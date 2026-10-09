@@ -142,6 +142,22 @@ jobs:
             --mount "type=bind,source=$PWD/watch/lib,target=/watch/lib,readonly" \
             --mount "type=bind,source=$PWD/models,target=/models,readonly" \
             vanguard-ci:local npm test
+      - name: Real frontend changes over the Vite WebSocket
+        run: |
+          docker build --target development --tag vanguard-dev-ci:local hub
+          docker network create vanguard-dev-ci
+          trap 'docker rm -f vanguard-dev-ci vanguard-api-ci; docker network rm vanguard-dev-ci' EXIT
+          docker run -d --name vanguard-api-ci --network vanguard-dev-ci \
+            --network-alias hub --env DB_PATH=:memory: vanguard-ci:local
+          docker run -d --name vanguard-dev-ci --network vanguard-dev-ci \
+            --publish 127.0.0.1:3301:3301 --env VITE_API_TARGET=http://hub:3000 \
+            --env VITE_USE_POLLING=true \
+            --mount "type=bind,source=$PWD/hub/public,target=/app/public,readonly" \
+            vanguard-dev-ci:local
+          docker run --rm --network container:vanguard-dev-ci \
+            --mount "type=bind,source=$PWD/hub/public,target=/checks/public" \
+            --mount "type=bind,source=$PWD/hub/qa,target=/checks/qa,readonly" \
+            vanguard-dev-ci:local node /checks/qa/hmr-check.cjs
 
   gate:
     name: PR acceptance gate
