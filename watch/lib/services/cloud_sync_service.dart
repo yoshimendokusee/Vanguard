@@ -1,6 +1,9 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../db/triage_db.dart';
+import 'cloud_config.dart';
+
+export 'cloud_config.dart';
 
 Map<String, Object?> cloudReportPayload(TriageRow row, String watchId) => {
   'report_id': row.reportId,
@@ -27,15 +30,8 @@ class CloudSyncService {
   final String? configurationMessage;
 
   static Future<CloudSyncService> initialize() async {
-    if (_url.isEmpty || _anonKey.isEmpty) {
-      return CloudSyncService._(null, 'Cloud sync is not configured');
-    }
-    final projectUri = Uri.tryParse(_url);
-    if (projectUri == null ||
-        projectUri.scheme != 'https' ||
-        projectUri.host.isEmpty) {
-      throw const FormatException('SUPABASE_URL must use HTTPS');
-    }
+    final error = cloudConfigurationError(_url, _anonKey);
+    if (error != null) return CloudSyncService._(null, error);
 
     await Supabase.initialize(url: _url, publishableKey: _anonKey);
     return CloudSyncService._(Supabase.instance.client, null);

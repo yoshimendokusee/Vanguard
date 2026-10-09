@@ -32,6 +32,17 @@ class AiStatus {
   );
 }
 
+/// Allowed observation values, mirroring `hub/risk.js`.
+const aiObservationValues = {
+  'breathing': {'normal', 'abnormal', 'absent', 'unknown'},
+  'consciousness': {'alert', 'unresponsive', 'unknown'},
+  'severeBleeding': {'present', 'absent', 'unknown'},
+  'walking': {'able', 'unable', 'unknown'},
+};
+
+/// Categories the deterministic hub rules can return; never Deceased.
+const _provisionalTriage = {'Immediate', 'Unassessed', 'Delayed', 'Minor'};
+
 class AiObservations {
   const AiObservations({
     required this.breathing,
@@ -45,12 +56,63 @@ class AiObservations {
   final String severeBleeding;
   final String walking;
 
-  static AiObservations fromJson(Map<String, dynamic> json) => AiObservations(
-    breathing: json['breathing'] as String? ?? 'unknown',
-    consciousness: json['consciousness'] as String? ?? 'unknown',
-    severeBleeding: json['severeBleeding'] as String? ?? 'unknown',
-    walking: json['walking'] as String? ?? 'unknown',
-  );
+  /// Missing keys stay unknown; out-of-schema values reject the whole reply.
+  static AiObservations fromJson(Map<String, dynamic> json) {
+    String value(String key) {
+      final v = json[key] ?? 'unknown';
+      if (v is! String || !aiObservationValues[key]!.contains(v)) {
+        throw FormatException('Invalid $key observation');
+      }
+      return v;
+    }
+
+    return AiObservations(
+      breathing: value('breathing'),
+      consciousness: value('consciousness'),
+      severeBleeding: value('severeBleeding'),
+      walking: value('walking'),
+    );
+  }
+}
+
+/// Local Qwen provenance (`processing.provenance.extraction`). Null for the
+/// hub/Ollama path; never fabricated.
+class AiExtractionProvenance {
+  const AiExtractionProvenance({
+    required this.model,
+    required this.revision,
+    required this.runtime,
+    required this.artifactSha256,
+  });
+
+  final String model;
+  final String revision;
+  final String runtime;
+  final String artifactSha256;
+  String get execution => 'local';
+
+  static AiExtractionProvenance? fromJson(Object? json) {
+    if (json == null) return null;
+    String text(String key) {
+      final v = json is Map ? json[key] : null;
+      if (v is! String || v.trim().isEmpty || v.length > 100) {
+        throw FormatException('Invalid extraction $key');
+      }
+      return v;
+    }
+
+    final sha = text('artifactSha256');
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(sha) ||
+        text('execution') != 'local') {
+      throw const FormatException('Extraction must be local with a SHA-256');
+    }
+    return AiExtractionProvenance(
+      model: text('model'),
+      revision: text('revision'),
+      runtime: text('runtime'),
+      artifactSha256: sha,
+    );
+  }
 }
 
 class AiExtraction {
@@ -63,6 +125,7 @@ class AiExtraction {
     required this.provisionalTriage,
     required this.provisionalReason,
     this.draftInjuries,
+    this.extraction,
   });
 
   final String originalTranscript;
@@ -73,6 +136,7 @@ class AiExtraction {
   final String provisionalTriage;
   final String provisionalReason;
   final String? draftInjuries;
+  final AiExtractionProvenance? extraction;
 
   static AiExtraction fromJson(Map<String, dynamic> json) {
     final processing = json['processing'] as Map<String, dynamic>? ?? {};
@@ -80,6 +144,13 @@ class AiExtraction {
     final ev = (json['evidence'] as Map<String, dynamic>?) ?? {};
     final prov = json['provisional'] as Map<String, dynamic>? ?? {};
     final draft = json['draft'] as Map<String, dynamic>?;
+    final provenance = processing['provenance'] as Map<String, dynamic>? ?? {};
+    // Urgency must come from the hub's deterministic rules, flagged advisory.
+    if (!_provisionalTriage.contains(prov['triage']) ||
+        prov['requiresVerification'] != true ||
+        prov['advisoryOnly'] != true) {
+      throw const FormatException('Invalid provisional triage');
+    }
     return AiExtraction(
       originalTranscript: processing['originalTranscript'] as String? ?? '',
       observations: AiObservations.fromJson(obs),
@@ -100,9 +171,10 @@ class AiExtraction {
         for (final w in (json['warnings'] as List? ?? []))
           if (w is String) w,
       ],
-      provisionalTriage: prov['triage'] as String? ?? 'Unassessed',
+      provisionalTriage: prov['triage'] as String,
       provisionalReason: prov['reason'] as String? ?? '',
       draftInjuries: draft?['injuries'] as String?,
+      extraction: AiExtractionProvenance.fromJson(provenance['extraction']),
     );
   }
 }
@@ -181,11 +253,19 @@ class AiService {
           _serverMessage(res.body) ?? 'Invalid AI reply',
         );
       }
-      return AiExtraction.fromJson(decoded);
+      final out = AiExtraction.fromJson(decoded);
+      if (out.originalTranscript != transcript) {
+        throw const FormatException('Transcript was not preserved');
+      }
+      return out;
     } on AiUnavailableException {
       rethrow;
     } on TimeoutException {
       throw AiUnavailableException('Local AI timed out; capture stays local');
+    } on FormatException {
+      throw AiUnavailableException(
+        'Invalid AI reply rejected; capture stays local',
+      );
     } catch (_) {
       throw AiUnavailableException('AI unavailable; capture stays local');
     }

@@ -201,6 +201,12 @@ The Supabase button syncs automatically after local saves made while signed in,
 on app startup when a session exists, and when tapped. It does not run a
 background connectivity watcher.
 
+To configure, build and install in one step from the git-ignored root `.env`
+(`HUB_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`), run
+`cd watch && dart run tool/setup_device.dart --install`. It writes the
+git-ignored `watch/env.json`, builds the APK and installs it on every authorized
+adb device. Use `--build` to skip installing, or no flag to only write `env.json`.
+
 The app requires Dart >= 3.13.2 and < 4; CI pins the locally checked Flutter 3.47.5
 (Dart 3.13.4). An Android SDK is required to build/install. Provision the speech
 asset **before** running the app; missing assets cause `MODEL ERROR` and disable

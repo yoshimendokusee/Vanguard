@@ -106,6 +106,14 @@ Rules every client can rely on:
   claim on-device weights; never invent a revision or checksum.
 - Save through the existing `POST /api/sync-triage` after human review. The AI
   routes never write to SQLite themselves.
+- The Flutter client (`AiService`) re-validates every reply and rejects it as AI
+  unavailable if any of these hold: an observation is outside the enums above, the
+  `provisional.triage` is not `Immediate|Unassessed|Delayed|Minor`, either
+  `requiresVerification` or `advisoryOnly` is not true, `originalTranscript`
+  differs from the sent transcript, or a non-null `extraction` lacks nonblank
+  model/revision/runtime, a 64-lowercase-hex `artifactSha256` and
+  `execution: "local"`. Missing observation keys stay `unknown`. Swift
+  `AiContract` types do not perform these checks yet.
 
 ## Status response
 
