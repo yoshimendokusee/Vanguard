@@ -24,6 +24,8 @@ public actor WatchAudioTranscriber {
 
         var contextParams = whisper_context_default_params()
         contextParams.use_gpu = false
+        // Watch slices are CPU-only; GGML flash attention aborts on this backend.
+        contextParams.flash_attn = false
         guard let context = modelURL.path.withCString({ whisper_init_from_file_with_params($0, contextParams) }) else {
             throw TranscriptionFailure.onDeviceUnavailable
         }
