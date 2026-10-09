@@ -93,12 +93,12 @@ test('the glossary never changes findings or provisional triage', () =>
   }));
 
 test('a glossary meaning cannot launder a model claim into a finding', () =>
-  // "Kinakapos ng hininga" is glossary-mapped to "Shortness of breath", but the transcript
+  // "Mabilis huminga" is glossary-mapped to "Rapid breathing", but the transcript
   // contains no confirmed breathing phrase, so the model's claim must still be dropped.
   withOllama({ observations: { breathing: 'abnormal', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' } }, async (chats) => {
     delete process.env.RAG_ENABLED;
-    const result = await extractEmergency('Kinakapos ng hininga po siya.');
-    assert.match(userMessage(chats[0]), /kinakapos ng hininga = Shortness of breath/);
+    const result = await extractEmergency('Mabilis huminga ang bata.');
+    assert.match(userMessage(chats[0]), /mabilis huminga = Rapid breathing/);
     assert.equal(result.processing.observations.breathing, 'unknown');
     assert.ok(result.warnings.some((w) => /breathing/.test(w)));
     assert.equal(result.provisional.triage, 'Unassessed');

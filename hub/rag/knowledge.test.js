@@ -37,6 +37,17 @@ test('matching ignores case, punctuation and diacritics but needs whole phrases'
   assert.equal(normalize('Pagkahilo, Café'), 'pagkahilo cafe');
 });
 
+test('Tagalog clitic particles inside a phrase do not break retrieval', () => {
+  assert.ok(ids('nahihirapan siyang huminga').includes('shortness-of-breath'));
+  assert.ok(ids('hirap po siya huminga').includes('shortness-of-breath'));
+  assert.ok(ids('hindi po siya makalakad').includes('cannot-walk'));
+  // A content word between phrase words still breaks the match.
+  assert.ok(!ids('nahihirapan matinding huminga').includes('shortness-of-breath'));
+  // A denial right before the phrase still flags it negated.
+  const denied = retrieve(index, 'hindi nahihirapan siyang huminga').find((m) => m.id === 'shortness-of-breath');
+  assert.equal(denied.negated, true);
+});
+
 test('the longest matching phrase is reported and results respect the limit', () => {
   const [match] = retrieve(index, 'malakas na pagdurugo sa braso');
   assert.equal(match.id, 'heavy-bleeding');

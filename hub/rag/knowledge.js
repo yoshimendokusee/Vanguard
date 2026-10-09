@@ -22,6 +22,39 @@ const MAX_QUERY_TOKENS = 200;
 // Words that, directly before a matched phrase, deny it ("no severe bleeding", "hindi nahihilo").
 const NEGATORS = new Set(['no', 'not', 'without', 'denies', 'denied', 'never', 'wala', 'walang', 'hindi', 'di', 'hindi po', 'walang po']);
 
+// Tagalog clitics, linkers and politeness particles may sit inside a reported
+// phrase without changing its claim: "nahihirapan siyang huminga" is still
+// "nahihirapan huminga". Negators and content words are deliberately excluded,
+// so a gap can never absorb a denial or an unrelated word.
+const CLITICS = ['po', 'ho', 'opo', 'oho', 'na', 'ng', 'nang', 'pa', 'ba', 'nga', 'naman', 'lang', 'lamang',
+  'din', 'rin', 'daw', 'raw', 'talaga', 'muna', 'pala', 'yata', 'ulit', 'sana', 'ay', 'yung', 'eh',
+  'ako', 'akong', 'ka', 'kang', 'ko', 'kong', 'mo', 'mong', 'siya', 'siyang', 'niya', 'niyang',
+  'kami', 'kaming', 'tayo', 'tayong', 'kayo', 'kayong', 'sila', 'silang', 'namin', 'nating', 'natin',
+  'nila', 'nilang', 'kaniya', 'kanya', 'kanyang', 'akin', 'atin', 'ating'];
+const MAX_CLITIC_GAP = 4;
+// Regex fragment: required whitespace plus up to MAX_CLITIC_GAP particles.
+const CLITIC_GAP = `\\s+(?:(?:${CLITICS.join('|')})\\s+){0,${MAX_CLITIC_GAP}}`;
+
+const phrasePatterns = new Map();
+function phrasePattern(phrase) {
+  let re = phrasePatterns.get(phrase);
+  if (!re) {
+    const escaped = phrase.split(/\s+/).map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    re = new RegExp(`\\b${escaped.join(CLITIC_GAP)}\\b`, 'i');
+    phrasePatterns.set(phrase, re);
+  }
+  return re;
+}
+
+/**
+ * Span of `phrase` inside `text`, tolerating clitic particles between its words.
+ * The returned quote is always a verbatim transcript substring.
+ */
+function findPhraseSpan(text, phrase) {
+  const m = phrasePattern(phrase).exec(text);
+  return m ? { quote: m[0], start: m.index, end: m.index + m[0].length } : null;
+}
+
 class KnowledgeError extends Error {}
 
 function normalize(text) {
@@ -101,8 +134,9 @@ function loadKnowledge(file = process.env.RAG_KNOWLEDGE_FILE || DEFAULT_FILE) {
 }
 
 /**
- * Entries whose phrase occurs in the text as whole words. FTS5 narrows the
- * candidates; the whole-phrase check keeps "dizzy" from matching inside other words.
+ * Entries whose phrase occurs in the text as whole words, tolerating Tagalog
+ * clitic particles between them ("nahihirapan siyang huminga"). FTS5 narrows the
+ * candidates; the phrase-span check keeps "dizzy" from matching inside other words.
  */
 function retrieve(index, text, { limit = 5 } = {}) {
   if (!index || typeof text !== 'string') return [];
@@ -113,19 +147,22 @@ function retrieve(index, text, { limit = 5 } = {}) {
   const padded = ` ${normalized} `;
   const best = new Map();
   for (const row of index.candidates.all(query)) {
-    if (!padded.includes(` ${row.phrase} `)) continue;
+    const hit = findPhraseSpan(padded, row.phrase);
+    if (!hit) continue;
     const previous = best.get(row.entry_id);
-    if (!previous || row.phrase.length > previous.length) best.set(row.entry_id, row.phrase);
+    if (!previous || hit.end - hit.start > previous.end - previous.start) {
+      best.set(row.entry_id, { matched: row.phrase, start: hit.start, end: hit.end });
+    }
   }
-  // Longest phrases first; a phrase inside an already accepted longer phrase
+  // Longest matched spans first; a phrase inside an already accepted longer phrase
   // ("dibdib" inside "sumasakit ang dibdib") is the same words, not a new finding.
   const accepted = [];
-  for (const [id, matched] of [...best.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))) {
-    const start = padded.indexOf(` ${matched} `);
-    const end = start + matched.length + 2;
-    // Only a strictly longer phrase hides this one; entries sharing the same phrase are all kept.
-    if (accepted.some((a) => start >= a.start && end <= a.end && a.end - a.start > end - start)) continue;
-    accepted.push({ id, matched, start, end });
+  const ranked = [...best.entries()]
+    .sort((a, b) => (b[1].end - b[1].start) - (a[1].end - a[1].start) || a[0].localeCompare(b[0]));
+  for (const [id, hit] of ranked) {
+    // Only a strictly longer span hides this one; entries sharing the same phrase are all kept.
+    if (accepted.some((a) => hit.start >= a.start && hit.end <= a.end && a.end - a.start > hit.end - hit.start)) continue;
+    accepted.push({ id, matched: hit.matched, start: hit.start, end: hit.end });
   }
   return accepted
     .slice(0, Math.max(0, Math.min(limit, 20)))
@@ -143,4 +180,4 @@ function packInfo(index) {
     : null;
 }
 
-module.exports = { KnowledgeError, normalize, validatePack, buildIndex, loadKnowledge, retrieve, packInfo };
+module.exports = { KnowledgeError, normalize, validatePack, buildIndex, loadKnowledge, retrieve, packInfo, findPhraseSpan, CLITIC_GAP };

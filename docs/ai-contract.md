@@ -106,10 +106,13 @@ Rules every client can rely on:
 - `observations` always has all four keys. Allowed values are fixed in
   `hub/risk.js`: breathing `normal|abnormal|absent|unknown`, consciousness
   `alert|unresponsive|unknown`, severeBleeding `present|absent|unknown`,
-  walking `able|unable|unknown`. Anything else becomes `unknown` with a warning.
-- `unknown` never means absent or normal. A non-unknown claim without an exact
-  transcript excerpt becomes `unknown` with a warning. Conflicting statements
-  become `unknown` with a warning.
+  walking `able|unable|unknown`. Unsupported model enums become `unknown`; a
+  supported transcript phrase may independently recover the observation.
+- `unknown` never means absent or normal. Supported explicit transcript phrases
+  can recover an observation when the model misses or mislabels it; the exact
+  excerpt is retained. Negated or conflicting phrases remain `unknown`. A
+  non-unknown claim without an exact transcript excerpt becomes `unknown` with a
+  warning.
 - `provisional` comes from deterministic `assessRisk`, not from the model.
   `requiresVerification` and `advisoryOnly` are always true. The model never
   assigns urgency, declares death, or diagnoses.
@@ -143,11 +146,14 @@ The response lists every match; the prompt gets one meaning per phrase and omits
   source, and may be wrong or incomplete. Where Filipino rescuers normally use the English
   word, the `filipino` field is that English word. Phrases that match ordinary speech
   (for example "back", "yes", "left") are deliberately excluded.
-- Matching is whole-phrase and exact: a misspelling or an unlisted word form will not
-  match. A phrase inside a longer matched phrase is not reported separately; entries that
-  share the same phrase are all returned. At most five terms go into the prompt. The
-  glossary can influence what the model writes, but every finding still needs an exact
-  transcript excerpt, so it cannot add a finding the transcript does not state.
+- Matching is whole-phrase: a misspelling or an unlisted word form will not match, but
+  Tagalog clitics, linkers and politeness particles may appear between a phrase's words
+  without breaking it ("nahihirapan siyang huminga" still matches "nahihirapan huminga").
+  Negators and content words still break the match. A phrase inside a longer matched
+  phrase is not reported separately; entries that share the same phrase are all returned.
+  At most five terms go into the prompt. The glossary can influence what the model writes,
+  but every finding still needs a verbatim transcript excerpt, so it cannot add a finding
+  the transcript does not state.
 - Pack entries may contain only `id, phrases, filipino, english, medicalTerm, category`
   (`category` is symptom, sign, injury, mechanism, condition, anatomy or history);
   urgency, triage or guideline fields are rejected at load, and an invalid pack disables
@@ -161,7 +167,7 @@ The response lists every match; the prompt gets one meaning per phrase and omits
 ## Prefilled report fields
 
 Extraction and triage-assist responses also carry `fields` (`location`, `patientCount`,
-`ageGroup`, `etaMinutes`, `injuries`), `fieldEvidence` (the exact transcript text each value
+`ageGroup`, `etaMinutes`, `symptomDuration`, `injuries`), `fieldEvidence` (the exact transcript text each value
 came from), `fieldNotes`, `locationBasis` (`explicit` for Barangay/Purok/Sitio, `inferred`
 for an "in/sa/near X" guess) and `legacy` (`{ triage, reason, version }`).
 
@@ -172,11 +178,17 @@ for an "in/sa/near X" guess) and `legacy` (`{ triage, reason, version }`).
 - ETA needs an arrival cue next to the minutes ("ETA", "away", "out", "papunta"); a duration
   such as "unconscious for 10 minutes" is not an ETA. Ages map to Infant (under 1 year),
   Child (1-12), Adult (18-59) and Elderly (60+); 13-17 and mixed groups stay unspecified.
+- `symptomDuration` is a separate `{ value, unit }` field, with exact `fieldEvidence`; it
+  requires an onset/duration cue such as "for", "ago", or Tagalog "na" and is never used as ETA.
 - Location is the least reliable field. An inferred location is only a guess and the dashboard
   says so. Roofs, stairs, body parts, hospitals and conditions are rejected, but the reviewer
   must still check it.
 - `injuries` lists the labels from the four validated findings first, then non-denied
   pack terms in the injury, condition, mechanism and symptom categories.
+- The AI processing envelope also saves evidence-backed observations, terminology matches,
+  patient fields, ETA and symptom duration in `processing.findings`. The report detail shows
+  them as **unverified** with transcript excerpts. They do not overwrite the legacy `injuries`
+  field or establish the saved report's clinical priority.
 - `legacy` is the hospital's existing legacy finding rules (`riskForRow`) applied to those
   injury terms as they would be saved with triage `Unassessed`. Those rules can raise urgency
   (for example "Chest pain", "Head injury", "Drowning" are Immediate) but never lower it. It is
@@ -186,9 +198,9 @@ for an "in/sa/near X" guess) and `legacy` (`{ triage, reason, version }`).
   location, patient count, age group and ETA from `fields` (anything the person typed wins, and
   a guessed `inferred` location is shown but not saved), stores that version, then sends it.
   The evidence quote for each filled value is shown. `injuries` is saved as typed, otherwise
-  `Unspecified`: terms found in the transcript are shown as a suggestion with the legacy-rule
-  preview, but are not saved automatically, because the legacy rules can raise urgency and no
-  person reviews the report before it is sent. Turning that on is a decision for a clinician.
+  `Unspecified`: transcript terms remain in the unverified processing findings and are shown
+  as suggestions with the legacy-rule preview, but are not promoted to the legacy field or
+  used to establish priority before a person reviews the report.
 
 ## Draft board setups
 
