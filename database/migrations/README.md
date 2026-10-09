@@ -10,7 +10,7 @@ adding the file does not change a remote database.
 | --- | --- | --- |
 | `watch/` | `../../watch/lib/db/triage_db.dart`: sqflite version 2, `onCreate`, `onUpgrade`, `triage_logs` and `meta` | Version 2 adds stable report UUIDs and independent, owner-scoped cloud-sync state while preserving the hospital queue. |
 | `hub/` | `../../hub/db.js` and `../../hub/migrations/0001_initial_schema.sql` | `openDb` applies numbered SQL migrations transactionally with `PRAGMA user_version`; compatible existing report tables are adopted, and incompatible schemas fail without advancing the version. `0002_clinical_history.sql` adds foreign-key-linked patient/encounter/report histories; its JavaScript backfill runs inside the same transaction. |
-| Cloud: `../../supabase/migrations/` | `../../supabase/migrations/20261009000000_create_triage_reports.sql` | Apply the versioned PostgreSQL migration to the intended Supabase project; local SQLite SQL is not PostgreSQL SQL. |
+| Cloud: `../../supabase/migrations/` | `../../supabase/migrations/20261009000000_create_triage_reports.sql`, then `20261009120000_widen_triage_reports_raw_text.sql` (widens `raw_text` to 16,000 characters) | Apply the versioned PostgreSQL migration to the intended Supabase project; local SQLite SQL is not PostgreSQL SQL. |
 
 Paths in the first column identify each owner; source links are relative to this
 directory. Future hub migration files use `NNNN_description.sql` and are applied

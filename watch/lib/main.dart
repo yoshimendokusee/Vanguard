@@ -64,6 +64,8 @@ class _TriageScreenState extends State<TriageScreen>
   bool _cloudSyncRequested = false;
   bool _cloudClaimRequested = false;
   String? _cloudError;
+  Timer? _cloudRetry;
+  int _cloudFailures = 0;
 
   @override
   void initState() {
@@ -122,6 +124,7 @@ class _TriageScreenState extends State<TriageScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _cloudRetry?.cancel();
     _sync?.dispose();
     _speech.dispose();
     _scroll.dispose();
@@ -227,6 +230,9 @@ class _TriageScreenState extends State<TriageScreen>
     if (state == AppLifecycleState.resumed && _sync != null) {
       unawaited(_sync!.sync());
     }
+    if (state == AppLifecycleState.resumed && _cloud?.currentUser != null) {
+      unawaited(_syncCloud());
+    }
   }
 
   void _syncFinished(SyncOutcome outcome) {
@@ -291,6 +297,8 @@ class _TriageScreenState extends State<TriageScreen>
       return;
     }
 
+    _cloudRetry?.cancel();
+    var cloudOk = false;
     setState(() {
       _cloudSyncing = true;
       _cloudError = null;
@@ -306,6 +314,7 @@ class _TriageScreenState extends State<TriageScreen>
       setState(() {
         _status = sent == 0 ? 'NO CLOUD REPORTS TO SEND' : 'CLOUD SENT $sent';
       });
+      cloudOk = true;
     } catch (error) {
       if (mounted) setState(() => _cloudError = error.toString());
     } finally {
@@ -315,6 +324,17 @@ class _TriageScreenState extends State<TriageScreen>
         if (mounted) setState(() => _cloudError = error.toString());
       }
       if (mounted) setState(() => _cloudSyncing = false);
+      _cloudFailures = cloudOk ? 0 : (_cloudFailures + 1).clamp(0, 4);
+      try {
+        // Offline or failed uploads stay queued in SQLite; retry with backoff.
+        final owned = await db.pendingCloudCount(userId: user.id);
+        if (mounted && owned > 0) {
+          _cloudRetry = Timer(
+            Duration(seconds: 30 * (1 << _cloudFailures)),
+            () => unawaited(_syncCloud()),
+          );
+        }
+      } catch (_) {}
       if (_cloudSyncRequested && mounted) {
         final confirm = _cloudClaimRequested;
         _cloudSyncRequested = false;
