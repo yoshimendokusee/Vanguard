@@ -66,7 +66,6 @@ class TriageDb {
 
   final Database _db;
   final String watchId;
-  int _lastTs = 0;
 
   static Future<TriageDb> open({DatabaseFactory? factory, String? path}) async {
     final dbFactory = factory ?? databaseFactory;
@@ -141,30 +140,38 @@ class TriageDb {
   Future<void> close() => _db.close();
 
   Future<TriageRow> insert(TriageResult r, {String? cloudOwnerId}) async {
-    // Keep timestamps strictly increasing so (watch_id, created_at) stays
-    // unique even if two reports land in the same millisecond.
-    var ts = DateTime.now().millisecondsSinceEpoch;
-    if (ts <= _lastTs) ts = _lastTs + 1;
-    _lastTs = ts;
-    final createdAt = DateTime.fromMillisecondsSinceEpoch(
-      ts,
-      isUtc: true,
-    ).toIso8601String();
     final reportId = _uuid.v4();
-
-    final id = await _db.insert('triage_logs', {
-      'location': r.location,
-      'injuries': r.injuriesText,
-      'triage': r.triage,
-      'patient_count': r.patientCount,
-      'age_group': r.ageGroup,
-      'eta_minutes': r.etaMinutes,
-      'raw_text': r.rawText,
-      'created_at': createdAt,
-      'sync_status': 0,
-      'report_id': reportId,
-      'cloud_owner_id': cloudOwnerId,
-      'cloud_sync_status': 0,
+    late String createdAt;
+    // Read inside the write transaction so restarts and clock rollback cannot reuse an identity.
+    final id = await _db.transaction((txn) async {
+      final latest =
+          (await txn.rawQuery(
+                'SELECT MAX(created_at) AS latest FROM triage_logs',
+              )).single['latest']
+              as String?;
+      var ts = DateTime.now().millisecondsSinceEpoch;
+      if (latest != null) {
+        final previous = DateTime.parse(latest).millisecondsSinceEpoch;
+        if (ts <= previous) ts = previous + 1;
+      }
+      createdAt = DateTime.fromMillisecondsSinceEpoch(
+        ts,
+        isUtc: true,
+      ).toIso8601String();
+      return txn.insert('triage_logs', {
+        'location': r.location,
+        'injuries': r.injuriesText,
+        'triage': r.triage,
+        'patient_count': r.patientCount,
+        'age_group': r.ageGroup,
+        'eta_minutes': r.etaMinutes,
+        'raw_text': r.rawText,
+        'created_at': createdAt,
+        'sync_status': 0,
+        'report_id': reportId,
+        'cloud_owner_id': cloudOwnerId,
+        'cloud_sync_status': 0,
+      });
     });
     return TriageRow(
       id: id,

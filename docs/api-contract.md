@@ -14,7 +14,7 @@ data in isolated development networks only.
 | `GET /api/config` | `200 {"hospital":"<configured name>"}` | `HOSPITAL_NAME` or the default receiving hospital label. |
 | `POST /api/sync-triage` | See below | One SQLite ingest transaction; acknowledges accepted and duplicate reports. |
 | `GET /api/triage` | `200 [<stored row>, ...]` | Includes all statuses; inbound first, then effective hospital priority (Immediate, Unassessed, Delayed, Minor, Deceased); known ETA before unknown, then expected arrival and creation time. Original `triage` is preserved. |
-| `PATCH /api/triage/:id` | `200 {"ok":true}` | Body `{"status":"inbound|arrived|cancelled"}`. `400 {"ok":false,"error":"Bad status"}` or `404 {"ok":false,"error":"Not found"}`. No transition restrictions. |
+| `PATCH /api/triage/:id` | `200 {"ok":true}` | Body `{"status":"inbound|arrived|cancelled"}`. `400 {"ok":false,"error":"Bad status"}` or `404 {"ok":false,"error":"Not found"}`. All three statuses remain reversible; each actual change is recorded atomically as a status event. Repeating the same status adds no event. |
 | `GET /api/events` | `200 text/event-stream` | `retry: 2000`; named `triage` events with `{"inserted":n}` or `{"updated":id}`; comments every 20 seconds. Fetch the list on an event; no durable cursor/replay. |
 | `GET /` | Dashboard HTML | Locally served assets; same-origin API/SSE calls. |
 
@@ -39,21 +39,21 @@ data in isolated development networks only.
 
 | Field | Current validator |
 | --- | --- |
-| `watchId` | Required nonblank string; trimmed and truncated to 64 characters. Self-declared, not authenticated. |
+| `watchId` | Required nonblank string; trimmed, maximum 64 characters; longer values are rejected without truncation. Self-declared, not authenticated. |
 | `reports` | Required array; empty is accepted; maximum 500. |
-| `localId` | Integer used for acknowledgment correlation. Missing/noninteger becomes `null` and is not acknowledged; the report may still be inserted. Positive/unique IDs are not enforced by the hub. |
-| `createdAt` | Must be accepted by JavaScript `Date.parse`; normalized to ISO UTC. Clients send ISO UTC milliseconds. Current validator does not require a strict ISO string type. |
+| `localId` | Positive safe integer if supplied. Missing IDs may be persisted but are not acknowledged. Repeated IDs within a batch reject every ambiguous row; no ambiguous acknowledgment is emitted. |
+| `createdAt` | ISO timestamp string with seconds and explicit Z/offset, optional 1–6 fractional digits; impossible calendar dates are rejected. Normalized to UTC milliseconds for legacy identity. |
 | `triage` | `Immediate`, `Unassessed`, `Delayed`, `Minor`, `Deceased`. |
-| `patientCount` | Integer 1–99; absent defaults to 1. |
+| `patientCount` | Integer 1–99; absent/null retains legacy stored default 1, but `patient_count_known` is false and the submitted unknown is preserved. The dashboard excludes unknown counts from totals. |
 | `ageGroup` | `Infant`, `Child`, `Adult`, `Elderly`, `Unspecified`; absent defaults to `Unspecified`. |
 | `etaMinutes` | Integer 1–720 or `null`; absent defaults to `null`. |
-| `location`, `injuries` | Strings, nonempty after trimming; truncated to 200/300 characters. Injuries is a comma-separated string, not an array. |
-| `rawText` | Optional string; preserved exactly up to 1000 characters, otherwise empty if not a string. Over-limit strings are rejected without ACK to retain the original locally. |
+| `location`, `injuries` | Nonblank strings up to 200/300 characters; over-limit values are rejected, not truncated. Injuries is a comma-separated string, not an array. |
+| `rawText` | Optional string, preserved exactly up to 16,000 characters. Non-strings and over-limit strings are rejected without ACK. If processing is supplied, both original transcripts must match; absent rawText uses the processing original. |
 
-Extra fields are ignored except `processing`, which is explicitly rejected without ACK until the database teammate integrates its durable storage. See `qwen-agent-handoff.md` for the validated integration envelope; it is not yet live ingest capability. `400 {"ok":false,"error":"Expected { watchId, reports: [] }"}`
+Extra fields remain in the original submission snapshot but do not drive clinical logic. Optional `processing` v1 is validated and persisted atomically; optional UUID `reportId` and `encounterId` are described below. `400 {"ok":false,"error":"Expected { watchId, reports: [] }"}`
 rejects an invalid batch envelope. `413 {"ok":false,"error":"Max 500 reports per batch"}`
 rejects too many reports. Express also rejects malformed JSON (`400`) and bodies
-above 1 MB (`413`); those parser errors do not have this API's JSON error shape.
+above 1 MB (`413`); all errors use `{ok:false,error:string}`. Database failures return 503 without internal details or acknowledgments.
 
 ## Batch response and retry semantics
 
@@ -71,15 +71,14 @@ Bad report fields produce `rejected: [{"localId":7,"reason":"invalid triage cate
 within a `200` response; `ok: true` does not mean every row succeeded. Other current
 reasons: `not an object`, `invalid createdAt`, `invalid patientCount`,
 `invalid ageGroup`, `invalid etaMinutes`, `missing location/injuries`,
-`rawText exceeds legacy storage; retain original locally`,
-`processing storage not integrated; retain report locally`, and the identity conflict above.
+`invalid or over-limit rawText; retain original locally`, invalid processing/evidence/provenance, ambiguous local IDs, and identity conflicts.
 
-The identity is `(trimmed/truncated watchId, normalized createdAt)`.
+The identity is `(trimmed watchId, normalized createdAt)`.
 Replay inserts zero rows but returns the duplicate row's supplied `localId` in
-`ackLocalIds`. Immutable normalized report fields are compared on a collision. Identical replays are acknowledged; different content returns `identity conflict: original report differs` without ACK and does not overwrite the original. A database
+`ackLocalIds`. Immutable report fields, validated processing, optional source UUID and explicit encounter links are compared on a collision. Identical replays are acknowledged; different content returns `identity conflict: original report differs` without ACK and does not overwrite the original. A database
 failure rolls back the transaction; it must not be treated as receipt.
 The watch retains rows on a non-200, timeout or decoding/connection failure;
-on 200 it validates the response shape and scopes ACK IDs to the transmitted batch before marking them synced. Contradictory ACK/rejection IDs and malformed responses retain the batch. It still does not independently authenticate the hub. The watch batches at 100 rows and caps encoded bodies at 900 KiB. Over-limit originals remain queued while shorter reports can proceed. Automatic foreground retries run after save, at startup/resume and every 30 seconds on success, with failure backoff of 60/120/240/480 seconds. A manual Retry Now is optional. Rejected rows remain pending and the UI reports an incomplete-sync error. These limitations are recorded in `architecture.md`.
+on 200 it validates the response shape and scopes ACK IDs to the transmitted batch before marking them synced. Contradictory ACK/rejection IDs and malformed responses retain the batch. It still does not independently authenticate the hub. The watch batches at 100 rows and caps encoded bodies at 900 KiB. Originals above 16,000 characters remain queued while other reports can proceed. Byte-aware batching also splits long/multibyte originals below the body limit. Automatic foreground retries run after save, at startup/resume and every 30 seconds on success, with failure backoff of 60/120/240/480 seconds. A manual Retry Now is optional. Rejected rows remain pending and the UI reports an incomplete-sync error. These limitations are recorded in `architecture.md`.
 
 ## Stored dashboard rows
 
@@ -102,8 +101,11 @@ are not implemented.
 
 The original `triage` column remains the source category. `GET /api/triage` adds
 `provisional_triage`, `effective_triage`, `risk_reason`, `rule_version` and
-`requires_verification: true`; no schema change is applied. `riskForRow` computes
-these fields on read. The live rule version is `legacy-findings-v1`.
+`requires_verification: true`, `revision`, `encounter_id`, `source_report_id`,
+`receipt_state: received`, `patient_count_known`, `current_transcript`, `processing`,
+`uncertainties`, `computed_triage` and `clinician_override`. Assessments are stored
+at intake and every clinical revision. Legacy intake uses `legacy-findings-v1`;
+structured assessment uses the existing `provisional-v1` rules.
 
 Exact comma-separated structured findings determine the first matching rule:
 
@@ -121,6 +123,94 @@ is retained in `effective_triage`, including source Unassessed above Delayed/Min
 Automatic rules never declare Deceased. ETA sorting applies within each effective
 priority, and non-inbound rows follow inbound rows. The dashboard uses effective
 priority for counts/color/order while displaying source category, rule and original
-text. Clinical correction/override audit APIs remain blocked on database integration;
-status PATCH remains available. `assessRisk` and `validateProcessing` provide tested
-structured integration utilities, not persisted structured processing yet.
+text. The Evidence and corrections dialog displays persisted history and allows
+transcript corrections and provisional overrides. It preserves an idempotency ID
+while retrying an unchanged edit. Status PATCH remains compatible.
+
+
+## Structured intake and findings
+
+`processing` v1 uses the envelope in `qwen-agent-handoff.md`: exact
+`originalTranscript` (up to 16,000 characters), all four `observations`, up to 30
+`uncertainties` (300 characters each), and STT/extraction `provenance`. Local
+extraction metadata includes model/revision/runtime/artifact SHA-256 and execution
+`local`. There is no production inference runtime here.
+
+Two optional fields extend that envelope without requiring native clients to change:
+
+- `evidence`: map from observation key to `{source, excerpt, contradictory}`.
+  Source is `reported`, `observed` or `model-inferred`; excerpt is nonblank, at
+  most 1,000 characters and an exact substring of the current transcript;
+  contradictory is a required boolean. Unsupported references reject intake.
+- `findings`: up to 100 entries with unique bounded string `id`, `kind`
+  (`symptom|observation|vital|patient|incident`), bounded `name`, `value` (bounded
+  string, finite number or null), optional `unit`, `source`, `excerpt`, and boolean
+  `contradictory`. Source also permits `unavailable`, which requires null value
+  and excerpt. Other findings need exact source excerpts. All findings and revisions
+  are preserved; arbitrary values never become scoring thresholds.
+
+For triage, a non-unknown observation requires a source excerpt and a reported or
+observed source without a contradiction. Conflicting findings with the same
+observation name invalidate that observation. Model-inferred values and **all
+machine extractions** remain unverified claims and become unknown for assessment;
+matching text alone does not prove semantic grounding. A qualified operator can
+submit a separate assessment with non-model provenance after verification. This
+changes provisional classification only; it does not gate automatic submission.
+Missing evidence in older processing envelopes is accepted, preserved, and assessed
+as unknown. Unknown breathing never becomes normal; automatic death declaration
+is unavailable. `assessRisk` uses only the existing prototype rules documented in
+`backend-completion.md`, not a new clinical protocol.
+
+Optional `encounterId` is an offline-generated UUID. An unknown encounter is
+created atomically on its first report; subsequent reports link only by that
+explicit ID. Without it the hub creates a distinct encounter with unknown patient
+identity. Names never merge patients or encounters. Optional `reportId` is a UUID
+stored as additional source identity. Reusing it for another legacy identity is
+rejected. It does not replace `(watch_id, created_at)`; a replay must preserve the
+source UUID presence/value. The current watch sender continues using legacy LAN
+identity; its separate cloud UUID remains unchanged.
+
+## Clinical history endpoints
+
+| Method/path | Result |
+| --- | --- |
+| `GET /api/triage/:id` | Current dashboard row plus immutable `original_submission`, ordered `history`, `events` and current encounter with encounter history. |
+| `POST /api/triage/:id/revisions` | Append and reassess, then return the detailed report. |
+| `POST /api/patients` | Create an explicitly unknown or reported patient using caller UUID `patientId`. Returns latest revision and complete history. |
+| `GET /api/patients/:id` | Current identity and complete history. |
+| `POST /api/patients/:id/revisions` | Append a complete identity snapshot; retains earlier records. |
+| `POST /api/encounters` | Create caller UUID `encounterId`, optional existing `patientId` (or null), and `incident` (bounded text or null). |
+| `GET /api/encounters/:id` | Current encounter and complete history. |
+| `POST /api/encounters/:id/revisions` | Append patient linkage and incident snapshot; never merge encounters. |
+
+All creation/revision writes require UUID `requestId`, nonblank `actor` (max 100)
+and `reason` (max 500). Revisions additionally require `baseRevision`, a nonnegative
+safe integer equal to the current revision; intake/creation starts at revision 0.
+Replaying the same request ID and body is idempotent even after later revisions;
+a changed body or stale base returns 409. Invalid bodies/IDs return 400, missing
+records 404, and database failures 503. Caller UUIDs are normalized to lowercase before identity lookup; actor
+and device labels remain self-declared, with no claim of verified identity.
+
+Patient snapshots require `identityStatus: unknown|reported` and `name: string|null`
+(max 200; unknown requires null). Verified identity is unsupported without trusted
+authentication. Encounter snapshots require `patientId: UUID|null` and
+`incident: string|null` (max 1,000). Creation includes its resource ID; subsequent
+revisions omit it. Each snapshot is immutable, including its original body.
+
+Report revisions require `kind`:
+
+- `correction`: `transcript` (exact string, max 16,000) and optional validated
+  `processing` for that transcript. Clears previous extraction, findings and
+  override before reassessment. Source transcript/category/injuries remain intact.
+- `extraction`: `processing` for the **current** transcript. A mismatched transcript
+  returns 409. Provenance and findings remain traceable to this revision.
+- `override`: `override: Immediate|Unassessed|Delayed|Minor|null`. Null clears it;
+  computed risk/reason remain visible and immutable in assessment history.
+  Deceased override requires a separately defined trusted clinical workflow.
+
+The dashboard is a development interface: overrides are provisional, actor labels
+are unauthenticated and `requires_verification` stays true. There is no mandatory
+pre-send approval. A durable hub receipt means its transaction committed; only the
+client can record that it received the HTTP acknowledgment. It does not establish
+trusted hospital delivery, clinical review or arrival. SQL failures roll back the
+whole batch; per-report validation failures leave only those rows pending.

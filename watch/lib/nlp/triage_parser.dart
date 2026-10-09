@@ -392,7 +392,7 @@ class TriageParser {
       patientCount: _patientCount(tokens),
       ageGroup: _ageGroup(tokens),
       etaMinutes: _etaMinutes(tokens),
-      rawText: transcript.trim(),
+      rawText: transcript,
     );
   }
 

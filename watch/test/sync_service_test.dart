@@ -157,7 +157,7 @@ void main() {
     final marked = <int>[];
     final service = SyncService(
       watchId: 'W-TEST',
-      pending: () async => [row(1, text: 'a' * 1001), row(2)],
+      pending: () async => [row(1, text: 'a' * 16001), row(2)],
       acknowledge: (ids) async => marked.addAll(ids),
       client: MockClient((request) async {
         requests++;
@@ -176,6 +176,38 @@ void main() {
       service.dispose();
     }
   });
+
+  test(
+    'long multibyte transcripts use bounded batches without losing originals',
+    () async {
+      final original = '界' * 16000;
+      final rows = List.generate(100, (i) => row(i + 1, text: original));
+      final marked = <int>[];
+      var requests = 0;
+      final service = SyncService(
+        watchId: 'W-TEST',
+        pending: () async => rows,
+        acknowledge: (ids) async => marked.addAll(ids),
+        client: MockClient((request) async {
+          requests++;
+          expect(
+            utf8.encode(request.body).length,
+            lessThanOrEqualTo(900 * 1024),
+          );
+          final reports = jsonDecode(request.body)['reports'] as List;
+          expect(reports.every((r) => r['rawText'] == original), isTrue);
+          return ack(reports.map((r) => r['localId'] as int).toList());
+        }),
+      );
+      try {
+        expect((await service.sync()).ok, isTrue);
+        expect(requests, greaterThan(1));
+        expect(marked, rows.map((r) => r.id).toList());
+      } finally {
+        service.dispose();
+      }
+    },
+  );
 
   testWidgets('automatic retry recovers a persisted pending row without Send', (
     tester,

@@ -3,17 +3,17 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../db/triage_db.dart';
 
 Map<String, Object?> cloudReportPayload(TriageRow row, String watchId) => {
-      'report_id': row.reportId,
-      'watch_id': watchId,
-      'location': row.location,
-      'injuries': row.injuries,
-      'triage': row.triage,
-      'patient_count': row.patientCount,
-      'age_group': row.ageGroup,
-      'eta_minutes': row.etaMinutes,
-      'raw_text': row.rawText,
-      'created_at': row.createdAt,
-    };
+  'report_id': row.reportId,
+  'watch_id': watchId,
+  'location': row.location,
+  'injuries': row.injuries,
+  'triage': row.triage,
+  'patient_count': row.patientCount,
+  'age_group': row.ageGroup,
+  'eta_minutes': row.etaMinutes,
+  'raw_text': row.rawText,
+  'created_at': row.createdAt,
+};
 
 class CloudSyncService {
   static const _batchSize = 100;
@@ -28,10 +28,7 @@ class CloudSyncService {
 
   static Future<CloudSyncService> initialize() async {
     if (_url.isEmpty || _anonKey.isEmpty) {
-      return CloudSyncService._(
-        null,
-        'Cloud sync is not configured',
-      );
+      return CloudSyncService._(null, 'Cloud sync is not configured');
     }
     final projectUri = Uri.tryParse(_url);
     if (projectUri == null ||
@@ -49,16 +46,16 @@ class CloudSyncService {
 
   Future<void> signIn(String email, String password) async {
     await _requireClient().auth.signInWithPassword(
-          email: email,
-          password: password,
-        );
+      email: email,
+      password: password,
+    );
   }
 
   Future<bool> signUp(String email, String password) async {
     final response = await _requireClient().auth.signUp(
-          email: email,
-          password: password,
-        );
+      email: email,
+      password: password,
+    );
     return response.session != null;
   }
 
@@ -79,10 +76,9 @@ class CloudSyncService {
       final batch = rows.skip(start).take(_batchSize).toList();
       final response = await client
           .from('triage_reports')
-          .upsert(
-            [for (final row in batch) cloudReportPayload(row, db.watchId)],
-            onConflict: 'report_id',
-          )
+          .upsert([
+            for (final row in batch) cloudReportPayload(row, db.watchId),
+          ], onConflict: 'report_id')
           .select('report_id');
 
       final acknowledgedIds = response

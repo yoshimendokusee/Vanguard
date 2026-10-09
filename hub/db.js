@@ -91,38 +91,44 @@ function assertLegacySchema(db) {
 }
 
 function migrate(db) {
-  const migrations = loadMigrations();
-  const currentVersion = db.pragma('user_version', { simple: true });
-  const latestVersion = migrations.at(-1).version;
-  if (currentVersion > latestVersion) {
-    throw new Error(
-      `Hub database version ${currentVersion} is newer than supported version ${latestVersion}`,
-    );
-  }
-
-  const pending = migrations.filter((migration) => migration.version > currentVersion);
-  if (pending.length === 0) {
-    assertLegacySchema(db);
-    return;
-  }
-
   db.transaction(() => {
-    if (currentVersion === 0 && hasTable(db, 'triage_reports')) {
-      assertLegacySchema(db);
+    const migrations = loadMigrations();
+    const currentVersion = db.pragma('user_version', { simple: true });
+    const latestVersion = migrations.at(-1).version;
+    if (currentVersion > latestVersion) {
+      throw new Error(`Hub database version ${currentVersion} is newer than supported version ${latestVersion}`);
     }
-    for (const migration of pending) {
+    if (currentVersion === 0 && hasTable(db, 'triage_reports')) assertLegacySchema(db);
+    for (const migration of migrations.filter((item) => item.version > currentVersion)) {
       db.exec(migration.sql);
+      if (migration.version === 2) require('./clinical').backfillReports(db);
       db.pragma(`user_version = ${migration.version}`);
     }
     assertLegacySchema(db);
-  })();
+    assertClinicalSchema(db);
+  }).immediate();
+}
+
+function assertClinicalSchema(db) {
+  // Prepare against every relationship before accepting a versioned database.
+  db.prepare(`SELECT e.patient_count_known, e.processing_json, e.submitted_json, v.state_json, v.assessment_json,
+    p.name, c.patient_id FROM report_evidence e JOIN report_revisions v ON v.report_id = e.report_id
+    JOIN encounter_revisions c ON c.encounter_id = e.encounter_id LEFT JOIN patient_revisions p ON p.patient_id = c.patient_id LIMIT 0`);
+  if (db.pragma('foreign_key_check').length || db.prepare(`SELECT 1 FROM triage_reports r
+    WHERE NOT EXISTS (SELECT 1 FROM report_evidence e WHERE e.report_id = r.id)
+      OR NOT EXISTS (SELECT 1 FROM report_revisions v WHERE v.report_id = r.id AND v.revision = 0) LIMIT 1`).get()) {
+    throw new Error('Hub clinical history is incomplete; refusing to open database');
+  }
 }
 
 function openDb(file = process.env.DB_PATH || path.join(__dirname, 'data', 'vanguard.db')) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new Database(file);
   try {
+    db.pragma('busy_timeout = 5000');
     db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = FULL');
+    db.pragma('foreign_keys = ON');
     migrate(db);
     return db;
   } catch (error) {

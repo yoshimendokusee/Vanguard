@@ -1,5 +1,11 @@
 # Implementation report — 2026-10-09
 
+> Backend integration update, 2026-10-09: the current request supersedes the
+> database deferral below. Structured intake, SQLite v2, corrections/overrides and
+> patient/encounter history are now implemented. Read `api-contract.md` and
+> `backend-completion.md` for the live contract; remaining Apple/Qwen runtime work
+> is still unimplemented. The material below records the earlier handoff.
+
 Branch: `codex/watch-offline-reporting`. The initial checkout was clean at
 `a18bdcd`. A final fetch found three new UI commits; the branch was safely
 fast-forwarded to `origin/main` at `931ccdc` and the implementation reapplied.

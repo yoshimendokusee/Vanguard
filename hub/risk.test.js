@@ -45,12 +45,12 @@ test('processing contract keeps long original text and rejects incomplete/locali
   assert.deepEqual(validateProcessing({ ...input, provenance: { ...input.provenance, extraction } }).value.provenance.extraction, extraction);
 });
 
-test('unintegrated metadata is not silently discarded or acknowledged', () => {
+test('invalid processing metadata is not silently discarded or acknowledged', () => {
   const db = openDb(':memory:');
   try {
     const result = ingestBatch(db, 'W-TEST', [report({ processing: {} })]);
     assert.deepEqual(result.ackLocalIds, []);
-    assert.match(result.rejected[0].reason, /storage not integrated/);
+    assert.match(result.rejected[0].reason, /invalid processing/);
     assert.equal(db.prepare('SELECT COUNT(*) AS n FROM triage_reports').get().n, 0);
   } finally { db.close(); }
 });
@@ -60,7 +60,7 @@ test('legacy originals are exact; over-limit originals are refused without ACK',
   try {
     const exact = '  Synthetic original with whitespace  ';
     assert.equal(ingestBatch(db, 'W-TEST', [report({ rawText: exact })]).inserted[0].raw_text, exact);
-    const result = ingestBatch(db, 'W-LONG', [report({ rawText: 'a'.repeat(1001) })]);
+    const result = ingestBatch(db, 'W-LONG', [report({ rawText: 'a'.repeat(16001) })]);
     assert.deepEqual(result.ackLocalIds, []);
     assert.match(result.rejected[0].reason, /retain original locally/);
   } finally { db.close(); }

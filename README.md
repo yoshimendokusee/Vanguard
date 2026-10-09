@@ -192,14 +192,14 @@ watch. A companion phone is a target fallback requiring implementation/testing.
 - Current verification and gaps are recorded in the dated
   [reverse-engineering report](docs/reverse-engineering.md). Historical browser/mock
   claims in the old guide do not establish native watch behavior.
-- There are no structured patient-name fields, but transcripts can contain names
+- The hub now supports explicit patient identity revisions; transcripts can also contain names
   or other identifying information. HTTP has no auth/TLS and SQLite is unencrypted.
   Use synthetic development data; access controls and protected storage/transport
   are required before real patient use.
 - Watch sync batches at 100 rows, with bounded bodies and foreground retry/backoff.
-  Background LAN delivery and BLE remain unimplemented; long transcripts await the storage upgrade.
-- A four-hex-digit watch ID and process-local timestamp ordering can collide across
-  devices/restarts/clock rollback. Returned ACK IDs are scoped to sent rows but remain unauthenticated.
+  Background LAN delivery and BLE remain unimplemented; transcripts up to 16,000 characters use bounded byte-aware batches.
+- A four-hex-digit watch ID can collide across devices; timestamps now advance from
+  the persisted maximum inside the SQLite transaction after restart/clock rollback. Returned ACK IDs are scoped to sent rows but remain unauthenticated.
 - Watch v2 and hub baseline migrations upgrade SQLite in place; Supabase migration application is separate.
 - Air-gapped devices have no NTP: ETA countdowns depend on the watch clock and are approximate.
 - This is a hackathon prototype, not a validated clinical triage tool.
@@ -222,3 +222,15 @@ Current delivery and teammate instructions:
 For an isolated synthetic QA hospital use `hub/compose.qa.yaml` (localhost:3301);
 normal root and legacy Compose data paths remain unchanged.
 - Cloud reports captured while signed out or before v2 require explicit owner assignment before upload.
+
+
+## Backend integration
+
+Hub SQLite v2 persists original evidence, structured findings/provenance,
+patient/encounter revisions, provisional assessment history, corrections and
+operator overrides. The existing dashboard exposes Evidence and corrections;
+automatic LAN submission still follows local save without a manual gate.
+Read [the API contract](docs/api-contract.md) and
+[backend completion report](docs/backend-completion.md) for the schema, audited
+execution paths, performed checks and limitations. No new dependencies or native
+Apple apps/model runtime were introduced. Use synthetic isolated development only.

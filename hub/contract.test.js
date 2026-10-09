@@ -97,3 +97,15 @@ test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor rep
   assert.equal(pick([minor, urgent]).id, urgent.id);
   assert.equal(urgent.triage, 'Minor', 'Original category must remain intact');
 });
+
+test('dashboard excludes unknown counts and invalidated findings from readiness suggestions', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const count = html.match(/  const countOf = .*;/)[0];
+  const sum = html.match(/  const patients = .*;/)[0];
+  const checkCounts = vm.runInNewContext(`${count}\n${sum}\npatients`, {});
+  assert.equal(checkCounts([{ patient_count: 1, patient_count_known: false }, { patient_count: 2, patient_count_known: true }]), 2);
+  const readiness = html.match(/  const readyItems = \(r\) => \{[\s\S]*?\n  \};/)[0];
+  const checkReadiness = vm.runInNewContext(`${readiness}\nreadyItems`, { needsOf: () => ['Blood / OR'] });
+  assert.equal(checkReadiness({ source_findings_current: false, age_group: 'Child' }).length, 0);
+  assert.equal(checkReadiness({ source_findings_current: true, age_group: 'Child' }).length, 2);
+});

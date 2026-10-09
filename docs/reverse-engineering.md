@@ -1,5 +1,10 @@
 # Vanguard repository audit and foundation
 
+> Backend update, 2026-10-09: `backend-completion.md` supersedes the database and
+> structured-processing gaps below for the current working tree. It records the
+> new workflows, performed checks and remaining clinical/platform limitations.
+> Earlier dated observations below are historical evidence.
+
 Date: 2026-10-09, Asia/Manila. Repository: `/Users/baronjoya/Vanguard`.
 Baseline: `6ef35c4` (`Initial commit: Vanguard-Wrist offline medical triage MVP`).
 Initial state: clean `main`, tracking `origin/main`. Work is uncommitted on
