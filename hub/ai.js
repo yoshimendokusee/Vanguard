@@ -19,11 +19,42 @@
  * - Raw transcripts are never logged; only lengths and error codes are logged.
  */
 
-const { assessRisk, validateObservations } = require('./risk');
+const { assessRisk, validateObservations, riskForRow } = require('./risk');
+const { extractReportFields } = require('./intake');
 const { verifyModel } = require('./model');
 const { isIP } = require('node:net');
+const { loadKnowledge, retrieve, packInfo } = require('./rag/knowledge');
 
-const PROMPT_VERSION = 'vanguard-extract-v1';
+const PROMPT_VERSION = 'vanguard-extract-v2';
+
+// Offline terminology retrieval is optional context: a missing or invalid pack
+// must never block extraction, so failures fall back to no glossary.
+let knowledge;
+function knowledgeIndex() {
+  if (process.env.RAG_ENABLED === '0') return null;
+  if (knowledge === undefined) {
+    try { knowledge = loadKnowledge(); }
+    catch (error) { knowledge = null; console.log(`[rag] disabled: ${error.message}`); }
+  }
+  return knowledge;
+}
+
+function glossaryFor(transcript) {
+  const index = knowledgeIndex();
+  const found = index ? retrieve(index, transcript) : [];
+  // The prompt gets one meaning per phrase and never a denied one ("no severe
+  // bleeding"); the response keeps every match, flagged, for the reviewer.
+  const seen = new Set();
+  const matches = found.filter((m) => {
+    if (m.negated || seen.has(m.matched)) return false;
+    seen.add(m.matched);
+    return true;
+  });
+  return {
+    matches,
+    retrieval: index ? { ...packInfo(index), matches: found } : null,
+  };
+}
 
 function aiConfig() {
   const ollamaUrl = (process.env.OLLAMA_URL || 'http://127.0.0.1:11434').replace(/\/+$/, '');
@@ -210,7 +241,14 @@ function toValidatedExtraction(modelJson, transcript) {
   return { observations, evidence, uncertainties: uncertainties.slice(0, 30), warnings: warnings.slice(0, 10) };
 }
 
-async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl = fetch } = {}) {
+/** Reference-only term translations; never evidence of a finding. */
+function glossaryNote(glossary) {
+  if (!glossary.length) return '';
+  const lines = glossary.map((g) => `- ${g.matched} = ${g.english}`);
+  return `\nReference glossary (word meanings only, not patient evidence; do not infer findings from it):\n${lines.join('\n')}`;
+}
+
+async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl = fetch, glossary = [] } = {}) {
   const cfg = aiConfig();
   const url = `${ollamaUrl || cfg.ollamaUrl}/api/chat`;
   const controller = new AbortController();
@@ -227,7 +265,7 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
         format: 'json',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: `Transcript (untrusted quoted speech, Tagalog/English/Taglish):\n"""${transcript}"""` },
+          { role: 'user', content: `Transcript (untrusted quoted speech, Tagalog/English/Taglish):\n"""${transcript}"""${glossaryNote(glossary)}` },
         ],
         options: { temperature: 0, num_predict: 128 },
       }),
@@ -268,10 +306,22 @@ async function callOllama(transcript, { timeoutMs, model, ollamaUrl, fetchImpl =
  * Full pipeline: validate input -> Ollama -> validate + ground ->
  * deterministic provisional triage (advisory only).
  */
+function injuryLabels(o) {
+  const injuries = [];
+  if (o.breathing === 'absent') injuries.push('Not breathing');
+  else if (o.breathing === 'abnormal') injuries.push('Difficulty breathing');
+  if (o.consciousness === 'unresponsive') injuries.push('Unconscious');
+  if (o.severeBleeding === 'present') injuries.push('Severe bleeding');
+  if (o.walking === 'unable') injuries.push('Non-ambulatory');
+  if (o.walking === 'able') injuries.push('Ambulatory');
+  return injuries;
+}
+
 async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const cfg = aiConfig();
   const manifest = await localModel(opts.fetchImpl || fetch, opts);
-  const raw = await callOllama(transcript, { ...opts, model: opts.model || cfg.model, ollamaUrl: opts.ollamaUrl || cfg.ollamaUrl });
+  const { matches, retrieval } = glossaryFor(transcript);
+  const raw = await callOllama(transcript, { ...opts, glossary: matches, model: opts.model || cfg.model, ollamaUrl: opts.ollamaUrl || cfg.ollamaUrl });
   const modelJson = extractJsonObject(raw);
   const { observations, evidence, uncertainties, warnings } = toValidatedExtraction(modelJson, transcript);
   const device = cleanDevice(provenanceInput.device);
@@ -291,10 +341,20 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
     },
   };
   const provisional = assessRisk(observations);
+  const intake = extractReportFields(transcript, knowledgeIndex(), injuryLabels(observations));
+  // What the hospital's existing legacy finding rules say about these injury terms.
+  // Preview only: only an explicit Save stores anything, and higher urgency is never lowered.
+  const legacy = riskForRow({ injuries: intake.fields.injuries, triage: 'Unassessed' });
   return {
     processing,
     evidence,
     warnings,
+    retrieval,
+    fields: intake.fields,
+    fieldEvidence: intake.evidence,
+    fieldNotes: intake.notes,
+    locationBasis: intake.locationBasis,
+    legacy: { triage: legacy.effective_triage, reason: legacy.risk_reason, version: legacy.rule_version },
     provisional: { ...provisional, requiresVerification: true, advisoryOnly: true },
     model: opts.model || cfg.model,
     promptVersion: cfg.promptVersion,
@@ -304,18 +364,10 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
 async function triageAssist(transcript, provenanceInput = {}, opts = {}) {
   const result = await extractEmergency(transcript, provenanceInput, opts);
   // Draft mapping into the legacy report vocabulary (deterministic, reviewable).
-  const injuries = [];
-  const o = result.processing.observations;
-  if (o.breathing === 'absent') injuries.push('Not breathing');
-  else if (o.breathing === 'abnormal') injuries.push('Difficulty breathing');
-  if (o.consciousness === 'unresponsive') injuries.push('Unconscious');
-  if (o.severeBleeding === 'present') injuries.push('Severe bleeding');
-  if (o.walking === 'unable') injuries.push('Non-ambulatory');
-  if (o.walking === 'able') injuries.push('Ambulatory');
   return {
     ...result,
     draft: {
-      injuries: injuries.length ? injuries.join(', ') : 'Unspecified',
+      injuries: result.fields.injuries,
       triage: result.provisional.triage, // provisional only; clinician must confirm
       provisional: true,
     },
@@ -416,4 +468,7 @@ module.exports = {
   aiStatus,
   aiHealth,
   localModel,
+  glossaryFor,
+  glossaryNote,
+  knowledgeIndex,
 };

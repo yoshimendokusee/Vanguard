@@ -106,6 +106,10 @@
           <label>Age group <select id="ai-age"><option>Infant</option><option>Child</option><option>Adult</option><option>Elderly</option><option selected>Unspecified</option></select></label>
           <label>ETA (min) <input id="ai-eta" type="number" min="1" max="720" placeholder="—"></label>
         </div>
+        <div class="ai-grid">
+          <label>Injuries and reported terms <input id="ai-injuries" type="text" maxlength="300" placeholder="Unspecified"></label>
+        </div>
+        <p class="hint" id="ai-fields-note" role="status"></p>
         <div class="ai-row">
           <button type="button" class="ai-btn" id="ai-save">Save provisional report</button>
         </div>

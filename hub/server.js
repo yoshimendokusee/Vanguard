@@ -5,7 +5,7 @@ const { existsSync } = require('node:fs');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
 const { riskForRow } = require('./risk');
-const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
+const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, glossaryFor, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
 const { createCloudSync } = require('./cloud');
@@ -149,6 +149,15 @@ function createApp(db, {
     } catch (err) {
       aiFailure(res, err, parsed.transcript.length);
     }
+  });
+
+  // Offline terminology lookup. POST so patient text never appears in a URL or access log.
+  app.post('/api/knowledge/lookup', (req, res) => {
+    const checked = validateTranscriptInput(req.body, aiConfig().maxTranscript);
+    if (checked.error) return res.status(400).json({ ok: false, ...checked.error });
+    const { retrieval } = glossaryFor(checked.transcript);
+    if (!retrieval) return res.status(503).json({ ok: false, error: 'knowledge-unavailable', message: 'Local terminology pack is not loaded' });
+    res.json({ ok: true, retrieval });
   });
 
   app.post('/api/ai/triage-assist', async (req, res) => {

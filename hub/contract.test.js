@@ -138,3 +138,21 @@ test('dashboard board puts every inbound report in exactly one time column and n
   const urgent = vm.runInNewContext(html.match(/  const URGENT = (\[.*?\]);/)[1]);
   assert.deepEqual([...urgent], ['Immediate', 'Unassessed'], 'Needs attention must keep unassessed reports in view');
 });
+
+test('draft setup suggestions are read-only, explain themselves, and never feed readiness', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
+  const suggested = html.match(/  const suggestedOf = \(r\) => \{[\s\S]*?\n  \};/)[0];
+  const prep = { Concussion: ['CT / neurosurgery', 'Neuro obs'], 'Head injury': ['CT / neurosurgery'], Dizziness: [] };
+  const suggestedOf = vm.runInNewContext(`${suggested}\nsuggestedOf`, {
+    labelsOf: (r) => r.injuries.split(',').map((s) => s.trim()), prepFor: (label) => prep[label] || [], Map, Set });
+  const list = (r) => JSON.stringify(suggestedOf(r)); // vm arrays have another realm's prototype
+  const aiSaved = { source_findings_current: false, processing: { version: 1 }, current_transcript: 'a', raw_text: 'a',
+    injuries: 'Concussion, Head injury, Dizziness', age_group: 'Adult' };
+  assert.equal(list(aiSaved), JSON.stringify([{ setup: 'CT / neurosurgery', because: ['Concussion', 'Head injury'] }, { setup: 'Neuro obs', because: ['Concussion'] }]));
+  assert.equal(list({ ...aiSaved, age_group: 'Child' }).includes('"setup":"Paediatrics","because":["age group Child"]'), true);
+  assert.equal(list({ ...aiSaved, current_transcript: 'corrected' }), '[]', 'corrected transcript invalidates the saved terms');
+  assert.equal(list({ ...aiSaved, processing: null }), '[]', 'invalidated without AI processing stays empty');
+  assert.equal(list({ ...aiSaved, source_findings_current: true }), '[]', 'current findings use the normal checklist');
+  const readiness = html.match(/  const readyItems = \(r\) => \{[\s\S]*?\n  \};/)[0];
+  assert.doesNotMatch(readiness, /suggestedOf/, 'suggestions must not enter readiness items or counts');
+});

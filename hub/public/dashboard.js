@@ -82,7 +82,27 @@
   const baseIso = (r) => (badClock(r) ? r.received_at : r.created_at);
   const etaAt = (r) => (r.eta_minutes ? Date.parse(baseIso(r)) + r.eta_minutes * 60000 : null);
   const minsLeft = (r) => { const t = etaAt(r); return t === null ? null : Math.round((t - Date.now()) / 60000); };
-  const needsOf = (r) => [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
+  // Draft setups for terms the hospital's own table above does not cover (public/setups.json).
+  // The hospital's mappings always win; the draft is unreviewed and labelled as such.
+  const PREP_DRAFT = {};
+  const prepFor = (label) => (PREP[label] ? [PREP[label]] : (PREP_DRAFT[label] || []));
+  const labelsOf = (r) => r.injuries.split(',').map((s) => s.trim());
+  const usesDraft = (r) => labelsOf(r).some((s) => !PREP[s] && PREP_DRAFT[s]);
+  const needsOf = (r) => [...new Set(labelsOf(r).flatMap(prepFor))];
+  // For a report saved from the AI panel (findings superseded by AI processing, transcript not
+  // corrected since), list setups for its saved terms as a read-only suggestion, each with the
+  // saved term that caused it so a reviewer can check the link. They are never part of
+  // readyItems, the readiness count or the board totals, which keep the safety rule.
+  const suggestedOf = (r) => {
+    if (!(r.source_findings_current === false && r.processing && r.current_transcript === r.raw_text)) return [];
+    const why = new Map();
+    for (const label of labelsOf(r)) {
+      for (const setup of prepFor(label)) why.set(setup, [...(why.get(setup) || []), label]);
+    }
+    // Same age rule the board's checklist already applies.
+    if ((r.age_group === 'Child' || r.age_group === 'Infant') && !why.has('Paediatrics')) why.set('Paediatrics', [`age group ${r.age_group}`]);
+    return [...why].map(([setup, because]) => ({ setup, because }));
+  };
   const readyItems = (r) => {
     if (r.source_findings_current === false) return [];
     const set = new Set(needsOf(r));
@@ -396,6 +416,7 @@
       const cnt = el('span', '');
       head.append(cnt);
       prep.append(head);
+      if (usesDraft(r)) prep.append(el('p', 'note', 'Some setups are an unreviewed draft, not clinician-approved. Check them against your protocols.'));
       const done = new Set(ready[r.id] || []);
       const note = el('p', 'note');
       note.setAttribute('aria-live', 'polite');
@@ -422,11 +443,21 @@
       upd();
       box.append(prep);
     }
-    const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && !PREP[x]);
+    const suggested = r.status === 'inbound' && category(r) !== 'Deceased' ? suggestedOf(r) : [];
+    if (suggested.length) {
+      const sug = el('div', 'prep');
+      sug.append(el('p', 'prep-h', 'Suggested setups (draft)'),
+        el('p', 'note', 'From the saved terms only. Not part of the readiness count. Unreviewed: check against your protocols.'),
+        ...suggested.map((s) => el('p', '', `${s.setup} \u2014 because: ${s.because.join(', ')}`)));
+      box.append(sug);
+    }
+    const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && (r.source_findings_current === false ? !PREP[x] : !prepFor(x).length));
     if (category(r) !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
       box.append(el('p', 'warn', r.injuries === 'Unspecified'
         ? 'No findings were understood. Read the note first.'
-        : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
+        : suggested.length
+          ? `No hospital-approved preparation is mapped for ${unmapped.join(', ')}; see the draft suggestion above. Read the note.`
+          : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
     }
     if (r.raw_text) {
       const d = el('details', 'rnote');
@@ -1006,7 +1037,10 @@
 
   readUrl();
   render();
-  load();
+  // Draft setups are optional: the board works without them.
+  fetch('/setups.json').then((res) => (res.ok ? res.json() : null))
+    .then((data) => { if (data && data.setups) Object.assign(PREP_DRAFT, data.setups); })
+    .catch(() => {}).finally(load);
   loadCloud();
   connect();
   setInterval(load, 10000);
@@ -1074,6 +1108,24 @@
       (data.warnings || []).forEach(function (w) {
         var p = document.createElement('p'); p.className = 'ai-warn'; p.textContent = 'Warning: ' + w; resultEl.append(p);
       });
+      var terms = (data.retrieval && data.retrieval.matches) || [];
+      if (terms.length) {
+        var tp = document.createElement('p'); tp.className = 'ai-ev';
+        tp.textContent = 'Reference terms (' + data.retrieval.reviewStatus + ' glossary, meanings only) — ' +
+          terms.map(function (m) { return m.matched + ' = ' + m.english + (m.negated ? ' (denied in report)' : ''); }).join(' · ');
+        resultEl.append(tp);
+      }
+      // The rules score only four findings. When none fired, say which reported
+      // terms were therefore left unscored, so they are not mistaken for "understood".
+      var unscored = terms.filter(function (m) {
+        return !m.negated && ['injury', 'condition', 'mechanism', 'symptom'].indexOf(m.category) !== -1;
+      });
+      if (unscored.length && data.provisional.triage === 'Unassessed') {
+        var up = document.createElement('p'); up.className = 'ai-warn';
+        up.textContent = 'Reported but not scored: ' + unscored.map(function (m) { return m.english; }).join(', ') +
+          '. The rules score only breathing, consciousness, severe bleeding and walking, so a qualified clinician must assess these.';
+        resultEl.append(up);
+      }
       var pr = document.createElement('p');
       pr.textContent = 'Provisional (deterministic rules, advisory only): ' + data.provisional.triage + ' — ' + data.provisional.reason + '. Verify clinically.';
       resultEl.append(pr);
@@ -1087,7 +1139,29 @@
       $('ai-obs-consciousness').value = obs.consciousness;
       $('ai-obs-bleeding').value = obs.severeBleeding;
       $('ai-obs-walking').value = obs.walking;
+      fillFields(data);
       reviewEl.hidden = false;
+    }
+    // Prefill the report fields from what the transcript states. Each value came from
+    // a quote shown in the note below; blanks stay blank, and everything is editable.
+    function fillFields(data) {
+      var f = data.fields || {}, ev = data.fieldEvidence || {}, notes = [];
+      $('ai-location').value = f.location || '';
+      $('ai-count').value = f.patientCount == null ? '' : f.patientCount;
+      $('ai-age').value = f.ageGroup || 'Unspecified';
+      $('ai-eta').value = f.etaMinutes == null ? '' : f.etaMinutes;
+      $('ai-injuries').value = f.injuries && f.injuries !== 'Unspecified' ? f.injuries : '';
+      if (f.location) notes.push('Location \u201C' + f.location + '\u201D from \u201C' + ev.location + '\u201D' + (data.locationBasis === 'inferred' ? ' (guessed — check it is the pickup place)' : ''));
+      if (f.patientCount != null) notes.push('Patients ' + f.patientCount + ' from \u201C' + ev.patientCount + '\u201D');
+      if (ev.ageGroup) notes.push('Age group from \u201C' + ev.ageGroup + '\u201D');
+      if (f.etaMinutes != null) notes.push('ETA ' + f.etaMinutes + ' min from \u201C' + ev.etaMinutes + '\u201D');
+      (data.fieldNotes || []).forEach(function (n) { notes.push(n); });
+      $('ai-fields-note').textContent = notes.length
+        ? 'Filled from the transcript — check every field before saving. ' + notes.join(' · ')
+        : 'Nothing could be filled from the transcript; enter the fields yourself.';
+      if (data.legacy && data.legacy.triage !== 'Unassessed') {
+        $('ai-fields-note').textContent += ' · Hospital finding rules on these injury terms: ' + data.legacy.triage + ' (' + data.legacy.reason + ').';
+      }
     }
     async function run(kind) {
       if (busy) return;
@@ -1124,7 +1198,8 @@
       var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
       if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
       var prov = { triage: 'Unassessed' };
-      var report = { location: loc, injuries: 'Unspecified', triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
+      var injuries = $('ai-injuries').value.trim() || 'Unspecified';
+      var report = { location: loc, injuries: injuries, triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
         rawText: lastExtraction.processing.originalTranscript, processing: lastExtraction.processing };
       var signature = JSON.stringify(report);
       if (!saveAttempt || saveAttempt.signature !== signature) saveAttempt = { signature: signature, report: Object.assign(report, { localId: Date.now(), createdAt: new Date().toISOString(), reportId: newUUID(), encounterId: newUUID() }) };
