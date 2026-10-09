@@ -39,7 +39,10 @@ const phrasePatterns = new Map();
 function phrasePattern(phrase) {
   let re = phrasePatterns.get(phrase);
   if (!re) {
-    const escaped = phrase.split(/\s+/).map((word) => word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    // "ang" and its spoken forms "yung"/"yong" are interchangeable ("masakit ang dibdib" = "masakit yung dibdib").
+    const escaped = phrase.split(/\s+/).map((word) => (word === 'ang'
+      ? '(?:ang|yung|yong)'
+      : word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     re = new RegExp(`\\b${escaped.join(CLITIC_GAP)}\\b`, 'i');
     phrasePatterns.set(phrase, re);
   }

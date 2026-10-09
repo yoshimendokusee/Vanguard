@@ -1,0 +1,1411 @@
+{
+ "_note": "Generated from hub/risk.js assessRisk. hub/triage-parity.test.js fails if this drifts; Swift TriageParityTests must match it exactly. Do not edit by hand.",
+ "version": 1,
+ "ruleVersion": "provisional-v1",
+ "cases": [
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Minor",
+    "reason": "Walking, alert, normal breathing, no severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "normal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "abnormal",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: abnormal",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "absent",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Breathing: absent",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "alert",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive; Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unresponsive",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Unresponsive",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "present",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Immediate",
+    "reason": "Severe bleeding reported",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "absent",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "able"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unable"
+   },
+   "expected": {
+    "triage": "Delayed",
+    "reason": "Unable to walk; other critical findings not established",
+    "version": "provisional-v1"
+   }
+  },
+  {
+   "observations": {
+    "breathing": "unknown",
+    "consciousness": "unknown",
+    "severeBleeding": "unknown",
+    "walking": "unknown"
+   },
+   "expected": {
+    "triage": "Unassessed",
+    "reason": "Insufficient explicit observations; qualified assessment required",
+    "version": "provisional-v1"
+   }
+  }
+ ]
+}

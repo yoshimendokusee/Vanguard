@@ -135,3 +135,10 @@ test('filled fields always pass the hub report validator and never lower urgency
   // The hospital's own legacy words still apply when the reviewer saves them.
   assert.equal(riskForRow({ injuries: extract('sumasakit ang dibdib').fields.injuries, triage: 'Unassessed' }).effective_triage, 'Immediate');
 });
+
+test('a how-long-ago figure is not an ETA, but "na lang" still is', () => {
+  assert.equal(findEta('Started 30 minutes ago. Arriving in 10 minutes at Barangay Uno.').value, 10);
+  assert.equal(findEta('Mga 30 minutes na. Sampung minuto papunta sa ospital.').value, 10);
+  assert.equal(findEta('limang minuto na lang darating').value, 5);
+  assert.equal(findEta('30 minutes ago, ETA unknown'), null);
+});

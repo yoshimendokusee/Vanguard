@@ -7,6 +7,8 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
     private let workflow: NativeWorkflow
     private let session: WCSession
     public var onChange: (@Sendable (String) -> Void)?
+    /// Fired with the capture ID when a paired device's result has been durably stored here.
+    public var onResult: (@Sendable (String) -> Void)?
     public init(workflow: NativeWorkflow) {
         self.workflow = workflow; session = WCSession.default
         super.init()
@@ -36,7 +38,9 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
             guard UUID(uuidString: source.id) != nil, source.id == source.id.lowercased(), source.transcript == nil else { throw NativeStoreFailure.invalidCapture }
             let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("WatchAudio")
             try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-            let destination = directory.appendingPathComponent(source.id + ".m4a")
+            // Keep the sender's container (caf from the Watch recorder, m4a from older builds).
+            let ext = URL(fileURLWithPath: source.audioPath ?? "").pathExtension
+            let destination = directory.appendingPathComponent(source.id + "." + (["caf", "m4a", "wav"].contains(ext) ? ext : "caf"))
             if FileManager.default.fileExists(atPath: destination.path) {
                 guard try Data(contentsOf: destination) == Data(contentsOf: file.fileURL) else { throw NativeStoreFailure.identityConflict }
             } else { try FileManager.default.copyItem(at: file.fileURL, to: destination) }
@@ -88,9 +92,9 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         } else if let data = userInfo["vanguardResult"] as? Data, data.count <= 100_000, let id = userInfo["captureID"] as? String {
             Task {
                 do {
-                    let processing = try JSONDecoder().decode(NativeProcessing.self, from: data)
-                    try await workflow.store.complete(id: id, transcript: processing.originalTranscript, processingJSON: data)
+                    try await workflow.adoptRemote(captureID: id, processingJSON: data)
                     onChange?("iPhone extraction durably received; hospital receipt still pending")
+                    onResult?(id)
                 } catch { onChange?("Fallback result refused; original and pending work retained") }
             }
         }
