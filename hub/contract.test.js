@@ -98,7 +98,7 @@ test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor rep
   assert.equal(urgent.triage, 'Minor', 'Original category must remain intact');
 });
 
-test('dashboard board puts every inbound report in exactly one time column and never hides Not sure', () => {
+test('dashboard board puts every inbound report in exactly one time column and never hides Unassessed', () => {
   const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
   const place = html.match(/  function colOf\(r\) \{[\s\S]*?\n  \}/)[0];
   const sandbox = { range: 60, minsLeft: (row) => row.m };
