@@ -150,3 +150,18 @@ has ten assertion failures (missing symptomDuration evidence and a matched-phras
 difference); these were reproduced from the untouched starting commit in a temporary
 archive. The scoped five-observation regressions pass. Full details and current
 remaining blockers are in `five-observation-implementation.md`.
+
+
+## Five-observation container CI mount — 2026-10-10
+
+The first hosted PR #26 container run failed because its test command mounted
+Flutter source but omitted native Apple source/resources. The new shared language
+parity test therefore could not read `observation-phrases.json`. The earlier local
+Docker test command included that mount, so its pass did not establish the shipped
+CI command passed. The workflow and current documented commands now mount
+`watch/apple/Sources/VanguardApple` read-only. No parity assertion was skipped.
+
+Both Compose configurations, a fresh image build, repository validation and the
+network-disabled/in-memory CI container command passed locally: 134 tests, 133
+passed, one opt-in live-AI skip, zero failures. Hosted rerun remains pending; native
+checks were not repeated for this workflow-only fix.

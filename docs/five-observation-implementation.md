@@ -160,8 +160,30 @@ A fresh temporary SQLite-backed hospital on localhost:3020 and synthetic PR fixt
 
 Hosted CI and teammate review are pending when the PR is opened. Physical-device acceptance and the pre-existing Swift intake-parity failure remain as documented above.
 
+## Container CI fix — 2026-10-10
+
+The first hosted PR #26 run failed the Compose/container job because its Docker
+test invocation omitted the Apple source/resource mount used by the five-field
+parity test. [Initial failed run](https://github.com/yoshimendokusee/Vanguard/actions/runs/37998278665).
+Earlier local container passes used the required mount; they did not validate the
+initial shipped CI invocation. The workflow now mounts
+`watch/apple/Sources/VanguardApple` read-only, alongside the existing docs, Flutter
+source and models. AGENTS and workflow instructions include those prerequisites.
+
+Current focused checks: PASS for both Compose configurations,
+`docker build --tag vanguard-five-ci-fix hub`, repository validation, whitespace
+and the corrected CI command (`--network none`, `DB_PATH=:memory:`, all four
+read-only mounts, `vanguard-five-ci-fix npm test`). Result: 134 tests, 133 passed,
+one opt-in live-AI skip, zero failures. Logs: `/tmp/vanguard-five-ci-fix-build.log`
+and `/tmp/vanguard-five-ci-fix-tests.log`. No application code, database schema or
+persistent data changed; no test assertion was relaxed. Hosted rerun is pending.
+Apple/physical-device checks were not repeated for this fix.
+
 ## Files changed
 
+- `.github/workflows/pr-ci.yml`
+- `AGENTS.md`
+- `docs/GITHUB_WORKFLOW.md`
 - `docs/ai-contract.md`
 - `docs/api-contract.md`
 - `docs/apple-watch-voice-workflow.md`

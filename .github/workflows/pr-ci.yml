@@ -141,6 +141,7 @@ jobs:
           docker run --rm --network none --env DB_PATH=:memory: \
             --mount "type=bind,source=$PWD/docs,target=/docs,readonly" \
             --mount "type=bind,source=$PWD/watch/lib,target=/watch/lib,readonly" \
+            --mount "type=bind,source=$PWD/watch/apple/Sources/VanguardApple,target=/watch/apple/Sources/VanguardApple,readonly" \
             --mount "type=bind,source=$PWD/models,target=/models,readonly" \
             vanguard-ci:local npm test
       - name: Real frontend changes over the Vite WebSocket

@@ -61,12 +61,14 @@ docker build -t vanguard-ci:local hub
 docker run --rm --network none --env DB_PATH=:memory: \
   --mount "type=bind,source=$PWD/docs,target=/docs,readonly" \
   --mount "type=bind,source=$PWD/watch/lib,target=/watch/lib,readonly" \
+  --mount "type=bind,source=$PWD/watch/apple/Sources/VanguardApple,target=/watch/apple/Sources/VanguardApple,readonly" \
+  --mount "type=bind,source=$PWD/models,target=/models,readonly" \
   vanguard-ci:local npm test
 ```
 
-The read-only mounts provide the shared contract and native sender/parser source
-for integration tests. Tests use synthetic in-memory or disposable temporary
-databases. Never mount `hub/data` for CI or reset a persistent database.
+The read-only mounts provide shared contracts, Flutter/native Apple source and
+resources, and model manifests for integration/parity tests. Tests use synthetic
+in-memory or disposable temporary databases. Never mount `hub/data` for CI or reset a persistent database.
 
 Inspect the diff, stage specific intended files, then commit and push the feature:
 

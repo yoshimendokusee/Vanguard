@@ -60,8 +60,10 @@ existing feature. Read `docs/api-contract.md` for integrations and
   C++ tools). Run hub tests in the Node 22 image instead:
   `docker build -t vanguard-hub-test ./hub` then `docker run --rm -e DB_PATH=:memory:
   -e LIVE_AI=0 -v <repo>/docs:/docs:ro -v <repo>/watch/lib:/watch/lib:ro
+  -v <repo>/watch/apple/Sources/VanguardApple:/watch/apple/Sources/VanguardApple:ro
   -v <repo>/models:/models:ro vanguard-hub-test node --test` (contract tests read
-  `docs/` and `watch/lib/`; AI/model tests read `models/qwen3-0.6b/manifest.json`).
+  `docs/`, `watch/lib/` and native Apple source/resources; AI/model tests read
+  `models/qwen3-0.6b/manifest.json`).
 - Hub Supabase backup reads `SUPABASE_*` from the git-ignored root `.env`; plain
   `docker run --env-file` keeps quotes literally, so use Compose or `node --env-file`.
 - Docker changes: validate both Compose files, build, and run hub tests in the
