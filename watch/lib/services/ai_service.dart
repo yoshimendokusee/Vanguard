@@ -19,21 +19,17 @@ class AiUnavailableException implements Exception {
 }
 
 class AiStatus {
-  const AiStatus({
-    required this.available,
-    required this.model,
-    this.error,
-  });
+  const AiStatus({required this.available, required this.model, this.error});
 
   final bool available;
   final String model;
   final String? error;
 
   static AiStatus fromJson(Map<String, dynamic> json) => AiStatus(
-        available: json['available'] == true,
-        model: json['model'] is String ? json['model'] as String : '',
-        error: json['error'] is String ? json['error'] as String : null,
-      );
+    available: json['available'] == true,
+    model: json['model'] is String ? json['model'] as String : '',
+    error: json['error'] is String ? json['error'] as String : null,
+  );
 }
 
 class AiObservations {
@@ -50,11 +46,11 @@ class AiObservations {
   final String walking;
 
   static AiObservations fromJson(Map<String, dynamic> json) => AiObservations(
-        breathing: json['breathing'] as String? ?? 'unknown',
-        consciousness: json['consciousness'] as String? ?? 'unknown',
-        severeBleeding: json['severeBleeding'] as String? ?? 'unknown',
-        walking: json['walking'] as String? ?? 'unknown',
-      );
+    breathing: json['breathing'] as String? ?? 'unknown',
+    consciousness: json['consciousness'] as String? ?? 'unknown',
+    severeBleeding: json['severeBleeding'] as String? ?? 'unknown',
+    walking: json['walking'] as String? ?? 'unknown',
+  );
 }
 
 class AiExtraction {
@@ -88,7 +84,12 @@ class AiExtraction {
       originalTranscript: processing['originalTranscript'] as String? ?? '',
       observations: AiObservations.fromJson(obs),
       evidence: {
-        for (final k in ['breathing', 'consciousness', 'severeBleeding', 'walking'])
+        for (final k in [
+          'breathing',
+          'consciousness',
+          'severeBleeding',
+          'walking',
+        ])
           k: ev[k] is String ? ev[k] as String : null,
       },
       uncertainties: [
@@ -107,7 +108,9 @@ class AiExtraction {
 }
 
 class AiService {
-  AiService({http.Client? client, String? hub}) : _client = client ?? http.Client(), _hub = hub ?? hubUrl;
+  AiService({http.Client? client, String? hub})
+    : _client = client ?? http.Client(),
+      _hub = hub ?? hubUrl;
 
   final http.Client _client;
   final String _hub;
@@ -141,11 +144,18 @@ class AiService {
     return _post('extract', transcript, device);
   }
 
-  Future<AiExtraction> triageAssist(String transcript, {String device = 'wear-os'}) {
+  Future<AiExtraction> triageAssist(
+    String transcript, {
+    String device = 'wear-os',
+  }) {
     return _post('triage-assist', transcript, device);
   }
 
-  Future<AiExtraction> _post(String kind, String transcript, String device) async {
+  Future<AiExtraction> _post(
+    String kind,
+    String transcript,
+    String device,
+  ) async {
     if (transcript.trim().isEmpty) {
       throw ArgumentError('transcript must be non-empty');
     }
@@ -161,11 +171,15 @@ class AiService {
           )
           .timeout(_timeout);
       if (res.statusCode != 200) {
-        throw AiUnavailableException(_serverMessage(res.body) ?? 'Hub replied ${res.statusCode}');
+        throw AiUnavailableException(
+          _serverMessage(res.body) ?? 'Hub replied ${res.statusCode}',
+        );
       }
       final decoded = jsonDecode(res.body);
       if (decoded is! Map<String, dynamic> || decoded['ok'] != true) {
-        throw AiUnavailableException(_serverMessage(res.body) ?? 'Invalid AI reply');
+        throw AiUnavailableException(
+          _serverMessage(res.body) ?? 'Invalid AI reply',
+        );
       }
       return AiExtraction.fromJson(decoded);
     } on AiUnavailableException {
