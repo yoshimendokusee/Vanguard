@@ -8,8 +8,13 @@ build/
 .env
 .env.*
 !.env.example
+<<<<<<< Updated upstream
 # Flutter --dart-define-from-file values; commit only env.json.example.
 env.json
+=======
+# Xcode per-machine build settings; commit only Secrets.xcconfig.example.
+Secrets.xcconfig
+>>>>>>> Stashed changes
 *.db
 *.db-*
 *.sqlite
