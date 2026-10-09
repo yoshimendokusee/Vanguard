@@ -47,7 +47,7 @@ extraction and receipt storage. See [the implemented design and setup](QWEN_INTE
 | Ollama inference | PASS | Real local echo output `VANGUARD_QWEN_OK`, 9 generated tokens, normal completion and exact artifact identity |
 | Docker integration | PASS | Hub image built; both Compose entry points validated; actual local model imported and generated inside isolated containers |
 | Backend API | PASS | Fresh execution-based health, extraction on persisted original, encounter preservation and idempotent replay |
-| Web integration | PASS | Actual rendered button invoked Qwen and appended revision 2; original, source excerpts, provenance and provisional Unassessed remained visible |
+| Web integration | PASS | Actual rendered button invoked Qwen and appended revision 3 after main integration; original, source excerpts, provenance and provisional Unassessed remained visible |
 | iOS native inference | PASS in simulator; physical BLOCKED | Production app used its own packaged GGUF/native engine and persisted actual clinical extraction; unsigned device target built |
 | watchOS inference | PASS in simulator; physical BLOCKED | Independent production Watch app generated tokens and preserved/persisted original; actual watchOS arm64_32 target built |
 | Watch fallback | BLOCKED on paired hardware | Recovery/storage regression passes; real WCSession disconnect, background transfer and reconnect have no physical evidence |
@@ -58,8 +58,8 @@ extraction and receipt storage. See [the implemented design and setup](QWEN_INTE
 
 | Command/check | Result |
 | --- | --- |
-| `cd hub && npm ci && npm test` | PASS: final suite 51 passed, 0 failed, 0 skipped; includes a real local Ollama live check |
-| `cd watch && flutter pub get && flutter analyze && flutter test` | PASS: analysis found no issues; 28 tests passed, including populated upgrade and intentional rollback-failure checks |
+| `cd hub && npm ci && npm test` | PASS: final suite 52 passed, 0 failed, 0 skipped; includes a real local Ollama live check |
+| `cd watch && flutter pub get && flutter analyze && flutter test` | PASS: analysis found no issues; 103 tests passed, including populated upgrade and intentional rollback-failure checks |
 | `./scripts/qwen-native-build.sh` | PASS: all five CPU slices built and local XCFramework created |
 | `./scripts/qwen-echo.sh` (also executed by aggregate check) | PASS: actual marker output, 9 tokens, warm request 821.1 ms, 90.2 tokens/s |
 | `QWEN_TEST_HUB_URL=… QWEN_IOS_SIM=… QWEN_WATCH_SIM=… VANGUARD_LIVE_MODEL_DIR=… VANGUARD_TEST_HUB_URL=… ./scripts/qwen-verify.sh` | Simulator/backend/native checks PASS; exit **2** honestly records physical coverage BLOCKED |
@@ -69,7 +69,7 @@ extraction and receipt storage. See [the implemented design and setup](QWEN_INTE
 | `xcodebuild … -scheme VanguardWatch -destination 'generic/platform=watchOS' CODE_SIGNING_ALLOWED=NO build` | PASS: unsigned Watch SDK/arm64_32 build; no hardware execution claim |
 | `docker compose config --quiet` and `docker compose -f hub/docker-compose.yml config --quiet` | PASS; isolated QA Compose also validated |
 | `docker build -t vanguard-qwen-qa:local hub` | PASS |
-| `docker run --rm --network none --env DB_PATH=:memory: … vanguard-qwen-qa:local npm test` with read-only docs/watch/model mounts | PASS: 50 passed, 0 failed, **1 skipped** because real Ollama is unreachable in this deliberately isolated regression container |
+| `docker run --rm --network none --env DB_PATH=:memory: … vanguard-qwen-qa:local npm test` with read-only docs/watch/model mounts | PASS: 51 passed, 0 failed, **1 skipped** because real Ollama is unreachable in this deliberately isolated regression container |
 | `./scripts/qwen-offline-test.sh` | Docker acceptance PASS; exit **2** for physical acceptance BLOCKED. External egress denied, actual extraction stored, both containers restarted, reports compared unchanged |
 | `node --test .github/scripts/validate-repository.test.js` | PASS: 6 tests; generated frameworks/app bundles excluded from fixture copies |
 | `node .github/scripts/validate-repository.js`, shell/Node syntax and actionlint | PASS |
@@ -78,8 +78,11 @@ extraction and receipt storage. See [the implemented design and setup](QWEN_INTE
 The final offline Docker project was `vanguard-qwen-offline-1791556175`.
 Its containers were stopped and synthetic volumes retained; no data reset was used.
 Earlier successful isolated acceptance runs were also stopped with volumes retained.
-The web browser's screenshot export failed; actual rendered accessibility state and
-persisted history were inspected instead. Screenshot evidence is unavailable.
+An earlier browser handle could not export screenshots. A fresh tab verified the
+merged dashboard and saved [synthetic screenshot evidence](../qa/qwen-web-verification.jpg).
+A fresh checkout also retrieved the actual LFS object and completed `qwen-setup.sh`,
+verifying the same SHA-256 before local import. Main advanced with dashboard/watch UI
+changes during implementation; those were integrated and affected regressions rerun.
 
 ## Observed performance
 

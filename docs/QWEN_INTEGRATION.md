@@ -217,7 +217,7 @@ retrieved and checksum-verified; generated text is not a fixture.
 | iOS simulator app | PASS, 8 tokens, init 1.05 s, completion 1.16 s, 30.8 tokens/s, peak RSS 867,565,568 bytes |
 | Watch simulator app | PASS, 8 tokens, init 1.72 s, completion 4.24 s, 16.1 tokens/s, peak RSS 679,067,648 bytes |
 | Watch device target compilation | PASS, watchOS SDK 27, arm64_32, unsigned build; execution unverified |
-| Web app | PASS, real button-triggered extraction appended revision 2; original, encounter, source excerpts and artifact provenance visible |
+| Web app | PASS, real button-triggered extraction appended revision 3 after main integration; original, encounter, source excerpts and artifact provenance visible |
 | Docker actual generation | PASS, local Ollama on internal-only network, pinned model |
 | Docker offline/restart/persistence | PASS, external egress denied, fresh extraction stored, restart retained original/provenance |
 | Physical iPhone/Watch execution and STT | BLOCKED, devices/signing/locale assets not available for this run |
@@ -258,7 +258,5 @@ Final command counts, offline-native execution and PR/CI evidence are recorded i
 - Database or relay failure: original capture/history stays durable. Retry pending
   work after app activation; hospital receipt is distinct from relay receipt and
   clinical verification. Physical background delivery is not guaranteed.
-- Screenshot export from the in-app browser was unavailable during this run; actual
-  web execution was verified using rendered accessibility state and persisted history.
 - Existing prototype storage/LAN APIs remain unencrypted/unauthenticated. No real
   patient deployment, cloud inference, BLE relay or remote settings change is made.
