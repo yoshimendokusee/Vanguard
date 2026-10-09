@@ -3,13 +3,20 @@
 <!--
   Vanguard settings merged into the generated Info.plist of VanguardPhone and
   VanguardWatch (INFOPLIST_FILE, with GENERATE_INFOPLIST_FILE = YES). Permission
-  prompts and NSAllowsLocalNetworking stay as INFOPLIST_KEY_* build settings in
-  Vanguard.xcodeproj. Values come from Vanguard.xcconfig and the git-ignored
+  prompts stay as INFOPLIST_KEY_* build settings in Vanguard.xcodeproj. The nested
+  local-network ATS dictionary is defined here because Xcode does not generate it
+  from an INFOPLIST_KEY_NSAppTransportSecurity_NSAllowsLocalNetworking setting.
+  Values come from Vanguard.xcconfig and the git-ignored
   Secrets.xcconfig. Everything here is readable from the installed app: public
   settings only, never passwords or secret/service-role keys.
 -->
 <plist version="1.0">
 <dict>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 	<!-- Read by AppConfiguration.load(); see Sources/VanguardApple/AppConfiguration.swift. -->
 	<key>HUB_URL</key>
 	<string>$(HUB_URL)</string>

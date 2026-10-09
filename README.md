@@ -196,11 +196,13 @@ copy `watch/apple/Config/Secrets.xcconfig.example` to `Secrets.xcconfig` (git-ig
 and set `HUB_URL = http:/$()/<computer-lan-ip>:3000`. The `$()` is needed because
 `//` starts an xcconfig comment. The project's base configuration is
 `Config/Vanguard.xcconfig`, and `Config/Info.plist` passes the value to
-`AppConfiguration.load()`. A URL typed in the app still takes precedence. Optional
+`AppConfiguration.load()`. A saved in-app URL still takes precedence. Optional
 `SUPABASE_URL`/`SUPABASE_PUBLISHABLE_KEY` stay empty when the hub uploads to Supabase.
 Info.plist is readable from the installed app, so it holds public values only:
 never the hub password, `sb_secret_*` or service-role keys. Values are fixed at build
-time; rebuild after changing them.
+time; rebuild after changing them. See [Apple hub URL verification](docs/apple-hub-url-verification.md)
+for the earlier unsigned simulator checks. [Shared hub setup](docs/shared-hub-setup.md)
+records the current Wi-Fi hostname, per-device enrollment and signed simulator checks.
 
 Optional native hub development (Node 22.12+):
 
