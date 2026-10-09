@@ -194,8 +194,9 @@ button:disabled { cursor: not-allowed; }
 .app > * { min-width: 0; }
 
 /* ---------- Brand & Navigation Rail ---------- */
+/* ---------- Brand & Navigation Rail ---------- */
 .rail {
-  background: var(--rail);
+  background: linear-gradient(175deg, var(--rail) 0%, rgba(5, 70, 83, 0.95) 100%);
   color: var(--on-rail);
   border-radius: var(--r-2xl);
   margin: var(--s3);
@@ -213,8 +214,10 @@ button:disabled { cursor: not-allowed; }
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
   overscroll-behavior: contain;
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.1), var(--shadow-md);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
   z-index: 50;
+  transition: all var(--dur-base) var(--ease);
 }
 .rail::-webkit-scrollbar {
   width: 4px;
@@ -241,7 +244,11 @@ button:disabled { cursor: not-allowed; }
   width: 34px;
   height: 34px;
   color: #52D8E8;
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+  filter: drop-shadow(0 2px 6px rgba(82, 216, 232, 0.3));
+  transition: transform var(--dur-fast) var(--ease);
+}
+.brand:hover .brand-logo {
+  transform: scale(1.08);
 }
 .brand-text {
   display: flex;
@@ -295,13 +302,14 @@ button:disabled { cursor: not-allowed; }
   stroke-width: 2.2;
   stroke-linecap: round;
   stroke-linejoin: round;
-  transition: transform var(--dur-fast) var(--ease);
+  transition: transform var(--dur-fast) var(--ease), filter var(--dur-fast) var(--ease);
 }
 .railbtn:hover {
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.16);
+  transform: translateY(-1px);
 }
 .railbtn:hover svg {
-  transform: translateY(-2px);
+  transform: translateY(-2px) scale(1.05);
 }
 .railbtn:active {
   background: rgba(0, 0, 0, 0.25);
@@ -311,7 +319,12 @@ button:disabled { cursor: not-allowed; }
   background: var(--rail-active-bg);
   color: var(--rail-active-fg);
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px);
+}
+.railbtn[aria-selected="true"] svg {
+  stroke-width: 2.4;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.15));
 }
 .railbtn .n {
   font-weight: 700;
@@ -321,6 +334,7 @@ button:disabled { cursor: not-allowed; }
   padding: 1px 8px;
   border-radius: 999px;
   min-width: 20px;
+  transition: all var(--dur-fast) var(--ease);
 }
 .railbtn[aria-selected="true"] .n {
   background: var(--rail-active-fg);
