@@ -6,6 +6,21 @@ const path = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 
+function composeUpWithPullRetry(compose, wait = ms => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)) {
+  const delays = [5000, 15000];
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return compose('up', '-d', '--build');
+    } catch (error) {
+      const details = [error.message, error.stderr?.toString(), error.stdout?.toString()].filter(Boolean).join('\n');
+      const transientRegistryFailure = /context deadline exceeded|Client\.Timeout|i\/o timeout|TLS handshake timeout|temporary failure|connection reset|unexpected EOF|no such host|network is unreachable|toomanyrequests|rate limit|(?:HTTP|status) (?:429|502|503|504)/i.test(details);
+      if (!transientRegistryFailure || attempt >= delays.length) throw error;
+      console.warn(`Docker image pull failed transiently; retrying Compose startup (${attempt + 2}/3) in ${delays[attempt] / 1000}s.`);
+      wait(delays[attempt]);
+    }
+  }
+}
+
 async function check() {
   const source = path.resolve(__dirname, '..');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'vanguard-connectivity-'));
@@ -22,7 +37,7 @@ async function check() {
     // Teammate without Git LFS: only a pointer, never cached real weights.
     fs.writeFileSync(path.join(directory, 'models/qwen3-0.6b/qwen3-0.6b-q4_k_m.gguf'), 'version https://git-lfs.github.com/spec/v1\n');
     started = true;
-    compose('up', '-d', '--build');
+    composeUpWithPullRetry(compose);
     const base = 'http://' + compose('port', 'frontend', '3301').trim();
     const get = async route => {
       const response = await fetch(base + route, { signal: AbortSignal.timeout(130000) });
@@ -87,4 +102,4 @@ async function check() {
   }
 }
 if (require.main === module) check().catch(error => { console.error(error.message); process.exitCode = 1; });
-module.exports = { check };
+module.exports = { check, composeUpWithPullRetry };

@@ -34,7 +34,7 @@ jobs:
           node-version: '22'
       - name: Structure, configuration and policy self-checks
         run: |
-          node --test .github/scripts/validate-repository.test.js
+          node --test .github/scripts/validate-repository.test.js scripts/connectivity-check.test.cjs
           node .github/scripts/validate-repository.js
           git show --format= --check --diff-merges=first-parent HEAD
           bash -n fake-watch.sh scripts/qwen-*.sh scripts/whisper-watch-build.sh
