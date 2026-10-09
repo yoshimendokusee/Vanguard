@@ -23,7 +23,7 @@ const { assessRisk, validateObservations, riskForRow } = require('./risk');
 const { extractReportFields } = require('./intake');
 const { verifyModel } = require('./model');
 const { isIP } = require('node:net');
-const { loadKnowledge, retrieve, packInfo } = require('./rag/knowledge');
+const { loadKnowledge, retrieve, packInfo, findPhraseSpan } = require('./rag/knowledge');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -160,39 +160,36 @@ function strArray(value, maxItems, maxLen) {
 
 // Server-side confirmation vocabulary. Mirrors the watch parser's Tagalog/English
 // keywords: a model claim counts only when one of these phrases actually occurs
-// in the transcript (word-boundary match, so "conscious" never matches
-// "unconscious" and "can walk" never matches "cannot walk"). This keeps the
-// tiny model honest: unconfirmed claims become unknown instead of findings.
+// in the transcript. Tagalog clitics/linkers between a phrase's words are
+// tolerated ("nahihirapan siyang huminga" confirms "nahihirapan huminga"), but
+// word boundaries still hold ("conscious" never matches "unconscious", "can
+// walk" never matches "cannot walk") and no particle is a negator. This keeps
+// the tiny model honest: unconfirmed claims become unknown instead of findings.
 const CONFIRM = {
   breathing: {
-    absent: ['not breathing', 'hindi humihinga', 'no breathing', 'stopped breathing', 'walang paghinga'],
-    abnormal: ['difficulty breathing', 'nahihirapan huminga', 'hirap huminga', 'drowning', 'nalunod', 'shortness of breath', 'trouble breathing', 'gasping', 'difficulty of breathing'],
-    normal: ['breathing normally', 'normal breathing', 'breathing fine', 'breathing ok', 'humihinga nang normal', 'normal huminga'],
+    absent: ['not breathing', 'hindi humihinga', 'di humihinga', 'no breathing', 'stopped breathing', 'walang paghinga', 'walang hininga', 'wala nang hininga'],
+    abnormal: ['difficulty breathing', 'nahihirapan huminga', 'mahirap huminga', 'hirap huminga', 'hirap sa paghinga', 'hinihingal', 'kinakapos ng hininga', 'kapos hininga', 'hindi makahinga', 'di makahinga', 'cannot breathe', "can't breathe", 'cant breathe', 'can t breathe', 'unable to breathe', 'drowning', 'nalunod', 'shortness of breath', 'trouble breathing', 'gasping', 'difficulty of breathing'],
+    normal: ['breathing normally', 'normal breathing', 'breathing fine', 'breathing ok', 'humihinga nang normal', 'normal huminga', 'nakakahinga', 'makahinga', 'humihinga'],
   },
   consciousness: {
-    unresponsive: ['unconscious', 'walang malay', 'unresponsive', 'not responding', 'no response', 'passed out', 'nawalan ng malay', 'unconsciousness'],
+    unresponsive: ['unconscious', 'walang malay', 'unresponsive', 'not responding', 'no response', 'passed out', 'nawalan ng malay', 'unconsciousness', 'walang ulirat', 'nawalan ng ulirat', 'hindi sumasagot', 'di sumasagot'],
     alert: ['awake', 'gising', 'alert', 'conscious', 'responsive', 'mulat'],
   },
   severeBleeding: {
-    present: ['severe bleeding', 'malakas na pagdurugo', 'heavy bleeding', 'lots of blood', 'maraming dugo', 'severe blood loss', 'bleeding heavily', 'bleeding a lot', 'profuse bleeding'],
-    absent: ['no severe bleeding', 'no bleeding', 'walang dugo', 'walang pagdurugo', 'no blood', 'bleeding stopped'],
+    present: ['severe bleeding', 'malakas na pagdurugo', 'heavy bleeding', 'lots of blood', 'maraming dugo', 'severe blood loss', 'bleeding heavily', 'bleeding a lot', 'profuse bleeding', 'sobrang dugo', 'duguan', 'massive bleeding', 'hemorrhage'],
+    absent: ['no severe bleeding', 'no bleeding', 'walang dugo', 'walang pagdurugo', 'no blood', 'bleeding stopped', 'hindi dumudugo', 'di dumudugo'],
   },
   walking: {
-    unable: ['cannot walk', "can't walk", 'hindi makalakad', 'cannot stand', 'unable to walk', 'could not walk', 'cant walk'],
-    able: ['can walk', 'nakakalakad', 'able to walk', 'walking'],
+    unable: ['cannot walk', "can't walk", 'hindi makalakad', 'di makalakad', 'hindi nakakalakad', 'di nakakalakad', 'cannot stand', 'unable to walk', 'could not walk', 'cant walk', 'can t walk'],
+    able: ['can walk', 'nakakalakad', 'able to walk', 'walking', 'makalakad', 'kayang maglakad'],
   },
 };
-
-function escapeRegExp(s) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 /** First matching trigger phrase with its span, or null. */
 function findPhrase(transcript, phrases) {
   for (const phrase of phrases) {
-    const re = new RegExp(`\\b${escapeRegExp(phrase)}\\b`, 'i');
-    const m = re.exec(transcript);
-    if (m) return { quote: m[0].slice(0, 120), start: m.index, end: m.index + m[0].length };
+    const hit = findPhraseSpan(transcript, phrase);
+    if (hit) return { quote: hit.quote.slice(0, 120), start: hit.start, end: hit.end };
   }
   return null;
 }
@@ -203,6 +200,28 @@ function oppositeOf(key, value) {
   if (key === 'severeBleeding') return value === 'present' ? ['absent'] : value === 'absent' ? ['present'] : [];
   if (key === 'walking') return value === 'able' ? ['unable'] : value === 'unable' ? ['able'] : [];
   return [];
+}
+
+const NEGATORS = new Set(['no', 'not', 'without', 'never', 'denies', 'denied', 'hindi', 'di', 'wala', 'walang']);
+const NEGATION_FILLERS = new Set(['po', 'ho', 'na', 'naman', 'talaga', 'rin', 'din', 'siya', 'siyang', 'niya', 'niyang']);
+
+function isNegatedPhrase(transcript, hit) {
+  const prefix = transcript.slice(Math.max(0, hit.start - 80), hit.start);
+  const words = [...prefix.matchAll(/[\p{L}\p{N}]+/gu)].map((match) => match[0].toLowerCase());
+  for (let index = Math.max(0, words.length - 3); index < words.length; index++) {
+    if (NEGATORS.has(words[index]) && words.slice(index + 1).every((word) => NEGATION_FILLERS.has(word))) return true;
+  }
+  return false;
+}
+
+function transcriptObservation(key, transcript) {
+  const matches = Object.entries(CONFIRM[key]).flatMap(([value, phrases]) => {
+    const hit = findPhrase(transcript, phrases);
+    return hit && !isNegatedPhrase(transcript, hit) ? [{ value, hit }] : [];
+  });
+  const conflict = matches.some((match, index) => matches.slice(index + 1)
+    .some((other) => oppositeOf(key, match.value).includes(other.value)));
+  return conflict ? { conflict: true } : matches[0] || null;
 }
 
 /** Validate model JSON (observations only) and confirm each claim in the transcript. */
@@ -222,12 +241,27 @@ function toValidatedExtraction(modelJson, transcript) {
   }
   const evidence = {};
   for (const key of Object.keys(ALLOWED)) {
+    const reported = transcriptObservation(key, transcript);
+    if (reported && reported.conflict) {
+      observations[key] = 'unknown';
+      evidence[key] = null;
+      warnings.push(`Contradictory transcript phrases about ${key}; treated as unknown`);
+      continue;
+    }
+    if (reported) {
+      if (observations[key] !== reported.value) {
+        warnings.push(`Explicit transcript phrase supports ${key}=${reported.value}; used instead of model output`);
+      }
+      observations[key] = reported.value;
+      evidence[key] = reported.hit.quote;
+      continue;
+    }
     if (observations[key] === 'unknown') {
       evidence[key] = null;
       continue;
     }
     const hit = findPhrase(transcript, CONFIRM[key][observations[key]] || []);
-    if (hit) {
+    if (hit && !isNegatedPhrase(transcript, hit)) {
       evidence[key] = hit.quote;
       // A denial ("no severe bleeding") contains the positive phrase: an opposite
       // match strictly inside the confirming span is the denial itself, not a
@@ -331,6 +365,11 @@ function injuryLabels(o) {
   return injuries;
 }
 
+function extractedField(id, kind, name, value, unit, excerpt) {
+  if (value == null || !excerpt) return null;
+  return { id, kind, name, value, unit, source: 'model-inferred', excerpt, contradictory: false };
+}
+
 async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const cfg = aiConfig();
   const manifest = await localModel(opts.fetchImpl || fetch, opts);
@@ -338,11 +377,28 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
   const raw = await callOllama(transcript, { ...opts, glossary: matches, model: opts.model || cfg.model, ollamaUrl: opts.ollamaUrl || cfg.ollamaUrl });
   const modelJson = extractJsonObject(raw);
   const { observations, evidence, uncertainties, warnings } = toValidatedExtraction(modelJson, transcript);
+  const intake = extractReportFields(transcript, knowledgeIndex(), injuryLabels(observations));
+  const observationFindings = Object.entries(observations).flatMap(([name, value]) => value === 'unknown' ? [] : [{
+    id: `observation-${name}`, kind: 'observation', name, value, unit: null,
+    source: 'model-inferred', excerpt: evidence[name], contradictory: false,
+  }]);
+  const terminologyFindings = intake.findings.filter((finding) =>
+    !(finding.name === 'Shortness of breath' && observations.breathing === 'abnormal')
+    && !(finding.name === 'Can walk' && observations.walking === 'able'));
+  const fieldFindings = [
+    extractedField('field-patient-count', 'patient', 'Patient count', intake.fields.patientCount, null, intake.evidence.patientCount),
+    extractedField('field-age-group', 'patient', 'Age group', intake.fields.ageGroup === 'Unspecified' ? null : intake.fields.ageGroup, null, intake.evidence.ageGroup),
+    extractedField('field-location', 'incident', 'Pickup location', intake.fields.location, null, intake.evidence.location),
+    extractedField('field-arrival-eta', 'incident', 'Arrival ETA', intake.fields.etaMinutes, 'minutes', intake.evidence.etaMinutes),
+    extractedField('field-symptom-duration', 'symptom', 'Symptom duration', intake.fields.symptomDuration?.value,
+      intake.fields.symptomDuration?.unit || null, intake.evidence.symptomDuration),
+  ].filter(Boolean);
   const device = cleanDevice(provenanceInput.device);
   const processing = {
     version: 1,
     originalTranscript: transcript,
     observations,
+    findings: [...observationFindings, ...terminologyFindings, ...fieldFindings],
     evidence: Object.fromEntries(Object.entries(evidence).filter(([, quote]) => quote !== null)
       .map(([key, excerpt]) => [key, { source: 'model-inferred', excerpt, contradictory: false }])),
     uncertainties,
@@ -355,7 +411,6 @@ async function extractEmergency(transcript, provenanceInput = {}, opts = {}) {
     },
   };
   const provisional = assessRisk(observations);
-  const intake = extractReportFields(transcript, knowledgeIndex(), injuryLabels(observations));
   // What the hospital's existing legacy finding rules say about these injury terms.
   // Preview only: the dashboard never saves AI-derived injury terms automatically, and
   // higher urgency is never lowered.

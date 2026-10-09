@@ -82,13 +82,13 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "unknown",
+     "consciousness": "unresponsive",
      "severeBleeding": "unknown",
      "walking": "unknown"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": null,
+     "consciousness": "Walang malay",
      "severeBleeding": null,
      "walking": null
     }
@@ -197,13 +197,13 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "unknown",
+     "consciousness": "unresponsive",
      "severeBleeding": "unknown",
      "walking": "unknown"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": null,
+     "consciousness": "unconscious",
      "severeBleeding": null,
      "walking": null
     }
@@ -313,13 +313,13 @@
     "observations": {
      "breathing": "unknown",
      "consciousness": "unknown",
-     "severeBleeding": "unknown",
+     "severeBleeding": "absent",
      "walking": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
-     "severeBleeding": null,
+     "severeBleeding": "No severe bleeding",
      "walking": null
     }
    }
@@ -336,13 +336,13 @@
     "observations": {
      "breathing": "unknown",
      "consciousness": "unknown",
-     "severeBleeding": "unknown",
+     "severeBleeding": "absent",
      "walking": "unknown"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
-     "severeBleeding": null,
+     "severeBleeding": "No severe bleeding",
      "walking": null
     }
    }
@@ -405,14 +405,14 @@
     "observations": {
      "breathing": "unknown",
      "consciousness": "unknown",
-     "severeBleeding": "unknown",
-     "walking": "unknown"
+     "severeBleeding": "absent",
+     "walking": "able"
     },
     "evidence": {
      "breathing": null,
      "consciousness": null,
-     "severeBleeding": null,
-     "walking": null
+     "severeBleeding": "Walang dugo",
+     "walking": "nakakalakad"
     }
    }
   },
@@ -564,13 +564,13 @@
    },
    "expected": {
     "observations": {
-     "breathing": "abnormal",
+     "breathing": "absent",
      "consciousness": "unknown",
      "severeBleeding": "unknown",
      "walking": "unknown"
     },
     "evidence": {
-     "breathing": "gasping",
+     "breathing": "stopped breathing",
      "consciousness": null,
      "severeBleeding": null,
      "walking": null
@@ -841,15 +841,15 @@
    "expected": {
     "observations": {
      "breathing": "unknown",
-     "consciousness": "unknown",
-     "severeBleeding": "unknown",
-     "walking": "unknown"
+     "consciousness": "alert",
+     "severeBleeding": "absent",
+     "walking": "able"
     },
     "evidence": {
      "breathing": null,
-     "consciousness": null,
-     "severeBleeding": null,
-     "walking": null
+     "consciousness": "gising",
+     "severeBleeding": "Walang pagdurugo",
+     "walking": "Nakakalakad"
     }
    }
   },

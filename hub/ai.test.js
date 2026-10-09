@@ -59,25 +59,77 @@ test('AI validation confirms claims in-transcript and drops unconfirmed ones', (
   const bad = toValidatedExtraction({
     observations: { breathing: 'absent', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' },
   }, transcript);
-  assert.equal(bad.observations.breathing, 'unknown');
-  assert.equal(bad.evidence.breathing, null);
-  assert.ok(bad.warnings.some((w) => w.includes('breathing')));
+  assert.equal(bad.observations.breathing, 'normal');
+  assert.equal(bad.evidence.breathing, 'breathing normally');
+  assert.ok(bad.warnings.some((w) => w.includes('breathing=normal')));
 });
 
 test('AI validation catches contradictions and negated phrases', () => {
   const mixed = toValidatedExtraction({
     observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'present', walking: 'unable' },
   }, 'Synthetic: no severe bleeding but the patient cannot walk.');
-  // "severe bleeding" occurs inside a denial, so the opposite trigger fires -> unknown.
-  assert.equal(mixed.observations.severeBleeding, 'unknown');
+  assert.equal(mixed.observations.severeBleeding, 'absent');
   assert.equal(mixed.observations.walking, 'unable');
   assert.ok(mixed.warnings.length > 0);
+});
+
+test('Tagalog clitics inside a reported phrase still confirm the claim', () => {
+  const transcript = 'may lalaki po dito around 69 years old, nahihirapan siyang huminga at masakit ang dibdib niya mga 30 minutes na';
+  const out = toValidatedExtraction({
+    observations: { breathing: 'abnormal', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
+  }, transcript);
+  assert.equal(out.observations.breathing, 'abnormal');
+  assert.equal(out.evidence.breathing, 'nahihirapan siyang huminga');
+  assert.ok(!out.uncertainties.includes('breathing was not clearly reported'));
+
+  const walk = toValidatedExtraction({
+    observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unable' },
+  }, 'nasugatan at hindi po siya makalakad');
+  assert.equal(walk.observations.walking, 'unable');
+  assert.equal(walk.evidence.walking, 'hindi po siya makalakad');
+});
+
+test('explicit transcript phrases recover model misses while negation and conflicts stay unknown', () => {
+  const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Gising siya at sumasagot. Walang pagdurugo at nakakalakad siya.';
+  const out = toValidatedExtraction({
+    observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
+  }, transcript);
+  assert.deepEqual(out.observations, { breathing: 'abnormal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' });
+  assert.equal(out.evidence.breathing, 'Nahihirapan siyang huminga');
+  assert.equal(out.evidence.consciousness, 'Gising');
+  assert.equal(out.evidence.severeBleeding, 'Walang pagdurugo');
+  assert.equal(out.evidence.walking, 'nakakalakad');
+  assert.ok(!out.uncertainties.some((item) => /^(breathing|consciousness|severeBleeding|walking) was/.test(item)));
+
+  const negated = toValidatedExtraction({
+    observations: { breathing: 'abnormal', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
+  }, 'Hindi po siya nahihirapan huminga.');
+  assert.equal(negated.observations.breathing, 'unknown');
+
+  const conflicting = toValidatedExtraction({
+    observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
+  }, 'Nahihirapan siyang huminga pero humihinga nang normal.');
+  assert.equal(conflicting.observations.breathing, 'unknown');
+  assert.ok(conflicting.warnings.some((item) => item.includes('Contradictory transcript phrases about breathing')));
+});
+
+test('a non-particle gap or an opposite statement still blocks confirmation', () => {
+  const hard = toValidatedExtraction({
+    observations: { breathing: 'abnormal', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' },
+  }, 'hirap nang matinding huminga ang bata');
+  assert.equal(hard.observations.breathing, 'unknown');
+  assert.ok(hard.warnings.length > 0);
+
+  const able = toValidatedExtraction({
+    observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'able' },
+  }, 'nasugatan at hindi po siya makalakad');
+  assert.equal(able.observations.walking, 'unable');
 });
 
 test('AI validation coerces invented enums to unknown instead of failing', () => {
   const out = toValidatedExtraction({
     observations: { breathing: 'yes', consciousness: 'awake', severeBleeding: 'no', walking: 'sometimes' },
-  }, TRANSCRIPT);
+  }, 'Synthetic patient report without supported observations.');
   assert.deepEqual(out.observations, { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' });
   assert.ok(out.warnings.length >= 3);
 });
@@ -187,6 +239,36 @@ test('AI extract returns validated processing + deterministic provisional triage
     assert.equal(assist.ok, true);
     assert.equal(assist.draft.triage, 'Minor');
     assert.ok(assist.disclaimer);
+  }));
+
+test('AI extraction persists a complete evidence-backed report without assigning verified triage', () =>
+  withAiApp(fakeOllama({ chat: JSON.stringify({ observations: {
+    breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown',
+  } }) }), async (base) => {
+    const transcript = 'May isang lalaki po dito, 69 years old. Nahihirapan siyang huminga at masakit ang dibdib niya. Gising siya at sumasagot. Walang pagdurugo at nakakalakad siya mga 30 minutes na.';
+    const extracted = await (await fetch(`${base}/api/ai/extract`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript }),
+    })).json();
+    assert.equal(extracted.fields.symptomDuration.value, 30);
+    assert.equal(extracted.fields.symptomDuration.unit, 'minutes');
+    assert.equal(extracted.fieldEvidence.symptomDuration, '30 minutes na');
+    assert.ok(extracted.processing.findings.some((finding) => finding.name === 'Chest pain' && finding.excerpt === 'masakit ang dibdib'));
+    assert.ok(extracted.processing.findings.some((finding) => finding.name === 'Symptom duration' && finding.excerpt === '30 minutes na'));
+    assert.equal(extracted.provisional.triage, 'Immediate');
+
+    const intake = await fetch(`${base}/api/sync-triage`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ watchId: 'W-REPORT-TEST', reports: [{
+        localId: 1, location: 'Unspecified', injuries: 'Unspecified', triage: 'Unassessed',
+        patientCount: extracted.fields.patientCount, ageGroup: extracted.fields.ageGroup,
+        etaMinutes: null, rawText: transcript, createdAt: '2026-10-10T00:00:00.000Z', processing: extracted.processing,
+      }] }),
+    });
+    assert.deepEqual((await intake.json()).ackLocalIds, [1]);
+    const rows = await (await fetch(`${base}/api/triage`)).json();
+    assert.equal(rows[0].injuries, 'Unspecified', 'machine findings do not overwrite the reviewed legacy field');
+    assert.equal(rows[0].effective_triage, 'Unassessed', 'machine observations remain unverified in the saved report');
+    assert.ok(rows[0].processing.findings.some((finding) => finding.name === 'Chest pain'));
   }));
 
 test('AI reports model-missing when Ollama lacks the configured model', () =>
