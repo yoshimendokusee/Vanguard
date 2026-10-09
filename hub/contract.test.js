@@ -51,7 +51,7 @@ test('documented LAN example works end to end with the shipped dashboard', async
     assert.ok(assets.length >= 2, 'Dashboard must load JavaScript and CSS');
     for (const asset of assets) assert.equal((await fetch(base + asset[1])).status, 200);
     const source = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
-    new vm.Script(source, { filename: 'dashboard.js' });
+    new vm.Script(source.replace(/^import '\.\/hub-client\.js';\r?\n/m, ''), { filename: 'dashboard.js' });
     const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\s*>/gi)];
     assert.ok(scripts.length > 0);
     for (const [index, script] of scripts.entries()) new vm.Script(script[1], { filename: `dashboard-${index}.js` });
@@ -155,4 +155,25 @@ test('draft setup suggestions are read-only, explain themselves, and never feed 
   assert.equal(list({ ...aiSaved, source_findings_current: true }), '[]', 'current findings use the normal checklist');
   const readiness = html.match(/  const readyItems = \(r\) => \{[\s\S]*?\n  \};/)[0];
   assert.doesNotMatch(readiness, /suggestedOf/, 'suggestions must not enter readiness items or counts');
+});
+
+test('extracted fields only fill blanks, never overwrite typed values, and never save a guessed location', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/dashboard.js'), 'utf8');
+  const fn = html.match(/    function applyExtractedFields\(report, data\) \{[\s\S]*?\n    \}/)[0];
+  const apply = vm.runInNewContext(`${fn}\napplyExtractedFields`, { Object, Number });
+  const blank = { location: 'Unspecified', injuries: 'Unspecified', patientCount: null, ageGroup: 'Unspecified', etaMinutes: null };
+  const fields = { location: 'Barangay Uno', patientCount: 2, ageGroup: 'Child', etaMinutes: 10, injuries: 'Chest pain' };
+  const done = apply(blank, { fields, locationBasis: 'explicit' });
+  assert.equal(JSON.stringify(done.changed), '["location","patientCount","ageGroup","etaMinutes"]');
+  assert.equal(done.report.location, 'Barangay Uno');
+  assert.equal(done.report.injuries, 'Unspecified', 'AI injury terms are never saved automatically');
+  const typed = apply({ ...blank, location: 'Plaza', patientCount: 5, ageGroup: 'Adult', etaMinutes: 30 }, { fields, locationBasis: 'explicit' });
+  assert.equal(typed.changed.length, 0);
+  assert.equal(typed.report.location, 'Plaza');
+  assert.equal(typed.report.patientCount, 5);
+  const guessed = apply(blank, { fields: { ...fields, location: 'Arnaldo' }, locationBasis: 'inferred' });
+  assert.equal(guessed.report.location, 'Unspecified', 'a guessed location is shown, not saved');
+  assert.equal(apply(blank, { fields: { ageGroup: 'Unspecified' } }).changed.length, 0);
+  // The filled version must be stored before the report is sent.
+  assert.match(html, /await VanguardApi\.retain\(Object\.assign\(\{\}, saveAttempt\.report, \{ readyToSend: true \}\)\);\s*await VanguardApi\.flush\(\);/);
 });

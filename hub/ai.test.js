@@ -361,3 +361,24 @@ test('concurrent extraction cannot overwrite a transcript correction', () =>
     assert.equal(detail.processing, null);
     assert.equal(detail.raw_text, TRANSCRIPT);
   }));
+
+
+test('invalid AI configuration returns an actionable error without stopping capture', () =>
+  withAiApp(fakeOllama({ chat: GOOD_CHAT }), async (base) => {
+    process.env.AI_TIMEOUT_MS = '-1';
+    const health = await (await fetch(base + '/api/ai/health')).json();
+    assert.equal(health.state, 'ERROR');
+    const response = await fetch(base + '/api/ai/extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript: TRANSCRIPT }) });
+    assert.equal(response.status, 503);
+    assert.equal((await response.json()).error, 'invalid-ai-config');
+    assert.equal((await fetch(base + '/api/health')).status, 200);
+  }));
+
+test('shared v1 fixture is accepted without losing transcript/provenance', () => {
+  const fixture = require('../docs/fixtures/ai-v1.json');
+  const normalized = require('./processing').validateProcessing(fixture.processing);
+  assert.equal(normalized.error, undefined);
+  assert.equal(normalized.value.originalTranscript, fixture.processing.originalTranscript);
+  assert.deepEqual(normalized.value.provenance, fixture.processing.provenance);
+  assert.deepEqual(normalized.value.evidence, fixture.processing.evidence);
+});

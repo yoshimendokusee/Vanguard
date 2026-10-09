@@ -1,3 +1,6 @@
+import './hub-client.js';
+
+  const VanguardApi = window.VanguardApi;
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
   // Keys must match the canonical finding names in watch/lib/nlp/triage_parser.dart.
   const PREP = {
@@ -52,6 +55,7 @@
   const saveReady = () => { try { localStorage.setItem('ready', JSON.stringify(ready)); } catch (_) {} };
 
   const $ = (id) => document.getElementById(id);
+  $('hub-token-save').onclick = () => VanguardApi.setToken($('hub-token').value).catch(error => toast(error.message));
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   const num = (n) => new Intl.NumberFormat().format(n);
   const plural = (n, w) => `${num(n)} ${w}${n === 1 ? '' : 's'}`;
@@ -120,7 +124,7 @@
   // ---------- data ----------
   async function load() {
     try {
-      const res = await fetch('/api/triage');
+      const res = await VanguardApi.request('/api/triage');
       if (!res.ok) throw new Error('bad status');
       const next = await res.json();
       const fresh = firstLoad ? [] : next.filter((r) => !seen.has(r.id));
@@ -142,7 +146,7 @@
     btn.classList.add('loading');
     btn.setAttribute('aria-busy', 'true');
     try {
-      const res = await fetch(`/api/triage/${r.id}`, {
+      const res = await VanguardApi.request(`/api/triage/${r.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status }),
@@ -495,7 +499,7 @@
     dialog.addEventListener('close', () => dialog.remove());
     document.body.append(dialog); dialog.showModal();
     try {
-      const response = await fetch(`/api/triage/${r.id}`);
+      const response = await VanguardApi.request(`/api/triage/${r.id}`);
       if (!response.ok) throw new Error('Could not load evidence');
       const detail = await response.json();
       content.replaceChildren(el('h2', '', 'Original evidence'), el('pre', '', detail.raw_text));
@@ -506,7 +510,7 @@
       extract.onclick = async () => {
         extract.disabled = true; aiState.textContent = 'Extracting locally; original report is already stored…';
         try {
-          const response = await fetch(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ requestId, baseRevision: detail.revision }) });
           const data = await response.json();
           if (!response.ok) throw new Error(data.message || data.error || 'Inference failed');
@@ -557,7 +561,7 @@
         }
         save.disabled = true;
         try {
-          const response = await fetch(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          const response = await VanguardApi.request(`/api/triage/${r.id}/revisions`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ ...change, requestId: attempt.requestId }) });
           const result = await response.json();
           if (!response.ok) throw new Error(result.error || 'Could not save revision');
@@ -996,18 +1000,18 @@
   tick();
   setInterval(tick, 10000);
 
-  fetch('/api/config').then((r) => r.json()).then((c) => {
+  VanguardApi.request('/api/config').then((r) => r.json()).then((c) => {
     $('hospital').textContent = c.hospital;
     document.title = c.hospital + ' · Pre-Arrival Board';
   }).catch(() => {});
 
   // Live push; the poll is a safety net if the stream drops.
   function connect() {
-    const es = new EventSource('/api/events');
-    es.onopen = () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; };
-    es.addEventListener('triage', () => load());
-    es.addEventListener('cloud', (e) => { try { renderCloud(JSON.parse(e.data)); } catch { /* keep last state */ } });
-    es.onerror = () => { $('conn').textContent = 'Reconnecting'; $('conn').className = 'conn down'; };
+    VanguardApi.events(
+      () => { $('conn').textContent = 'Live'; $('conn').className = 'conn live'; },
+      () => load(),
+      () => { $('conn').textContent = 'Polling'; $('conn').className = 'conn down'; },
+      renderCloud);
   }
   // Supabase backup status from the hub; the board never talks to Supabase directly.
   function cloudLabel(s) {
@@ -1026,12 +1030,12 @@
     btn.disabled = s.state === 'syncing';
   }
   function loadCloud() {
-    fetch('/api/cloud/status').then((r) => r.json()).then(renderCloud)
+    VanguardApi.request('/api/cloud/status').then((r) => r.json()).then(renderCloud)
       .catch(() => { $('cloud-conn').textContent = 'Cloud: unknown'; $('cloud-conn').className = 'conn down'; });
   }
   $('cloud-sync').addEventListener('click', () => {
     $('cloud-sync').disabled = true;
-    fetch('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
+    VanguardApi.request('/api/cloud/sync', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ retryRejected: true }) })
       .then((r) => r.json()).then(renderCloud).catch(loadCloud);
   });
 
@@ -1044,6 +1048,10 @@
   loadCloud();
   connect();
   setInterval(load, 10000);
+  const retryOutbox = () => VanguardApi.flush().catch(() => {});
+  retryOutbox();
+  window.addEventListener('online', retryOutbox);
+  setInterval(retryOutbox, 30000);
   setInterval(loadCloud, 30000);
   setInterval(render, 15000); // keep ETA countdowns and "x min ago" fresh between polls
 
@@ -1057,19 +1065,18 @@
     var textEl = $('ai-text'), stateEl = $('ai-state'), resultEl = $('ai-result'), reviewEl = $('ai-review');
     var extractBtn = $('ai-extract'), assistBtn = $('ai-assist'), saveBtn = $('ai-save');
     var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
-    var busy = false, lastExtraction = null, saveAttempt = null;
+    var busy = false, lastExtraction = null, saveAttempt = null, lastApplied = null;
     var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
     function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
     async function refreshStatus() {
       try {
-        var s = await (await fetch('/api/ai/health')).json();
-        if (s && s.inference_available) { setConn(true, 'AI ready'); return; }
-        setConn(false, 'AI unavailable');
-        stateEl.textContent = (s && s.error === 'model-missing')
-          ? 'Qwen model is missing on the hospital computer. The board still works.'
-          : 'Local AI is unreachable. The board still works without it.';
+        var s = await (await VanguardApi.request('/api/ai/health')).json();
+        if (s && s.state === 'READY' && s.inference_available) { setConn(true, 'AI Live'); connEl.title = 'Pinned local Qwen generated completed tokens'; return; }
+        setConn(false, 'AI: ' + (s.state || 'UNAVAILABLE').toLowerCase().replaceAll('_', ' '));
+        connEl.title = 'Docker AI: ' + (s.state || 'UNAVAILABLE') + (s.error ? ' (' + s.error + ')' : '') + '. Inspect model-init/Ollama logs; reports remain local until acknowledged.';
       } catch (e) { setConn(false, 'AI unavailable'); }
     }
+    setInterval(refreshStatus, 30000);
     function errText(data, res) {
       var map = {
         'ollama-unreachable': 'Local AI is unreachable; is Ollama running on the hospital computer?',
@@ -1142,83 +1149,87 @@
       fillFields(data);
       reviewEl.hidden = false;
     }
-    // Prefill the report fields from what the transcript states. Each value came from
-    // a quote shown in the note below; blanks stay blank, and everything is editable.
+    // Only blank fields are filled, from what the transcript states; anything the person typed wins.
+    // A guessed location and the injury terms are shown as suggestions and never saved automatically.
+    function applyExtractedFields(report, data) {
+      var f = data.fields || {}, out = Object.assign({}, report), changed = [];
+      if ((!report.location || report.location === 'Unspecified') && f.location && data.locationBasis === 'explicit') { out.location = f.location; changed.push('location'); }
+      if (report.patientCount === null && Number.isInteger(f.patientCount)) { out.patientCount = f.patientCount; changed.push('patientCount'); }
+      if (report.ageGroup === 'Unspecified' && f.ageGroup && f.ageGroup !== 'Unspecified') { out.ageGroup = f.ageGroup; changed.push('ageGroup'); }
+      if (report.etaMinutes === null && Number.isInteger(f.etaMinutes)) { out.etaMinutes = f.etaMinutes; changed.push('etaMinutes'); }
+      return { report: out, changed: changed };
+    }
     function fillFields(data) {
-      var f = data.fields || {}, ev = data.fieldEvidence || {}, notes = [];
-      $('ai-location').value = f.location || '';
-      $('ai-count').value = f.patientCount == null ? '' : f.patientCount;
-      $('ai-age').value = f.ageGroup || 'Unspecified';
-      $('ai-eta').value = f.etaMinutes == null ? '' : f.etaMinutes;
-      $('ai-injuries').value = f.injuries && f.injuries !== 'Unspecified' ? f.injuries : '';
-      if (f.location) notes.push('Location \u201C' + f.location + '\u201D from \u201C' + ev.location + '\u201D' + (data.locationBasis === 'inferred' ? ' (guessed — check it is the pickup place)' : ''));
-      if (f.patientCount != null) notes.push('Patients ' + f.patientCount + ' from \u201C' + ev.patientCount + '\u201D');
-      if (ev.ageGroup) notes.push('Age group from \u201C' + ev.ageGroup + '\u201D');
-      if (f.etaMinutes != null) notes.push('ETA ' + f.etaMinutes + ' min from \u201C' + ev.etaMinutes + '\u201D');
-      (data.fieldNotes || []).forEach(function (n) { notes.push(n); });
-      $('ai-fields-note').textContent = notes.length
-        ? 'Filled from the transcript — check every field before saving. ' + notes.join(' · ')
-        : 'Nothing could be filled from the transcript; enter the fields yourself.';
-      if (data.legacy && data.legacy.triage !== 'Unassessed') {
-        $('ai-fields-note').textContent += ' · Hospital finding rules on these injury terms: ' + data.legacy.triage + ' (' + data.legacy.reason + ').';
+      var f = data.fields || {}, ev = data.fieldEvidence || {}, r = saveAttempt && saveAttempt.report;
+      var applied = (lastApplied && lastApplied.changed) || [], notes = [], suggestions = [];
+      if (r) {
+        $('ai-location').value = r.location === 'Unspecified' ? '' : r.location;
+        $('ai-count').value = r.patientCount == null ? '' : r.patientCount;
+        $('ai-age').value = r.ageGroup;
+        $('ai-eta').value = r.etaMinutes == null ? '' : r.etaMinutes;
       }
+      if (applied.indexOf('location') !== -1) notes.push('Location \u201C' + f.location + '\u201D from \u201C' + ev.location + '\u201D');
+      if (applied.indexOf('patientCount') !== -1) notes.push('Patients ' + f.patientCount + ' from \u201C' + ev.patientCount + '\u201D');
+      if (applied.indexOf('ageGroup') !== -1) notes.push('Age group ' + f.ageGroup + ' from \u201C' + ev.ageGroup + '\u201D');
+      if (applied.indexOf('etaMinutes') !== -1) notes.push('ETA ' + f.etaMinutes + ' min from \u201C' + ev.etaMinutes + '\u201D');
+      (data.fieldNotes || []).forEach(function (n) { suggestions.push(n); });
+      if (f.location && applied.indexOf('location') === -1 && (!r || r.location === 'Unspecified')) {
+        suggestions.push('Location \u201C' + f.location + '\u201D was only guessed from \u201C' + ev.location + '\u201D, so it was not saved. Enter it yourself if correct.');
+      }
+      if (f.injuries && f.injuries !== 'Unspecified' && (!r || r.injuries === 'Unspecified')) {
+        suggestions.push('Injury terms found (not saved automatically): ' + f.injuries +
+          (data.legacy && data.legacy.triage !== 'Unassessed' ? '. If saved, the hospital finding rules would rate these ' + data.legacy.triage + ' (' + data.legacy.reason + ')' : ''));
+      }
+      $('ai-fields-note').textContent = (notes.length ? 'Filled from the transcript and saved with the report: ' + notes.join(' \u00B7 ') + '. ' : '') + suggestions.join(' \u00B7 ');
     }
     async function run(kind) {
       if (busy) return;
       var transcript = textEl.value;
       if (!transcript.trim()) { stateEl.textContent = 'Type a transcript first.'; return; }
-      lastExtraction = null; saveAttempt = null; reviewEl.hidden = true;
+      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
+      var eta = $('ai-eta').value === '' ? null : Number($('ai-eta').value);
+      if ((pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) || (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720))) { stateEl.textContent = 'Check patient count (1–99) and ETA (1–720 minutes), or leave unknown.'; return; }
+      lastExtraction = null; saveAttempt = null; lastApplied = null; reviewEl.hidden = false;
       busy = true; extractBtn.disabled = true; assistBtn.disabled = true;
-      stateEl.textContent = 'Working — asking local Qwen…';
+      stateEl.textContent = 'Saving original locally…';
       try {
-        var res = await fetch('/api/ai/' + kind, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: transcript, device: 'hospital-browser', sttEngine: 'typed/hub-form', sttRuntime: 'hub-ai-v1' })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { stateEl.textContent = errText(data, res); return; }
+        saveAttempt = { report: { localId: Date.now(), createdAt: new Date().toISOString(), reportId: VanguardApi.uuid(), encounterId: VanguardApi.uuid(),
+          rawText: transcript, location: $('ai-location').value.trim() || 'Unspecified', injuries: $('ai-injuries').value.trim() || 'Unspecified', triage: 'Unassessed', patientCount: pc, ageGroup: $('ai-age').value, etaMinutes: eta } };
+        stateEl.textContent = 'Original will be saved locally before Qwen runs…';
+        var data = await VanguardApi.prepare(saveAttempt.report, kind);
         lastExtraction = data;
-        setConn(true, 'AI ready');
-        stateEl.textContent = 'Ready — review the extraction below before saving.';
+        setConn(true, 'AI Live');
+        lastApplied = applyExtractedFields(saveAttempt.report, data);
+        saveAttempt.report = lastApplied.report;
         renderResult(data);
-      } catch (e) { stateEl.textContent = 'Could not reach the hub; the board still works.'; }
+        saveAttempt.report.processing = data.processing;
+        // Blank fields were filled from the transcript: store that version before sending.
+        if (lastApplied.changed.length) await VanguardApi.retain(Object.assign({}, saveAttempt.report, { readyToSend: true }));
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === saveAttempt.report.reportId; })) throw Error('Hospital receipt pending');
+        stateEl.textContent = 'Saved and transmitted automatically; provisional Unassessed. Verify clinically.';
+        saveBtn.disabled = true;
+        load();
+      } catch (e) { stateEl.textContent = e.code === 'local-storage-unavailable' ? e.message : 'Processing or receipt unavailable; original saved locally and queued for automatic delivery.'; saveBtn.disabled = false; retryOutbox(); }
       finally { busy = false; extractBtn.disabled = false; assistBtn.disabled = false; }
     }
     extractBtn.onclick = function () { run('extract'); };
     assistBtn.onclick = function () { run('triage-assist'); };
     saveBtn.onclick = async function () {
       if (!lastExtraction || lastExtraction.processing.originalTranscript !== textEl.value) { saveStateEl.textContent = 'Transcript changed; extract it again before saving.'; return; }
-      var loc = $('ai-location').value.trim();
-      if (!loc) { saveStateEl.textContent = 'Enter a pickup location first.'; return; }
-      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
-      if (pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) { saveStateEl.textContent = 'Patients must be 1–99 or unknown.'; return; }
-      var ages = ['Infant', 'Child', 'Adult', 'Elderly', 'Unspecified'];
-      var ag = $('ai-age').value; if (ages.indexOf(ag) === -1) ag = 'Unspecified';
-      var etaRaw = $('ai-eta').value.trim();
-      var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
-      if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
-      var prov = { triage: 'Unassessed' };
-      var injuries = $('ai-injuries').value.trim() || 'Unspecified';
-      var report = { location: loc, injuries: injuries, triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
-        rawText: lastExtraction.processing.originalTranscript, processing: lastExtraction.processing };
-      var signature = JSON.stringify(report);
-      if (!saveAttempt || saveAttempt.signature !== signature) saveAttempt = { signature: signature, report: Object.assign(report, { localId: Date.now(), createdAt: new Date().toISOString(), reportId: newUUID(), encounterId: newUUID() }) };
+      if (!saveAttempt) return;
+      var report = saveAttempt.report;
       saveBtn.disabled = true; saveStateEl.textContent = 'Saving…';
       try {
-        var res = await fetch('/api/sync-triage', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ watchId: 'HUB-AI', reports: [saveAttempt.report] })
-        });
-        var data = await res.json().catch(function () { return null; });
-        if (!res.ok || !data || data.ok !== true) { saveStateEl.textContent = 'Save failed; nothing was stored.'; return; }
-        if (data.rejected && data.rejected.length) { saveStateEl.textContent = 'Hub refused the report: ' + data.rejected[0].reason; return; }
-        saveStateEl.textContent = 'Saved as inbound (' + prov.triage + ', provisional) — verify clinically.';
-        if (!data.ackLocalIds || data.ackLocalIds.indexOf(saveAttempt.report.localId) === -1) throw new Error('No explicit receipt');
-        if (typeof toast === 'function') toast('AI report saved', prov.triage + ' · verify clinically', prov.triage);
+        await VanguardApi.retain(report);
+        await VanguardApi.flush();
+        if ((await VanguardApi.pending()).some(function (row) { return row.reportId === report.reportId; })) throw Error('Hospital receipt pending');
+        saveStateEl.textContent = 'Hospital receipt acknowledged; verify clinically.';
+        if (typeof toast === 'function') toast('AI report saved', 'Unassessed · verify clinically', 'Unassessed');
         if (typeof load === 'function') load();
       } catch (e) { saveStateEl.textContent = 'Receipt unavailable; retain this form and retry the same report.'; }
       finally { saveBtn.disabled = false; }
     };
-    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; });
+    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; $(id).value = 'unknown'; });
     refreshStatus();
   })();

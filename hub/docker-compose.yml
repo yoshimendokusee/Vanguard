@@ -1,4 +1,11 @@
 services:
+  model-init:
+    build: .
+    command: ["node", "provision-model.js"]
+    volumes:
+      - ../models/qwen3-0.6b:/model-source:ro
+      - qwen-weights:/models/qwen3-0.6b
+    restart: "no"
   hub:
     build: .
     ports:
@@ -7,7 +14,10 @@ services:
       HOSPITAL_NAME: "${HOSPITAL_NAME:-Receiving Hospital · Emergency Department}"
       OLLAMA_URL: "http://ollama:11434"
       QWEN_MODEL_DIR: /models/qwen3-0.6b
-      AI_TIMEOUT_MS: "${AI_TIMEOUT_MS:-60000}"
+      AI_TIMEOUT_MS: "${AI_TIMEOUT_MS:-120000}"
+      AI_NUM_THREADS: "${AI_NUM_THREADS:-2}"
+      HUB_USERS: "${HUB_USERS:-}"
+      HUB_BIND_ADDRESS: "${HUB_BIND_ADDRESS:-127.0.0.1}"
       # Optional Supabase backup; empty values keep the hub LAN-only.
       SUPABASE_URL: "${SUPABASE_URL:-}"
       SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
@@ -16,7 +26,7 @@ services:
       CLOUD_SYNC_INTERVAL_MS: "${CLOUD_SYNC_INTERVAL_MS:-30000}"
     volumes:
       - ./data:/data
-      - ../models:/models:ro
+      - qwen-weights:/models/qwen3-0.6b:ro
     networks: [default, inference]
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
@@ -31,10 +41,15 @@ services:
     environment:
       OLLAMA_HOST: 0.0.0.0:11434
       OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_MAX_QUEUE: "8"
     volumes:
       - ollama-models:/root/.ollama
-      - ../models/qwen3-0.6b:/models:ro
-    entrypoint: ["/bin/sh", "/models/start-ollama.sh"]
+      - qwen-weights:/models:ro
+      - ../models/qwen3-0.6b/start-ollama.sh:/start-ollama.sh:ro
+    entrypoint: ["/bin/sh", "/start-ollama.sh"]
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
     # Internal-only access, with no internet route or host Ollama port.
     networks: [inference]
     healthcheck:
@@ -49,3 +64,4 @@ networks:
     internal: true
 volumes:
   ollama-models:
+  qwen-weights:

@@ -55,3 +55,7 @@ watch/apple/DerivedData/
 
 # Vite production output.
 hub/dist/
+# Initial provisioning progress is runtime state, never part of the artifact.
+models/**/provisioning.json*
+models/**/*.partial
+models/**/.verify-*/

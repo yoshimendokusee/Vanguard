@@ -43,6 +43,7 @@ void main() {
       final marked = <int>[];
       var requests = 0;
       final service = SyncService(
+        hub: 'http://synthetic-hub.test',
         watchId: 'W-TEST',
         pending: () async => rows,
         acknowledge: (ids) async => marked.addAll(ids),
@@ -79,6 +80,7 @@ void main() {
       ]) {
         final marked = <int>[];
         final service = SyncService(
+          hub: 'http://synthetic-hub.test',
           watchId: 'W-TEST',
           pending: () async => [row(1)],
           acknowledge: (ids) async => marked.addAll(ids),
@@ -99,6 +101,7 @@ void main() {
     () async {
       final marked = <int>[];
       final service = SyncService(
+        hub: 'http://synthetic-hub.test',
         watchId: 'W-TEST',
         pending: () async => [row(1), row(2)],
         acknowledge: (ids) async => marked.addAll(ids),
@@ -127,6 +130,7 @@ void main() {
       final marked = <int>[];
       var requests = 0;
       final service = SyncService(
+        hub: 'http://synthetic-hub.test',
         watchId: 'W-TEST',
         pending: () async => [row(1)],
         acknowledge: (ids) async => marked.addAll(ids),
@@ -156,6 +160,7 @@ void main() {
     var requests = 0;
     final marked = <int>[];
     final service = SyncService(
+      hub: 'http://synthetic-hub.test',
       watchId: 'W-TEST',
       pending: () async => [row(1, text: 'a' * 16001), row(2)],
       acknowledge: (ids) async => marked.addAll(ids),
@@ -185,6 +190,7 @@ void main() {
       final marked = <int>[];
       var requests = 0;
       final service = SyncService(
+        hub: 'http://synthetic-hub.test',
         watchId: 'W-TEST',
         pending: () async => rows,
         acknowledge: (ids) async => marked.addAll(ids),
@@ -215,6 +221,7 @@ void main() {
     var pending = [row(1)];
     var requests = 0;
     final service = SyncService(
+      hub: 'http://synthetic-hub.test',
       watchId: 'W-TEST',
       pending: () async => pending,
       acknowledge: (ids) async =>
