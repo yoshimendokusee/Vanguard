@@ -28,7 +28,7 @@ class VanguardWristApp extends StatelessWidget {
   );
 }
 
-enum _Phase { loading, idle, listening, error }
+enum _Phase { loading, idle, listening, processing, error }
 
 class TriageScreen extends StatefulWidget {
   const TriageScreen({super.key});
@@ -37,7 +37,8 @@ class TriageScreen extends StatefulWidget {
   State<TriageScreen> createState() => _TriageScreenState();
 }
 
-class _TriageScreenState extends State<TriageScreen> {
+class _TriageScreenState extends State<TriageScreen>
+    with WidgetsBindingObserver {
   static const _parser = TriageParser();
 
   final _speech = OfflineSpeech();
@@ -56,7 +57,9 @@ class _TriageScreenState extends State<TriageScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _speech.onTranscript = (t) {
+      if (!mounted) return;
       setState(() => _transcript = t);
       // Keep the newest words visible as the rescuer keeps talking.
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -72,14 +75,21 @@ class _TriageScreenState extends State<TriageScreen> {
     try {
       final db = await TriageDb.open();
       _db = db;
-      _sync = SyncService(db);
+      _sync = SyncService(
+        watchId: db.watchId,
+        pending: db.pending,
+        acknowledge: db.markSynced,
+      );
+      _sync!.start(_syncFinished);
       _pending = await db.pendingCount();
       await _speech.init();
+      if (!mounted) return;
       setState(() {
         _phase = _Phase.idle;
         _status = 'TAP TO REPORT';
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _phase = _Phase.error;
         _status = 'MODEL ERROR';
@@ -90,6 +100,8 @@ class _TriageScreenState extends State<TriageScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _sync?.dispose();
     _speech.dispose();
     _scroll.dispose();
     super.dispose();
@@ -105,20 +117,40 @@ class _TriageScreenState extends State<TriageScreen> {
         _transcript = '';
         _lastSaved = null;
       });
-      await _speech.start();
+      try {
+        await _speech.start();
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _phase = _Phase.error;
+          _status = 'MICROPHONE FAILED';
+        });
+      }
     }
   }
 
   Future<void> _finish() async {
-    setState(() => _status = 'SAVING…');
-    final text = await _speech.stop();
-    await _process(text);
+    setState(() {
+      _phase = _Phase.processing;
+      _status = 'SAVING…';
+    });
+    try {
+      final text = await _speech.stop();
+      await _process(text);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _phase = _Phase.error;
+        _status = 'CAPTURE/SAVE FAILED';
+      });
+    }
   }
 
   /// Transcript -> deterministic parse -> SQLite -> haptic confirmation.
   Future<void> _process(String text) async {
     if (text.trim().isEmpty) {
       await _buzz(_Buzz.nothing);
+      if (!mounted) return;
       setState(() {
         _phase = _Phase.idle;
         _status = 'NOTHING HEARD';
@@ -135,12 +167,14 @@ class _TriageScreenState extends State<TriageScreen> {
           ? _Buzz.immediate
           : _Buzz.saved,
     );
+    if (!mounted) return;
     setState(() {
       _phase = _Phase.idle;
       _lastSaved = row;
       _pending = pending;
       _status = result.isRecognized ? 'SAVED' : 'SAVED – CHECK';
     });
+    unawaited(_sync!.sync());
   }
 
   /// Demo fail-safe: long-press the header to run a sample report through the
@@ -150,29 +184,43 @@ class _TriageScreenState extends State<TriageScreen> {
     const phrase =
         'Dalawang bata, nalunod at walang malay, sa Barangay '
         'Arnaldo, sampung minuto papunta sa ospital.';
-    setState(() => _transcript = phrase);
+    setState(() {
+      _phase = _Phase.processing;
+      _transcript = phrase;
+    });
     await _process(phrase);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _sync != null) {
+      unawaited(_sync!.sync());
+    }
+  }
+
+  void _syncFinished(SyncOutcome outcome) {
+    unawaited(_showSyncOutcome(outcome));
+  }
+
+  Future<void> _showSyncOutcome(SyncOutcome outcome) async {
+    final pending = await _db!.pendingCount();
+    if (!mounted) return;
+    setState(() {
+      _syncing = false;
+      _pending = pending;
+      if (_phase == _Phase.idle &&
+          (pending > 0 || outcome.sent + outcome.duplicates > 0)) {
+        _status = pending > 0
+            ? outcome.error?.toUpperCase() ?? 'SAVED · RETRYING'
+            : 'HUB ACKNOWLEDGED';
+      }
+    });
   }
 
   Future<void> _doSync() async {
     if (_syncing || _sync == null) return;
-    setState(() {
-      _syncing = true;
-      _status = 'SENDING…';
-    });
-    final outcome = await _sync!.sync();
-    final pending = await _db!.pendingCount();
-    if (outcome.ok) await _buzz(_Buzz.saved);
-    setState(() {
-      _syncing = false;
-      _pending = pending;
-      _status = outcome.ok
-          ? (outcome.sent + outcome.duplicates == 0
-                ? 'NOTHING TO SEND'
-                : 'SENT ${outcome.sent}'
-                      '${outcome.duplicates > 0 ? ' (${outcome.duplicates} dup)' : ''}')
-          : outcome.error!.toUpperCase();
-    });
+    setState(() => _syncing = true);
+    await _sync!.sync();
   }
 
   @override
@@ -266,7 +314,7 @@ class _TriageScreenState extends State<TriageScreen> {
                 child: FilledButton.icon(
                   onPressed: _syncing || listening ? null : _doSync,
                   icon: const Icon(Icons.local_hospital, size: 18),
-                  label: const Text('SEND TO HOSPITAL'),
+                  label: const Text('RETRY NOW'),
                 ),
               ),
             ],

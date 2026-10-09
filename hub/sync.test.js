@@ -117,24 +117,24 @@ test('ED ordering: acuity, then soonest ETA; arrived patients sink', () =>
     await post({
       watchId: 'W-1',
       reports: [
-        report({ localId: 1, triage: 'Minor', etaMinutes: 5, createdAt: t('01') }),
-        report({ localId: 2, triage: 'Deceased', etaMinutes: 5, createdAt: t('02') }),
-        report({ localId: 3, triage: 'Delayed', etaMinutes: 5, createdAt: t('03') }),
-        report({ localId: 4, triage: 'Unassessed', etaMinutes: null, createdAt: t('04') }),
+        report({ localId: 1, triage: 'Minor', injuries: 'Abrasion', etaMinutes: 5, createdAt: t('01') }),
+        report({ localId: 2, triage: 'Deceased', injuries: 'Deceased', etaMinutes: 5, createdAt: t('02') }),
+        report({ localId: 3, triage: 'Delayed', injuries: 'Fracture', etaMinutes: 5, createdAt: t('03') }),
+        report({ localId: 4, triage: 'Unassessed', injuries: 'Unspecified', etaMinutes: null, createdAt: t('04') }),
         report({ localId: 5, triage: 'Immediate', etaMinutes: 30, createdAt: t('05') }),
         report({ localId: 6, triage: 'Immediate', etaMinutes: 10, createdAt: t('06') }),
         report({ localId: 7, triage: 'Immediate', etaMinutes: null, createdAt: t('07') }),
       ],
     });
-    const order = async () => (await list()).map((r) => r.eta_minutes + ':' + r.triage);
+    const order = async () => (await list()).map((r) => r.eta_minutes + ':' + r.effective_triage);
     assert.deepStrictEqual(await order(), [
       '10:Immediate',
       '30:Immediate',
       'null:Immediate', // unknown ETA after known ETAs
+      '5:Unassessed', // reported death requires qualified confirmation
       'null:Unassessed',
       '5:Delayed',
       '5:Minor',
-      '5:Deceased',
     ]);
 
     const [first] = await list();
