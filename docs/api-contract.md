@@ -123,10 +123,10 @@ is retained in `effective_triage`, including source Unassessed above Delayed/Min
 Automatic rules never declare Deceased. ETA sorting applies within each effective
 priority, and non-inbound rows follow inbound rows. The dashboard uses effective
 priority for counts/color/order while displaying source category, rule and original
-text. Clinical correction/override audit APIs remain blocked on database integration;
-status PATCH remains available. See docs/ai-contract.md for the hub-local Qwen routes (GET /api/ai/status, POST /api/ai/extract, POST /api/ai/triage-assist): extraction with evidence plus deterministic provisional triage, advisory only, never writing to SQLite. `assessRisk` and `validateProcessing` provide tested
-structured integration utilities, not persisted structured processing yet.
-text. The Evidence and corrections dialog displays persisted history and allows
+text. The hub-local Qwen routes provide preview extraction with evidence and
+deterministic provisional triage; `POST /api/triage/:id/ai-extract` appends machine
+extraction to existing SQLite history. See docs/ai-contract.md. The Evidence and
+corrections dialog displays persisted history and allows
 transcript corrections and provisional overrides. It preserves an idempotency ID
 while retrying an unchanged edit. Status PATCH remains compatible.
 
@@ -137,7 +137,7 @@ while retrying an unchanged edit. Status PATCH remains compatible.
 `originalTranscript` (up to 16,000 characters), all four `observations`, up to 30
 `uncertainties` (300 characters each), and STT/extraction `provenance`. Local
 extraction metadata includes model/revision/runtime/artifact SHA-256 and execution
-`local`. There is no production inference runtime here.
+`local`. The Qwen prototype now verifies repository-managed weights and local runtime execution; physical clinical/hardware validation remains incomplete.
 
 Two optional fields extend that envelope without requiring native clients to change:
 
@@ -217,3 +217,29 @@ pre-send approval. A durable hub receipt means its transaction committed; only t
 client can record that it received the HTTP acknowledgment. It does not establish
 trusted hospital delivery, clinical review or arrival. SQL failures roll back the
 whole batch; per-report validation failures leave only those rows pending.
+
+
+## Local Qwen execution and persisted extraction
+
+`GET /api/ai/health` verifies the repository GGUF checksum, configured local runtime,
+Ollama imported blob SHA and Qwen architecture, then generates fresh nonempty tokens.
+Success is HTTP 200 `{status: "ready", model: "qwen3:0.6b", runtime: "ollama",
+model_loaded: true, inference_available: true}`; unavailable/invalid execution is
+503 with false flags and an error code. `GET /api/ai/status` remains the cheap
+exact-tag check and does not establish generation or clinical readiness.
+
+`POST /api/triage/:id/ai-extract` requires only UUID `requestId` and nonnegative
+integer `baseRevision`. It extracts from the **current persisted transcript**,
+then appends an extraction revision with actor `Qwen/ollama`. A replay with the
+same request/revision returns `{ok: true, report, replay: true}` without new inference
+or history. Changed request identity/base, stale revisions and concurrent corrections
+return 409. Missing records return 404; invalid input 400; runtime errors 502/503/504;
+storage errors 503. No error deletes original data or emits a receipt.
+
+Success returns `{ok: true, processing, evidence, warnings, provisional, model,
+promptVersion, report}`. Processing carries exact originals, source excerpts labeled
+`model-inferred` and verified model/revision/runtime/artifact SHA with execution
+`local`. Advisory provisional output does not replace persisted rule assessment:
+machine claims remain excluded until qualified non-model reassessment. Original
+source triage/encounter linkage/correction history remain intact; no approval gate
+is required for saving or relaying the generated extraction.

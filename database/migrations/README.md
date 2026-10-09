@@ -63,3 +63,11 @@ Legacy baseline assessments are explicitly attributed to `migration` at their
 actual computation time; historical source/receipt timestamps remain unchanged.
 The backfill does not imply a clinical assessment occurred when the old report
 was received.
+
+Native Apple clients use a **separate** `vanguard-native.sqlite` in their own app
+sandbox. `watch/apple/Sources/VanguardApple/Migrations/0001_native.sql` creates
+immutable capture, original speech transcription and extraction tables plus an
+independent receipt table in one transaction. `NativeStore` applies it only to
+version 0 and refuses a newer schema. No Flutter or hub migrations change. Future
+native changes need a new numbered transaction and populated reopen/upgrade tests.
+Native audio files are retained alongside SQLite; a relay receipt never deletes them.
