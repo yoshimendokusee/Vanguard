@@ -41,7 +41,7 @@ Compose override replacing only `/data` with named synthetic storage. Original
 and installs passed. A later rebuild encountered host/container DNS failures for
 registry.npmjs.org and api.github.com (npm exited with “Exit handler never called”).
 The final rebuild passed using a **temporary, uncommitted build-only DNS override**
-with addresses obtained from a public resolver and normal TLS verification. No
+with addresses obtained from a public resolver and normal TLS verification. A subsequent default `docker compose build` also passed without that override. No
 repository DNS/IP override or operating-system network change was made. The final
 development image is about 436 MB; production about 392 MB, with compiler tools
 excluded from both runtime images.
@@ -72,6 +72,15 @@ existing data; persistence checks use only synthetic fixtures. CI now repeats th
 real CSS/JavaScript WebSocket check against disposable API/Vite containers. Local
 checks do not establish hosted CI success. The CI container WebSocket command was
 also executed locally against a fresh API/Vite pair without a browser.
+
+## Changed files
+
+| Area | Files |
+| --- | --- |
+| Docker | `compose.yaml`, `hub/docker-compose.yml`, `hub/compose.dev.yaml`, `hub/Dockerfile`, `hub/.dockerignore` |
+| Dashboard/build | `hub/package.json`, `hub/package-lock.json`, `hub/vite.config.mjs`, `hub/public/index.html`, `hub/public/dashboard.css`, `hub/public/dashboard.js`, `hub/server.js` |
+| Checks | `hub/contract.test.js`, `hub/qa/hmr-check.cjs`, `.github/scripts/validate-repository.js`, `.github/workflows/pr-ci.yml` |
+| Configuration/docs | `.env.example`, `.gitignore`, `README.md`, `docs/architecture.md`, `docs/api-contract.md`, `docs/docker-development.md` |
 
 ## Boundaries and remaining verification
 
