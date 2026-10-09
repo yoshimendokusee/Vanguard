@@ -53,13 +53,12 @@ public struct NativeProcessing: Codable, Sendable {
     public var findings: [Finding]? = nil
 
     public var isValid: Bool {
-        let allowed = ["breathing": ["normal", "abnormal", "absent", "unknown"], "consciousness": ["alert", "unresponsive", "unknown"],
-            "severeBleeding": ["present", "absent", "unknown"], "walking": ["able", "unable", "unknown"]]
+        let allowed = TriageRules.allowed
         return version == 1 && originalTranscript.utf16.count <= 16_000
-            && observations.count == 4 && allowed.allSatisfy { observations[$0.key].map($0.value.contains) ?? false }
+            && TriageRules.isValid(observations)
             && uncertainties.count <= 30 && uncertainties.allSatisfy { !$0.isEmpty && $0.utf16.count <= 300 }
             && evidence.allSatisfy { key, item in
-                allowed[key] != nil && item.source == "model-inferred" && !item.excerpt.isEmpty
+                (allowed[key] != nil || key == "circulation") && item.source == "model-inferred" && !item.excerpt.isEmpty
                     && item.excerpt.utf16.count <= 1000 && originalTranscript.contains(item.excerpt)
             }
             && (findings ?? []).count <= 100 && Set((findings ?? []).map(\.id)).count == (findings ?? []).count
@@ -91,17 +90,20 @@ public struct NativeProcessing: Codable, Sendable {
             let data = generated[first...last].data(using: .utf8),
             let raw = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { throw QwenFailure.decodeFailed }
         let allowed = ["breathing": ["normal", "abnormal", "absent", "unknown"],
-            "consciousness": ["alert", "unresponsive", "unknown"],
+            "consciousness": ["alert", "confused", "unresponsive", "unknown"],
             "severeBleeding": ["present", "absent", "unknown"], "walking": ["able", "unable", "unknown"]]
         let claims = raw["observations"] as? [String: Any] ?? raw
         // The model's quote is not trusted: the transcript must contain a phrase that really means the claimed
         // value, with no contradiction. See ObservationConfirmation (parity-tested against the hub).
         let confirmed = ObservationConfirmation.confirm(
             claims: Dictionary(uniqueKeysWithValues: allowed.keys.map { ($0, claims[$0] as? String ?? "unknown") }), transcript: transcript)
-        let observations = confirmed.observations
-        let evidence: [String: Evidence] = confirmed.evidence.mapValues { Evidence(source: "model-inferred", excerpt: $0, contradictory: false) }
+        var observations = confirmed.observations
+        let pulse = ObservationConfirmation.circulation(in: transcript)
+        observations["circulation"] = pulse.value
+        var evidence: [String: Evidence] = confirmed.evidence.mapValues { Evidence(source: "model-inferred", excerpt: $0, contradictory: false) }
+        if let quote = pulse.quote { evidence["circulation"] = Evidence(source: "model-inferred", excerpt: quote, contradictory: false) }
         var uncertainty = ["Machine extraction is unverified; qualified assessment required"]
-        for key in ObservationConfirmation.order where observations[key] == "unknown" { uncertainty.append("\(key) is unknown or lacks source evidence") }
+        for key in ObservationConfirmation.order + ["circulation"] where observations[key] == "unknown" { uncertainty.append("\(key) is unknown or lacks source evidence") }
         uncertainty.append(contentsOf: confirmed.warnings.filter { $0.hasPrefix("Contradictory") })
         return NativeProcessing(version: 1, originalTranscript: transcript, observations: observations,
             evidence: evidence, uncertainties: uncertainty,

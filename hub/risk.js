@@ -1,6 +1,6 @@
 const OBSERVATIONS = {
   breathing: ['normal', 'abnormal', 'absent', 'unknown'],
-  consciousness: ['alert', 'unresponsive', 'unknown'],
+  consciousness: ['alert', 'confused', 'unresponsive', 'unknown'],
   severeBleeding: ['present', 'absent', 'unknown'],
   walking: ['able', 'unable', 'unknown'],
 };
@@ -8,7 +8,8 @@ const RULE_VERSION = 'provisional-v1';
 
 function validateObservations(value) {
   return value && typeof value === 'object' && !Array.isArray(value)
-    && Object.keys(value).every((key) => Object.hasOwn(OBSERVATIONS, key))
+    && Object.keys(value).every((key) => Object.hasOwn(OBSERVATIONS, key) || key === 'circulation')
+    && (value.circulation === undefined || ['present', 'absent', 'unknown'].includes(value.circulation))
     && Object.entries(OBSERVATIONS).every(([key, options]) => options.includes(value[key]));
 }
 

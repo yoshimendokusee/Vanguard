@@ -161,23 +161,25 @@ test('denied terms and duplicate phrases are kept out of the prompt but still re
     assert.equal(result.provisional.triage, 'Minor');
   }));
 
-test('the pipeline returns prefilled report fields with evidence and the legacy-rule preview', () =>
+test('the pipeline retains RAG terms while limiting extraction to five observations', () =>
   withOllama({ observations: { breathing: 'unknown', consciousness: 'unknown', severeBleeding: 'unknown', walking: 'unknown' } }, async () => {
     delete process.env.RAG_ENABLED;
     const result = await extractEmergency('concussion with internal bleeding in arnaldo');
-    assert.equal(result.fields.location, 'Arnaldo');
-    assert.equal(result.fields.injuries, 'Internal bleeding, Concussion');
-    assert.equal(result.fieldEvidence.location, 'in arnaldo');
-    assert.equal(result.locationBasis, 'inferred');
+    assert.equal(result.fields.location, null);
+    assert.equal(result.fields.injuries, 'Unspecified');
+    assert.ok(result.retrieval.matches.some(match => match.english === 'Internal bleeding'));
+    assert.ok(result.retrieval.matches.some(match => match.english === 'Concussion'));
+    assert.deepEqual(result.fieldEvidence, {});
+    assert.equal(result.locationBasis, null);
     // Terms the hospital's legacy rules do not know are not scored; nothing is escalated.
     assert.equal(result.legacy.triage, 'Unassessed');
     assert.equal(result.provisional.triage, 'Unassessed');
     assert.equal(result.processing.originalTranscript, 'concussion with internal bleeding in arnaldo');
 
     const chest = await extractEmergency('sumasakit ang dibdib sa Barangay Uno');
-    assert.equal(chest.fields.injuries, 'Chest pain');
-    // The hospital's own legacy word is surfaced before saving, not hidden.
-    assert.equal(chest.legacy.triage, 'Immediate');
-    assert.match(chest.legacy.reason, /Chest pain/);
+    assert.equal(chest.fields.injuries, 'Unspecified');
+    assert.ok(chest.retrieval.matches.some(match => match.english === 'Chest pain'));
+    // RAG terminology remains visible without promoting it into scored report fields.
+    assert.equal(chest.legacy.triage, 'Unassessed');
     assert.equal(chest.provisional.triage, 'Unassessed');
   }));

@@ -14,12 +14,14 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         super.init()
         if WCSession.isSupported() { session.delegate = self; session.activate() }
     }
-    public func offer(_ capture: NativeCapture) throws {
+    public func offer(_ capture: NativeCapture) async throws {
         guard session.activationState == .activated else { throw NativeStoreFailure.unavailable }
+        try await workflow.store.ensureDelivery(captureID: capture.id)
+        let encounter = try await workflow.store.deliveryRecord(captureID: capture.id)!.encounterID
         let data = try JSONEncoder().encode(capture)
         if let path = capture.audioPath {
-            session.transferFile(URL(fileURLWithPath: path), metadata: ["vanguardCapture": data])
-        } else { session.transferUserInfo(["vanguardCapture": data]) }
+            session.transferFile(URL(fileURLWithPath: path), metadata: ["vanguardCapture": data, "encounterID": encounter])
+        } else { session.transferUserInfo(["vanguardCapture": data, "encounterID": encounter]) }
     }
     public func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {
         if activationState == .activated { retry() }
@@ -48,6 +50,7 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
             Task {
                 do {
                     try await workflow.store.save(capture)
+                    try await workflow.store.ensureDelivery(captureID: capture.id, encounterID: file.metadata?["encounterID"] as? String)
                     let processing = try await workflow.processAudio(capture)
                     session.transferUserInfo(["vanguardResult": try JSONEncoder().encode(processing), "captureID": capture.id])
                     onChange?("Watch audio and original speech preserved; iPhone result queued")
@@ -62,7 +65,7 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         Task {
             do {
                 #if os(watchOS)
-                for capture in try await workflow.store.captures(pendingOnly: true) { try offer(capture) }
+                for capture in try await workflow.store.captures(pendingOnly: true) { try await offer(capture) }
                 #else
                 for capture in try await workflow.store.captures() where capture.watchID.hasPrefix("APPLE-WATCH-") {
                     if let processing = try await workflow.store.processing(id: capture.id) {
@@ -74,14 +77,69 @@ public final class WatchRelay: NSObject, WCSessionDelegate, @unchecked Sendable 
         }
     }
 
+    /// Completed reports use their original extraction and encounter; the iPhone never runs Qwen again.
+    public func relayPendingReports() async throws {
+        guard session.activationState == .activated else { throw NativeStoreFailure.unavailable }
+        #if os(watchOS)
+        let pending = try await workflow.store.deliverable().map { $0["id"]! }
+        let corrections = try await workflow.store.correctionsToSend().map(\.captureID)
+        for id in Set(pending + corrections).sorted().prefix(100) {
+            let report = try await workflow.relayReport(id: id)
+            let data = try JSONEncoder().encode(report)
+            guard data.count <= 900 * 1024 else { throw NativeStoreFailure.invalidCapture }
+            if !session.outstandingUserInfoTransfers.contains(where: { $0.userInfo["reportID"] as? String == report.capture.id }) {
+                session.transferUserInfo(["vanguardReport": data, "reportID": report.capture.id])
+            }
+        }
+        #else
+        for capture in try await workflow.store.captures() where capture.watchID.hasPrefix("APPLE-WATCH-") {
+            guard let delivery = try await workflow.store.deliveryRecord(captureID: capture.id), delivery.state == .delivered else { continue }
+            if !session.outstandingUserInfoTransfers.contains(where: { $0.userInfo["vanguardReceipt"] as? String == capture.id }) {
+                session.transferUserInfo(["vanguardReceipt": capture.id, "watchID": capture.watchID,
+                    "createdAt": capture.createdAt, "encounterID": delivery.encounterID,
+                    "correctionReceipts": try await workflow.store.transcriptVersions(captureID: capture.id).filter { $0.version > 0 && $0.sentAt != nil }.map(\.requestID)])
+            }
+        }
+        #endif
+    }
+
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
-        if let data = userInfo["vanguardCapture"] as? Data, data.count <= 100_000 {
+        if let data = userInfo["vanguardReport"] as? Data, data.count <= 900 * 1024 {
+            #if os(iOS)
+            Task {
+                do {
+                    let report = try JSONDecoder().decode(RelayedReport.self, from: data)
+                    try await workflow.acceptRelay(report)
+                    onChange?("Watch report persisted on iPhone; hospital acknowledgment pending")
+                } catch { onChange?("Watch report relay refused; original retained on Watch") }
+            }
+            #endif
+        } else if let id = userInfo["vanguardReceipt"] as? String,
+                  let watchID = userInfo["watchID"] as? String, let createdAt = userInfo["createdAt"] as? String,
+                  let encounter = userInfo["encounterID"] as? String {
+            #if os(watchOS)
+            Task {
+                do {
+                    guard let capture = try await workflow.store.captures().first(where: { $0.id == id }),
+                          capture.watchID == watchID, capture.createdAt == createdAt,
+                          try await workflow.store.deliveryRecord(captureID: id)?.encounterID == encounter else { throw NativeStoreFailure.identityConflict }
+                    try await workflow.store.acknowledge(ids: [id])
+                    let receipts = userInfo["correctionReceipts"] as? [String] ?? []
+                    for version in try await workflow.store.transcriptVersions(captureID: id) where version.version > 0 && receipts.contains(version.requestID) {
+                        try await workflow.store.markCorrectionSent(captureID: id, version: version.version)
+                    }
+                    onResult?(id)
+                } catch { onChange?("Relay receipt refused; report retained") }
+            }
+            #endif
+        } else if let data = userInfo["vanguardCapture"] as? Data, data.count <= 100_000 {
             Task {
                 do {
                     let capture = try JSONDecoder().decode(NativeCapture.self, from: data)
                     // Incoming text jobs cannot supply an arbitrary local audio path.
                     guard capture.audioPath == nil, capture.transcript != nil else { throw NativeStoreFailure.invalidCapture }
                     try await workflow.store.save(capture)
+                    try await workflow.store.ensureDelivery(captureID: capture.id, encounterID: userInfo["encounterID"] as? String)
                     #if os(iOS)
                     let processing = try await workflow.process(capture, device: .iphone)
                     session.transferUserInfo(["vanguardResult": try JSONEncoder().encode(processing), "captureID": capture.id])

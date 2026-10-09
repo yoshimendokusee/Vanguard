@@ -73,7 +73,8 @@ function backfillReports(db) {
   for (const row of db.prepare('SELECT * FROM triage_reports').all()) initializeReport(db, row);
 }
 
-const REPORT_VIEW = `SELECT r.*, e.encounter_id, e.source_report_id, e.patient_count_known, e.submitted_json,
+const REPORT_VIEW = `SELECT r.*, (SELECT patient_id FROM encounter_revisions
+    WHERE encounter_id = e.encounter_id ORDER BY revision DESC LIMIT 1) AS patient_id, e.encounter_id, e.source_report_id, e.patient_count_known, e.submitted_json,
   v.revision, v.state_json, v.assessment_json FROM triage_reports r
   JOIN report_evidence e ON e.report_id = r.id JOIN report_revisions v ON v.report_id = r.id
     AND v.revision = (SELECT MAX(revision) FROM report_revisions WHERE report_id = r.id)`;
@@ -82,6 +83,7 @@ function viewFromRow({ state_json, assessment_json, submitted_json, ...row }) {
   const state = JSON.parse(state_json);
   return { ...row, ...JSON.parse(assessment_json),
     current_transcript: state.transcript, processing: state.processing,
+    machine_triage: state.processing?.provenance.extraction ? assessRisk(state.processing.observations) : null,
     source_findings_current: !state.transcriptChanged && state.processing === null,
     receipt_state: 'received', patient_count_known: Boolean(row.patient_count_known) };
 }

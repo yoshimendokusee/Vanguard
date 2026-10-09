@@ -1,8 +1,8 @@
 # Apple Watch voice-report workflow
 
-Status: **implemented and tested on macOS and the iOS simulator; not verified on Apple Watch or iPhone hardware.**
+Status: **current update statically checked only; historical macOS/iOS simulator evidence below does not verify the current pipeline or Apple hardware.**
 Every claim below says where it was checked. Nothing here is a clinical validation. The terminology pack and board
-setups are unreviewed drafts, and the hospital hub's HTTP/SQLite storage remains unauthenticated and unencrypted
+setups are unreviewed drafts. LAN credentials are required for non-loopback binding; HTTP and SQLite remain unencrypted
 (see `docs/architecture.md`): do not use any of this for real patients.
 
 ## What the app does
@@ -12,11 +12,12 @@ Watch microphone ─▶ CAF audio saved to SQLite-referenced file ─▶ Watch W
    ─▶ immutable transcript ─▶ paired iPhone fallback if Watch recognition or extraction fails
    ─▶ local Qwen3-0.6B: four observations (breathing, consciousness, severe bleeding, walking)
    ─▶ confirmation against the transcript (ported hub rules) ─▶ deterministic triage (ported hub rules)
-   ─▶ quote-grounded symptoms and details (location, patients, age group, ETA)
-   ─▶ durable report + delivery queue ─▶ hospital hub ─▶ valid receipt ─▶ DELIVERED
+   ─▶ explicit radial-pulse circulation + separate quote-grounded RAG terms
+   ─▶ durable report + queue ─▶ direct LAN / optional complete-report iPhone relay
+   ─▶ hospital hub SQLite ─▶ valid ACK / return paired receipt ─▶ Sent
 ```
 
-* **UI** (`watch/apple/Sources/VanguardApple/WatchUI`): the ten storyboard screens as SwiftUI views over plain values;
+* **UI** (`watch/apple/Sources/VanguardApple/WatchUI`): focused SwiftUI views over plain values; the result opens automatically, with no Pickup Location or send-confirmation step;
   `WatchRootView` binds them to `VoiceReportController`. The system draws the clock.
 * **Business logic** (`VoiceReportController`, `VoiceReportState`): explicit state machine; permission, recording
   with live metering, silence/interruption handling, transcription hook, extraction, triage, corrections, delivery.
@@ -28,14 +29,14 @@ Watch microphone ─▶ CAF audio saved to SQLite-referenced file ─▶ Watch W
   `DELIVERED` is refused by the database unless a stored hospital receipt exists. Retries carry the same report ID
   (`reportId`, `(watch_id, created_at)`), so the hub cannot duplicate a report. Save only holds a report out of the queue.
 * **Corrections**: a new transcript version, re-extracted and reassessed locally; after delivery it is sent as a
-  `kind: correction` report revision (original submission kept on both sides). Edited location/count/age/ETA are kept
-  locally as revisions, but the hub has no revision path for those source fields (limitation below).
+  `kind: correction` report revision (original submission kept on both sides). Intake retries preserve the first details snapshot;
+  newer hospital corrections are never overwritten by an automatically rebased device edit.
 
 ## Decisions made from evidence
 
 1. **Qwen3-0.6B only classifies four observations.** A live run with a richer findings schema returned garbled keys
-   and hallucinated observations (for example "alert, can walk" for unconscious drowned children). Structured details
-   therefore come from deterministic, quote-grounded rules ported from the hub, not from model output.
+   and hallucinated observations (for example "alert, can walk" for unconscious drowned children). The prompt remains unchanged;
+   circulation comes from exact radial-pulse statements. New extraction returns only the five observations plus RAG terms.
 2. **A model quote is never trusted.** The old Swift validator accepted any claim whose quote merely occurred in the
    transcript, so an injected sentence could yield `Minor`. It now uses the hub's confirmation phrases (see parity).
 3. **Triage is a port, not a second algorithm.** `Triage.swift` mirrors `hub/risk.js`.
@@ -129,8 +130,15 @@ and duplicate concurrent extractions of one capture (now one shared job per capt
   decision. Symptom terms are shown from the pack regardless.
 * Term pack and board setups are unreviewed drafts. Exact-phrase matching misses misspellings and unlisted wordings.
 * Taglish inside one sentence can be transcribed imperfectly by a single-language recognizer.
-* Edited location, patient count, age group and ETA after delivery stay local: the hub exposes revisions only for
+* Legacy optional location, patient count, age group and ETA edits stay local: the hub exposes revisions only for
   transcript corrections, overrides and extractions.
-* Locating a report for a correction fetches `GET /api/triage` (the whole list); a lookup by report ID would scale better.
-* The hospital name on the Send screen is generic until the hub's configuration is surfaced in the app.
+* Corrections use scoped `GET /api/triage/source/:reportId`; a newer hospital revision leaves an older device correction pending for human reconciliation.
+* Foreground retries run every 30 seconds; optional Hospital connection settings configure the LAN URL and Keychain token.
 * Hub transport is unauthenticated HTTP on the LAN unless an access token is configured; storage is unencrypted.
+
+## Current acceptance boundary
+
+The 2026-10-10 delivery/observation/dashboard update used static analysis and unsigned
+generic device builds only. Historical PASS rows above refer to earlier code.
+See [manual checklist](triage-delivery-update.md). No unit, integration, E2E, simulator,
+hardware, API smoke or automated transmission tests were executed for this update.

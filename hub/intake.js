@@ -223,4 +223,4 @@ function extractReportFields(transcript, index, observationInjuries = []) {
   };
 }
 
-module.exports = { extractReportFields, findLocation, findPatientCount, findAgeGroup, findEta, findSymptomDuration, injuriesFor };
+module.exports = { terminologyFindings, extractReportFields, findLocation, findPatientCount, findAgeGroup, findEta, findSymptomDuration, injuriesFor };

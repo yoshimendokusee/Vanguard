@@ -20,13 +20,14 @@ public enum TriageRules {
     public static let ruleVersion = "provisional-v1"
     public static let allowed: [String: [String]] = [
         "breathing": ["normal", "abnormal", "absent", "unknown"],
-        "consciousness": ["alert", "unresponsive", "unknown"],
+        "consciousness": ["alert", "confused", "unresponsive", "unknown"],
         "severeBleeding": ["present", "absent", "unknown"],
         "walking": ["able", "unable", "unknown"],
     ]
 
     public static func isValid(_ observations: [String: String]) -> Bool {
-        observations.count == allowed.count
+        observations.keys.allSatisfy { allowed[$0] != nil || $0 == "circulation" }
+            && (observations["circulation"].map { ["present", "absent", "unknown"].contains($0) } ?? true)
             && allowed.allSatisfy { key, values in observations[key].map(values.contains) ?? false }
     }
 

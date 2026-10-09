@@ -155,7 +155,7 @@ final class DeliveryTests: XCTestCase {
         StubHub.handler = { request, body in
             switch (request.httpMethod ?? "GET", request.url!.path) {
             case ("GET", "/api/config"): return (200, ["contractVersion": 1, "hospital": "Synthetic hospital"] as [String: Any])
-            case ("GET", "/api/triage"): return (200, [["id": 7, "source_report_id": capture.id, "revision": 0]] as [[String: Any]])
+            case ("GET", "/api/triage/source/\(capture.id)"): return (200, ["id": 7, "source_report_id": capture.id, "revision": 0, "current_transcript": capture.transcript!, "history": []] as [String: Any])
             case ("POST", "/api/triage/7/revisions"):
                 revisionCalls += 1
                 if revisionCalls == 1 { return (409, ["ok": false, "error": "Stale base revision"] as [String: Any]) }
@@ -188,4 +188,55 @@ final class DeliveryTests: XCTestCase {
         let record = try await reopened.deliveryRecord(captureID: capture.id)
         XCTAssertEqual(record?.state, .delivered)
     }
+    func testEditingDetailsAfterLostAcknowledgmentDoesNotChangeIntakeRetry() async throws {
+        let capture = try await queuedReport("Synthetic original.", details: ReportDetails(patientCount: 2))
+        StubHub.handler = { _, _ in throw URLError(.timedOut) }
+        do { _ = try await workflow.sync(to: hub, session: session) } catch {}
+        try await store.appendDetails(captureID: capture.id, source: "edited", ReportDetails(patientCount: 3))
+        StubHub.handler = { _, body in self.ack(body, inserted: 0, duplicates: 1) }
+        _ = try await workflow.sync(to: hub, session: session)
+        let requests = StubHub.log.filter { $0.path == "/api/sync-triage" }
+        let first = try XCTUnwrap(requests.first?.body)
+        let last = try XCTUnwrap(requests.last?.body)
+        XCTAssertEqual(NSDictionary(dictionary: first), NSDictionary(dictionary: last))
+    }
+
+    func testNewerHospitalCorrectionIsNeverOverwrittenByQueuedDeviceCorrection() async throws {
+        let capture = try await queuedReport("Synthetic original.")
+        StubHub.handler = { _, body in self.ack(body) }
+        _ = try await workflow.sync(to: hub, session: session)
+        _ = try await store.appendCorrection(captureID: capture.id, transcript: "Synthetic device correction.")
+        StubHub.handler = { request, _ in
+            if request.url?.path == "/api/config" { return (200, ["contractVersion": 1, "hospital": "Synthetic"] as [String: Any]) }
+            XCTAssertEqual(request.httpMethod, "GET", "no stale correction may be posted")
+            return (200, ["id": 7, "source_report_id": capture.id, "revision": 2,
+                "current_transcript": "Synthetic newer hospital correction.", "history": []] as [String: Any])
+        }
+        _ = try await workflow.sync(to: hub, session: session)
+        let pending = try await store.correctionsToSend()
+        XCTAssertEqual(pending.count, 1)
+    }
+
+    func testCompletedReportRelayPreservesIdentityAndRemainsPendingUntilHospitalAck() async throws {
+        let capture = try await queuedReport("Synthetic original.")
+        let packet = try await workflow.relayReport(id: capture.id)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let phoneStore = try NativeStore(file: directory.appendingPathComponent("phone.sqlite"))
+        let phoneWorkflow = NativeWorkflow(store: phoneStore, engine: QwenEngine(directory: directory))
+        try await phoneWorkflow.acceptRelay(packet)
+        try await phoneWorkflow.acceptRelay(packet)
+        let copies = try await phoneStore.captures()
+        XCTAssertEqual(copies.count, 1)
+        XCTAssertEqual(copies.first?.id, capture.id)
+        let delivery = try await phoneStore.deliveryRecord(captureID: capture.id)
+        XCTAssertEqual(delivery?.encounterID, packet.encounterID)
+        XCTAssertEqual(delivery?.state, .queued)
+        let pending = try await store.outbox()
+        XCTAssertEqual(pending.count, 1, "iPhone persistence never acknowledges hospital delivery on Watch")
+        let phoneProcessing = try await phoneStore.processing(id: capture.id)
+        let originalProcessing = try await store.processing(id: capture.id)
+        XCTAssertEqual(phoneProcessing, originalProcessing)
+    }
+
 }

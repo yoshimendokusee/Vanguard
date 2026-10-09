@@ -15,12 +15,13 @@ const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, '../docs/fixture
 test('the hub validator accepts the Swift processing envelope, findings included', () => {
   const checked = validateProcessing(fixture.processing);
   assert.equal(checked.error, undefined);
-  assert.ok(checked.value.findings.length >= 5);
+  assert.ok(checked.value.findings.length >= 2);
   for (const finding of checked.value.findings) {
     assert.ok(fixture.processing.originalTranscript.includes(finding.excerpt), `${finding.name} is quoted from the transcript`);
     assert.equal(finding.source === 'reported' || finding.source === 'model-inferred', true);
   }
-  assert.ok(checked.value.findings.some((f) => f.name === 'age' && f.value === '60'));
+  assert.deepEqual(Object.keys(checked.value.observations).sort(), ['breathing', 'circulation', 'consciousness', 'severeBleeding', 'walking']);
+  assert.ok(checked.value.findings.every(f => f.kind === 'symptom'), 'RAG terms remain without patient or incident extraction');
   assert.ok(!checked.value.findings.some((f) => f.kind === 'vital'), 'no vital sign is invented');
 });
 
@@ -34,15 +35,15 @@ test('a native report with these details is stored with its findings and unknown
   const db = openDb(':memory:');
   const reportId = randomUUID();
   const body = { localId: 1, reportId, encounterId: randomUUID(), createdAt: '2026-10-10T01:00:00.000Z', triage: 'Unassessed',
-    location: fixture.extraction.details.location, injuries: 'Unspecified', patientCount: null, ageGroup: fixture.extraction.details.ageGroup,
-    etaMinutes: fixture.extraction.details.etaMinutes, rawText: fixture.processing.originalTranscript, processing: fixture.processing };
+    location: 'Unspecified', injuries: 'Unspecified', patientCount: null, ageGroup: fixture.extraction.details.ageGroup,
+    etaMinutes: null, rawText: fixture.processing.originalTranscript, processing: fixture.processing };
   assert.equal(validateReport(body).error, undefined);
   const result = ingestBatch(db, 'APPLE-WATCH-SYNTHETIC', [body]);
   assert.deepEqual(result.ackLocalIds, [1]);
   const row = db.prepare('SELECT id FROM triage_reports').get();
   const view = reportView(db, row.id);
   assert.equal(view.patient_count_known, false, 'an unknown count is not treated as zero or one');
-  assert.equal(view.age_group, 'Elderly'); assert.equal(view.eta_minutes, 10);
+  assert.equal(view.age_group, 'Unspecified'); assert.equal(view.eta_minutes, null);
   assert.equal(view.processing.findings.length, fixture.processing.findings.length);
   // Model-inferred observations never drive the hospital's assessment without verification.
   assert.equal(view.effective_triage, 'Unassessed');

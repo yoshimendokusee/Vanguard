@@ -226,7 +226,7 @@ test('AI extract returns validated processing + deterministic provisional triage
     assert.equal(data.ok, true);
     assert.equal(data.processing.version, 1);
     assert.equal(data.processing.originalTranscript, TRANSCRIPT);
-    assert.deepEqual(data.processing.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able' });
+    assert.deepEqual(data.processing.observations, { breathing: 'normal', consciousness: 'alert', severeBleeding: 'absent', walking: 'able', circulation: 'unknown' });
     assert.equal(data.processing.provenance.extraction.artifactSha256, manifest.sha256);
     assert.equal(data.processing.evidence.walking.source, 'model-inferred');
     assert.equal(data.provisional.triage, 'Minor'); // deterministic assessRisk, not the model
@@ -249,11 +249,12 @@ test('AI extraction persists a complete evidence-backed report without assigning
     const extracted = await (await fetch(`${base}/api/ai/extract`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript }),
     })).json();
-    assert.equal(extracted.fields.symptomDuration.value, 30);
-    assert.equal(extracted.fields.symptomDuration.unit, 'minutes');
-    assert.equal(extracted.fieldEvidence.symptomDuration, '30 minutes na');
+    assert.equal(extracted.fields.symptomDuration, null);
+    assert.deepEqual(extracted.fieldEvidence, {});
+    assert.deepEqual(Object.keys(extracted.processing.observations), ['breathing', 'consciousness', 'severeBleeding', 'walking', 'circulation']);
+    assert.ok(!extracted.processing.findings.some(finding => ['patient', 'incident', 'vital'].includes(finding.kind)));
     assert.ok(extracted.processing.findings.some((finding) => finding.name === 'Chest pain' && finding.excerpt === 'masakit ang dibdib'));
-    assert.ok(extracted.processing.findings.some((finding) => finding.name === 'Symptom duration' && finding.excerpt === '30 minutes na'));
+    assert.ok(!extracted.processing.findings.some((finding) => finding.name === 'Symptom duration'));
     assert.equal(extracted.provisional.triage, 'Immediate');
 
     const intake = await fetch(`${base}/api/sync-triage`, {
@@ -464,3 +465,23 @@ test('shared v1 fixture is accepted without losing transcript/provenance', () =>
   assert.deepEqual(normalized.value.provenance, fixture.processing.provenance);
   assert.deepEqual(normalized.value.evidence, fixture.processing.evidence);
 });
+
+test('five-field extraction quote-grounds radial pulse and preserves RAG without demographic extraction', () =>
+  withAiApp(fakeOllama({ chat: GOOD_CHAT }), async (base) => {
+    for (const [pulse, expected] of [
+      ['Radial pulse present.', 'present'], ['No palpable radial pulse.', 'absent'],
+      ['Radial pulse present but radial pulse absent.', 'unknown'], ['Not radial pulse present.', 'unknown'],
+      ['Pulse present.', 'unknown'],
+    ]) {
+      const transcript = `Synthetic patient: awake, breathing normally, no bleeding, can walk. Chest pain. 60 years old, Barangay Uno, ETA 10 minutes. ${pulse}`;
+      const result = await (await fetch(`${base}/api/ai/extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ transcript }) })).json();
+      assert.equal(result.processing.observations.circulation, expected);
+      assert.equal(result.fields.location, null);
+      assert.equal(result.fields.patientCount, null);
+      assert.equal(result.fields.ageGroup, 'Unspecified');
+      assert.equal(result.fields.etaMinutes, null);
+      assert.ok(result.processing.findings.every(f => ['observation', 'symptom'].includes(f.kind)));
+      assert.ok(result.retrieval.matches.length, 'RAG output is retained');
+      assert.equal(result.provisional.triage, 'Minor', 'circulation introduces no scoring rule');
+    }
+  }));

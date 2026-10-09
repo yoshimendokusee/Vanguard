@@ -113,7 +113,7 @@ are not implemented.
 
 The original `triage` column remains the source category. `GET /api/triage` adds
 `provisional_triage`, `effective_triage`, `risk_reason`, `rule_version` and
-`requires_verification: true`, `revision`, `encounter_id`, `source_report_id`,
+`requires_verification: true`, `patient_id` (explicit encounter linkage or null), `revision`, `encounter_id`, `source_report_id`,
 `receipt_state: received`, `patient_count_known`, `current_transcript`, `processing`,
 `uncertainties`, `computed_triage` and `clinician_override`. Assessments are stored
 at intake and every clinical revision. Legacy intake uses `legacy-findings-v1`;
@@ -149,7 +149,7 @@ while retrying an unchanged edit. Status PATCH remains compatible.
 ## Structured intake and findings
 
 `processing` v1 uses the envelope in `qwen-agent-handoff.md`: exact
-`originalTranscript` (up to 16,000 characters), all four `observations`, up to 30
+`originalTranscript` (up to 16,000 characters), four required `observations` and optional `circulation`, up to 30
 `uncertainties` (300 characters each), and STT/extraction `provenance`. Local
 extraction metadata includes model/revision/runtime/artifact SHA-256 and execution
 `local`. The Qwen prototype now verifies repository-managed weights and local runtime execution; physical clinical/hardware validation remains incomplete.
@@ -270,3 +270,54 @@ also applies to SSE; the browser central client uses fetch streaming with three
 reconnection attempts, then authenticated polling. The health liveness route remains
 public and contains no records. Read the AI contract and `global-ai-connectivity.md`
 for readiness states, independent native inference and pairing instructions.
+
+## Five-field extraction and native relay — 2026-10-10
+
+New native and hub extraction outputs contain exactly `breathing`, `consciousness`,
+`severeBleeding`, `walking`, and `circulation`. Display labels are Normal / Difficulty
+breathing / Not breathing; Responsive / Confused / Unresponsive; Present / Absent;
+Can walk / Cannot walk; Radial pulse present / Radial pulse absent. Every field also
+supports Unknown. The stored `alert` value means Responsive; enum spelling remains
+compatible. `confused` is accepted as an observation without a new scoring rule.
+Circulation is an optional `present|absent|unknown` extension for older v1 envelopes.
+It requires an explicit radial-pulse statement, preserves an exact excerpt, and does
+not alter `provisional-v1`. A generic pulse statement, missing evidence, denial or
+contradictory statements cannot establish radial pulse presence.
+
+The four-field Qwen prompt/runtime are unchanged. Circulation is added by bounded,
+quote-grounded extraction. RAG retrieval and terminology findings are retained
+separately. New extraction no longer derives age, sex, patient count, location,
+ETA or symptom duration. Hub preview `fields` retains null/Unspecified compatibility
+values, with empty `fieldEvidence`/`fieldNotes` and null `locationBasis`. Existing
+stored reports, optional manually supplied details and their histories remain readable.
+
+`GET /api/triage` and report details add nullable `machine_triage` (the existing
+rules applied to unverified processing observations). Explicit `patient_id` links come from the latest encounter revision, never transcript guesses.
+This is advisory and displayed
+separately from the hospital's persisted assessment; machine claims do not establish
+verified hospital urgency. All categories remain provisional.
+
+`GET /api/triage/source/:reportId` locates a report by its existing source UUID and
+returns its detail/history. A device token can access only assigned watch IDs; linked
+hospital patient/encounter details are omitted. Devices may use the existing
+`POST /api/triage/:id/revisions` for their own transcript corrections only. Attached
+extraction must remain machine-attributed. Operators retain existing clinical access.
+
+Native intake retries use the original extraction and first persisted details snapshot.
+The legacy identity, source UUID and encounter UUID are preserved across direct LAN
+and paired-iPhone relay; each sender scopes `ackLocalIds` to its own transmitted ID.
+The iPhone persists complete reports atomically before transport, without rerunning
+Qwen. Only a validated backend ACK creates a receipt; paired persistence alone never
+marks the Watch sent. The paired return receipt includes source identity and acknowledged
+correction request IDs. Interrupted/offline reports remain queued. Native foreground
+retries run after save, on activation and every 30 seconds while the app is active.
+Watch Connectivity can defer transfers; background execution is not guaranteed.
+Configure the iPhone for the same hospital and authorize its credential for relayed
+Watch IDs. Watch pairing is available through Hospital connection; tokens use Keychain.
+
+Correction retries first inspect immutable history. An already recorded request is
+acknowledged even if a later correction exists. Otherwise its base must still be the
+preceding local correction (or intake revision 0). A newer hospital revision leaves the
+old device correction queued for human reconciliation, rather than rebasing it over
+newer clinical work. HTTP receipts remain prototype evidence of backend ingestion,
+not cryptographic proof of hospital review or arrival.
