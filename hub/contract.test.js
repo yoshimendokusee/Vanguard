@@ -83,3 +83,17 @@ test('reopening a populated hub database preserves reports, status and deduplica
     fs.rmSync(temp, { recursive: true, force: true });
   }
 });
+
+test('dashboard priority keeps an urgent unknown ETA ahead of a sooner minor report', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8');
+  const category = html.match(/  const category = .*;/)[0];
+  const rank = html.match(/  const RANK = .*;/)[0];
+  const select = html.match(/  function priorityPatient\(list\) \{[\s\S]*?\n  \}/)[0];
+  const pick = vm.runInNewContext(`${category}\n${rank}\n${select}\npriorityPatient`, {
+    etaAt: (row) => row.eta_minutes === null ? null : row.eta_minutes,
+  });
+  const minor = { id: 1, triage: 'Minor', effective_triage: 'Minor', eta_minutes: 1 };
+  const urgent = { id: 2, triage: 'Minor', effective_triage: 'Immediate', eta_minutes: null };
+  assert.equal(pick([minor, urgent]).id, urgent.id);
+  assert.equal(urgent.triage, 'Minor', 'Original category must remain intact');
+});

@@ -413,8 +413,10 @@
     </div>
 
     <p class="note">
-      Categories follow START triage from a rescuer's spoken report and are advisory. Confirm each patient on arrival.
-      "Not sure" means the report was saved but not understood. Readiness ticks are saved in this browser only.
+      Provisional priority uses exact structured findings and preserves higher source urgency. Verify clinically.
+      "Not sure" includes unknown findings and unconfirmed death; the hub never declares death automatically.
+      Original categories and notes remain visible. Audited corrections/overrides await database integration.
+      Readiness ticks are saved in this browser only.
       ETAs use the watch clock, so treat countdowns and the curve as approximate.
     </p>
   </main>
@@ -444,6 +446,7 @@
     'Snakebite': 'Antivenom',
     'Weak / dehydrated': 'IV fluids',
   };
+  const category = (r) => r.effective_triage || r.triage;
   const TRIAGE = ['Immediate', 'Unassessed', 'Delayed', 'Minor', 'Deceased'];
   const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
   const LABEL = { Immediate: 'Immediate', Unassessed: 'Not sure', Delayed: 'Delayed', Minor: 'Minor', Deceased: 'Deceased' };
@@ -453,7 +456,7 @@
   let view = 'inbound';
   let cat = null;
   let query = '';
-  let sel = null; // report the user picked for the big card; null = the next to arrive
+  let sel = null; // report the user picked; null selects the highest provisional priority
   let range = 60; // arrivals curve window, in minutes
   let lastInbound = [], curveW = 0;
   let loadState = 'loading'; // loading | ok | error
@@ -582,14 +585,14 @@
     setTimeout(() => t.remove(), 7000);
   }
   function announce(r) {
-    toast(`New ${LABEL[r.triage]} ×${r.patient_count}: ${r.injuries}`,
-          `From ${r.location}${r.eta_minutes ? `, ETA ${r.eta_minutes} min` : ''}`, r.triage);
-    if (soundOn && r.triage === 'Immediate') beep();
+    toast(`New ${LABEL[category(r)]} ×${r.patient_count}: ${r.injuries}`,
+          `From ${r.location}${r.eta_minutes ? `, ETA ${r.eta_minutes} min` : ''}`, category(r));
+    if (soundOn && category(r) === 'Immediate') beep();
   }
   // A watch syncing a backlog arrives as one batch: summarise it instead of one toast per report.
   function announceAll(list) {
     if (list.length <= 3) { list.forEach(announce); return; }
-    const imm = list.filter((r) => r.triage === 'Immediate');
+    const imm = list.filter((r) => category(r) === 'Immediate');
     toast(plural(list.length, 'new report'),
           `${plural(patients(list), 'patient')}${imm.length ? `, ${plural(patients(imm), 'Immediate patient')}` : ''}`,
           imm.length ? 'Immediate' : '');
@@ -611,21 +614,21 @@
   const inView = () => rows.filter((r) => view === 'all' || r.status === view);
   function visible() {
     const q = query.trim().toLowerCase();
-    return inView().filter((r) => (!cat || r.triage === cat) &&
-      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, LABEL[r.triage]].join(' ').toLowerCase().includes(q)));
+    return inView().filter((r) => (!cat || category(r) === cat) &&
+      (!q || [r.injuries, r.location, r.watch_id, r.raw_text, r.age_group, r.triage, category(r), LABEL[category(r)]].join(' ').toLowerCase().includes(q)));
   }
-  function nextToArrive(list) {
-    const live = list.filter((r) => r.triage !== 'Deceased');
-    const timed = live.filter((r) => etaAt(r) !== null).sort((a, b) => etaAt(a) - etaAt(b) || RANK[a.triage] - RANK[b.triage]);
-    return timed[0] || live[0] || null;
+  function priorityPatient(list) {
+    const live = list.filter((r) => category(r) !== 'Deceased');
+    return live.sort((a, b) => RANK[category(a)] - RANK[category(b)]
+      || (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity))[0] || null;
   }
-  // The report shown in the big card: the one the user picked, else the next to arrive.
+  // The report shown in the big card: the one the user picked, else the highest provisional priority.
   function heroOf(list) {
     const picked = list.find((r) => r.id === sel);
     if (picked) return { r: picked, isNext: false };
     sel = null;
     const inbound = list.filter((r) => r.status === 'inbound');
-    return { r: nextToArrive(inbound) || list[0] || null, isNext: true };
+    return { r: priorityPatient(inbound) || list[0] || null, isNext: true };
   }
 
   // ---------- render ----------
@@ -633,7 +636,7 @@
   let lastStatus = '', statusTimer = null;
   function announceStatus(inbound) {
     if (loadState !== 'ok') return;
-    const total = patients(inbound), need = patients(inbound.filter((r) => r.triage === 'Immediate'));
+    const total = patients(inbound), need = patients(inbound.filter((r) => category(r) === 'Immediate'));
     const msg = total
       ? `${plural(total, 'patient')} inbound, ${num(need)} ${need === 1 ? 'needs' : 'need'} care right away`
       : 'No patients inbound';
@@ -695,7 +698,7 @@
     const s = $('sline');
     if (loadState === 'loading') { s.textContent = 'Loading reports'; return; }
     if (view === 'inbound' && !cat && !query.trim()) {
-      const total = patients(inbound), need = patients(inbound.filter((r) => r.triage === 'Immediate'));
+      const total = patients(inbound), need = patients(inbound.filter((r) => category(r) === 'Immediate'));
       s.textContent = total
         ? `${plural(total, 'patient')} on the way, ${num(need)} ${need === 1 ? 'needs' : 'need'} care right away`
         : 'No one is on the way';
@@ -724,7 +727,7 @@
     };
     $('cat-clear').hidden = !cat;
     box.append(mk('All categories', patients(list), null));
-    for (const t of TRIAGE) box.append(mk(LABEL[t], patients(list.filter((r) => r.triage === t)), t));
+    for (const t of TRIAGE) box.append(mk(LABEL[t], patients(list.filter((r) => category(r) === t)), t));
   }
 
   function renderFilters() {
@@ -780,7 +783,7 @@
     const b = el('button', `btn ${kind || ''}`, label);
     b.type = 'button';
     b.dataset.fk = `act:${scope}:${r.id}:${status}`;
-    b.setAttribute('aria-label', `${label}: ${LABEL[r.triage]} ×${r.patient_count}, ${r.injuries}, from ${r.location}`);
+    b.setAttribute('aria-label', `${label}: ${LABEL[category(r)]} ×${r.patient_count}, ${r.injuries}, from ${r.location}`);
     b.onclick = () => setStatus(r, status, b);
     return b;
   }
@@ -790,27 +793,29 @@
     box.replaceChildren();
     box.hidden = false;
     if (loadState === 'loading') {
-      box.append(el('h2', 'eyebrow', 'Next to arrive'), el('div', 'skel'), el('div', 'skel'));
+      box.append(el('h2', 'eyebrow', 'Priority patient'), el('div', 'skel'), el('div', 'skel'));
       box.firstChild.id = 'hero-h';
       return;
     }
     if (!r) { box.hidden = true; return; }
 
-    const h = el('h2', 'eyebrow', isNext && r.status === 'inbound' ? 'Next to arrive' : 'Selected patient');
+    const h = el('h2', 'eyebrow', isNext && r.status === 'inbound' ? 'Priority patient' : 'Selected patient');
     h.id = 'hero-h';
     h.tabIndex = -1;
-    const badge = el('div', `badge ${r.triage}`);
+    const badge = el('div', `badge ${category(r)}`);
     badge.setAttribute('role', 'img');
-    badge.setAttribute('aria-label', LABEL[r.triage]);
-    badge.append(shape(r.triage));
+    badge.setAttribute('aria-label', LABEL[category(r)]);
+    badge.append(shape(category(r)));
     box.append(h, badge, el('h3', 'who', r.injuries), el('p', 'where', `${noun(r)} · From ${r.location}`), timeBlock(r, 'big'));
     const stats = el('div', 'stats');
     const stat = (k, v) => { const d = el('div', 'stat'); d.append(el('small', '', k), el('b', '', v)); return d; };
-    stats.append(stat('Patients', '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[r.triage]));
+    stats.append(stat('Patients', '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[category(r)]));
     box.append(stats);
+    box.append(el('p', 'note', `Provisional · verify clinically · source category: ${r.triage}`));
+    if (r.risk_reason) box.append(el('p', 'note', `${r.rule_version}: ${r.risk_reason}`));
 
     // readiness checklist (kept in this browser only)
-    const items = r.status === 'inbound' && r.triage !== 'Deceased' ? readyItems(r) : [];
+    const items = r.status === 'inbound' && category(r) !== 'Deceased' ? readyItems(r) : [];
     if (items.length) {
       const prep = el('div', 'prep');
       const head = el('p', 'prep-h', 'Get ready');
@@ -844,7 +849,7 @@
       box.append(prep);
     }
     const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && !PREP[x]);
-    if (r.triage !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
+    if (category(r) !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
       box.append(el('p', 'warn', r.injuries === 'Unspecified'
         ? 'No findings were understood. Read the note first.'
         : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
@@ -878,16 +883,16 @@
   // Three cards for the patients after the big one, each with a coloured side bar
   function renderSoon(list, heroReport) {
     const sec = $('soon-sec'), box = $('soon');
-    const cards = list.filter((r) => r.status === 'inbound' && r.triage !== 'Deceased' && (!heroReport || r.id !== heroReport.id))
-      .sort((a, b) => (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity) || RANK[a.triage] - RANK[b.triage]).slice(0, 3);
+    const cards = list.filter((r) => r.status === 'inbound' && category(r) !== 'Deceased' && (!heroReport || r.id !== heroReport.id))
+      .sort((a, b) => RANK[category(a)] - RANK[category(b)] || (etaAt(a) ?? Infinity) - (etaAt(b) ?? Infinity)).slice(0, 3);
     sec.hidden = view !== 'inbound' || loadState === 'loading' || !cards.length;
     box.replaceChildren();
     for (const r of cards) {
       const w = whenText(r);
-      const b = el('button', `soon-card ${r.triage}`);
+      const b = el('button', `soon-card ${category(r)}`);
       b.type = 'button';
       b.dataset.fk = 'soon:' + r.id;
-      b.append(el('span', `t ${w.c}`, `${LABEL[r.triage]} · ${w.t}`), el('b', '', r.injuries), el('span', 's', `${noun(r)} · ${r.location}`));
+      b.append(el('span', `t ${w.c}`, `${LABEL[category(r)]} · ${w.t}`), el('b', '', r.injuries), el('span', 's', `${noun(r)} · ${r.location}`));
       b.onclick = () => pick(r);
       box.append(b);
     }
@@ -919,14 +924,14 @@
     const all = Array(N).fill(0), imm = Array(N).fill(0);
     let later = 0, unknown = 0, past = 0;
     for (const r of inbound) {
-      if (r.triage === 'Deceased') continue;
+      if (category(r) === 'Deceased') continue;
       const m = minsLeft(r);
       if (m === null) { unknown += r.patient_count; continue; }
       if (m > range) { later += r.patient_count; continue; }
       if (m <= 0) past += r.patient_count;
       const i = m <= 0 ? 0 : Math.min(N, Math.ceil(m / step)) - 1; // anyone due or past ETA counts in the first bin
       all[i] += r.patient_count;
-      if (r.triage === 'Immediate') imm[i] += r.patient_count;
+      if (category(r) === 'Immediate') imm[i] += r.patient_count;
     }
     const total = all.reduce((a, b) => a + b, 0), immTotal = imm.reduce((a, b) => a + b, 0);
     $('curve-note').textContent = [past ? `${num(past)} already past ETA, shown at Now` : '', later ? `${plural(later, 'patient')} later than this window` : '', unknown ? `${plural(unknown, 'patient')} with no ETA` : ''].filter(Boolean).join(' · ');
@@ -1001,7 +1006,7 @@
     const rest = list.filter((r) => !heroReport || r.id !== heroReport.id);
     const page = rest.slice(0, limit);
     const groups = view === 'inbound'
-      ? [['Arriving soon', (r) => { const m = minsLeft(r); return m !== null && m <= 15; }], ['Later', (r) => { const m = minsLeft(r); return m === null || m > 15; }]]
+      ? [['By provisional priority', () => true]]
       : [[VIEW_TITLE[view], () => true]];
 
     for (const [name, test] of groups) {
@@ -1015,8 +1020,8 @@
         const it = el('button', `item${isNew ? ' fresh' : ''}`);
         it.type = 'button';
         it.dataset.fk = 'item:' + r.id;
-        const chip = el('span', `chip ${r.triage}`);
-        chip.append(shape(r.triage), document.createTextNode(LABEL[r.triage]));
+        const chip = el('span', `chip ${category(r)}`);
+        chip.append(shape(category(r)), document.createTextNode(LABEL[category(r)]));
         const who = el('span', 'iw', `${noun(r)}, ${r.injuries}`);
         who.append(el('small', '', `From ${r.location}`));
         it.append(chip, who, timeBlock(r, 'tm'));
@@ -1039,7 +1044,7 @@
     if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
     let soon = 0, late = 0;
     for (const r of inbound) {
-      if (r.triage === 'Deceased') continue;
+      if (category(r) === 'Deceased') continue;
       const m = minsLeft(r);
       if (m !== null && m <= 30) { soon += r.patient_count; if (m < -2) late += r.patient_count; }
     }
@@ -1054,7 +1059,7 @@
     if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
     const needs = {};
     for (const r of inbound) {
-      if (r.triage === 'Deceased') continue;
+      if (category(r) === 'Deceased') continue;
       for (const n of readyItems(r)) needs[n] = (needs[n] || 0) + r.patient_count;
     }
     const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);

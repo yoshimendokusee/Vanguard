@@ -1,0 +1,12 @@
+# Isolated synthetic QA storage; never mounts hub/data.
+services:
+  hub:
+    build: .
+    ports:
+      - '127.0.0.1:3301:3000'
+    environment:
+      HOSPITAL_NAME: 'SYNTHETIC QA Hospital'
+    volumes:
+      - qa_data:/data
+volumes:
+  qa_data:

@@ -29,3 +29,8 @@ coverage/
 # Downloaded speech/LLM model weights; retain the asset directory placeholder.
 watch/assets/models/*
 !watch/assets/models/.gitkeep
+
+# Native Apple build output and local QA records.
+.build/
+.swiftpm/
+qa/windows-results.txt
