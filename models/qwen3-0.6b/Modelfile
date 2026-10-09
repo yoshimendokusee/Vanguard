@@ -1,0 +1,18 @@
+FROM ./qwen3-0.6b-q4_k_m.gguf
+PARAMETER num_ctx 2048
+PARAMETER temperature 0
+PARAMETER num_predict 160
+TEMPLATE """{{ if .Messages }}{{ range .Messages }}<|im_start|>{{ .Role }}
+{{ .Content }}<|im_end|>
+{{ end }}{{ else }}{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+{{ end }}<|im_start|>assistant
+<think>
+
+</think>
+
+"""
+PARAMETER stop <|im_end|>
+PARAMETER stop <|im_start|>

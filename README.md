@@ -8,13 +8,14 @@ live pre-arrival board: how many casualties are coming, how bad, what they need,
 when they arrive. This describes the implemented prototype, not hardware-verified
 operation or clinical validation. No speech model is bundled in this checkout.
 
-The approved target adds mobile BLE relay, Supabase sync, local LLM extraction and
-a React/TypeScript/Tailwind dashboard. On-device Qwen weights/runtime and durable processing storage belong to teammates and are **not implemented**. This branch adds automatic foreground sync, hospital provisional rules, native iPhone STT/recovery library ports and Windows QA; complete Apple apps remain blocked.
-The existing watch, hub and plain HTML dashboard remain in their current paths.
-Optional authenticated Supabase sync coexists with automatic foreground LAN sync.
-Main adds hospital provisional rules, native iPhone STT/recovery library ports and
-Windows QA; Backend adds SQLite migrations and cloud sync. Local LLM extraction,
-BLE, Realtime and complete Apple apps remain unimplemented. Applications stay in place.
+The repository now includes local Qwen3-0.6B GGUF weights through Git LFS,
+Ollama inference in the existing hospital hub, and native SwiftUI iOS/watchOS app
+targets with CPU llama.cpp and durable local processing. Both Apple simulators have
+generated real tokens; physical-device feasibility, offline Watch speech and
+paired-device transfer remain unverified. See [Qwen integration](docs/QWEN_INTEGRATION.md)
+and [performed results](docs/QWEN_RESULTS.md). The existing Flutter/Wear OS app,
+SQLite/hospital flows and optional Supabase path remain in place. BLE, Realtime
+and the proposed React replacement are still target work.
 
 ```
 vanguard-wrist/
@@ -137,47 +138,40 @@ Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
 `SUPABASE_ANON_KEY` are watch compile-time defines; `.env` does not automatically
 configure Flutter.
 
-## Local AI (Qwen via Ollama, hub-local)
+## Local Qwen inference
 
-Qwen `qwen3:0.6b` runs on the hospital computer through Ollama. The hub calls it
-from `hub/ai.js` (`GET /api/ai/status`, `POST /api/ai/extract`,
-`POST /api/ai/triage-assist`). The model only extracts what the transcript states
-with evidence; deterministic `hub/risk.js` rules plus your review decide the
-provisional triage. Nothing is saved by the AI routes. See `docs/ai-contract.md`.
-Use synthetic data only. Never expose Ollama to the internet.
+Actual pinned Q4_K_M weights live at
+`models/qwen3-0.6b/qwen3-0.6b-q4_k_m.gguf` through Git LFS. Complete model setup
+while online; no model download or cloud inference occurs during normal startup.
 
-From Windows PowerShell at the repository root:
-
-```powershell
-# 1. Start Ollama on the hub computer, then check the model.
-ollama list
-# Must show qwen3:0.6b. If missing: ollama pull qwen3:0.6b
-
-# 2. Configure the hub.
-Copy-Item .env.example .env
-# .env already sets OLLAMA_URL=http://127.0.0.1:11434 and OLLAMA_MODEL=qwen3:0.6b.
-
-# 3. Run the hub with Docker (uses hub/data), then open the board.
-docker compose up --build
-# Board: http://localhost:3000
-
-# 4. In the "Local AI triage assistant" panel: type a transcript, choose
-# Extract with Qwen or Triage assist, review evidence and warnings, correct the
-# fields, tick the review box, then Save reviewed report.
-# Header shows AI ready or AI unavailable. The board works either way.
-
-# 5. Backend tests (Docker, in-memory DB, no demo data touched).
-docker build -t vanguard-hub-ai ./hub
-docker run --rm -e DB_PATH=:memory: vanguard-hub-ai npm test -- --test-name-pattern="AI"
+```sh
+git lfs install --local
+git lfs pull --include='models/**/*.gguf'
+ollama serve                 # separate terminal, Ollama 0.11.4
+./scripts/qwen-setup.sh
+./scripts/qwen-echo.sh
+# Apple: Xcode with iOS/watchOS SDKs plus CMake
+./scripts/qwen-native-build.sh
+open watch/apple/Vanguard.xcodeproj
 ```
 
-Native Node (needs Node 22+ and build tools for better-sqlite3): `cd hub; npm ci; npm test`.
-Watch AI client: `watch/lib/services/ai_service.dart` posts to `/api/ai/*` and fails
-fast offline so capture stays in SQLite. Apple types: `watch/apple/.../AiContract.swift`.
-`127.0.0.1` on a watch or phone means that device, not the hub PC. For real devices
-use the hub laptop LAN IP as `HUB_URL`, keep phone and hub on the same router, and
-allow the hub port in Windows Firewall. No on-device Qwen, BLE, Supabase, or React
-is claimed in this branch.
+For Docker, prepare the pinned Ollama image and build the hub while online, then
+start with `docker compose up -d --no-build --pull never`. Both existing Compose
+entry points preserve `hub/data`; Ollama imports the mounted GGUF on its internal
+network. The hospital dashboard executes Qwen on the local server. Open a report's
+**Evidence and corrections** dialog and choose **Extract this report with Qwen**:
+the original is already in SQLite, and generated claims append an immutable revision
+without a manual storage approval gate. `GET /api/ai/health` verifies artifact identity
+and fresh generated tokens; a listed tag alone does not prove readiness.
+
+Qwen does not recognize speech or independently assign urgency. Machine claims
+remain unverified; unknown data never means normal. Apple typed capture uses native
+inference; iPhone speech uses the existing on-device transcriber. Watch audio is
+saved and queued for iPhone processing because offline Watch STT is unimplemented.
+
+Read [complete setup, scripts, measurements and blockers](docs/QWEN_INTEGRATION.md)
+and [the AI API contract](docs/ai-contract.md). Keep synthetic development on isolated
+networks: existing LAN/storage protections remain prototype limitations.
 
 ## Watch app
 
@@ -250,7 +244,7 @@ watch. A companion phone is a target fallback requiring implementation/testing.
 - This is a hackathon prototype, not a validated clinical triage tool.
 
 The supported product targets are Apple Watch, iPhone and the hospital web app.
-The current watch code is a legacy Wear OS prototype; Complete Apple applications do not exist yet; native library modules are under `watch/apple`. CI runs hub/API/dashboard tests, existing Dart analysis/parser regressions,
+The Flutter watch code remains a legacy Wear OS prototype; native Apple app targets and shared modules are under `watch/apple`. CI runs hub/API/dashboard tests, existing Dart analysis/parser regressions,
 formatting, secret scanning, workflow/configuration validation and Docker tests.
 There is no Android build or Apple native/hardware validation in this workflow.
 See [the team workflow](docs/GITHUB_WORKFLOW.md) and
@@ -277,5 +271,4 @@ operator overrides. The existing dashboard exposes Evidence and corrections;
 automatic LAN submission still follows local save without a manual gate.
 Read [the API contract](docs/api-contract.md) and
 [backend completion report](docs/backend-completion.md) for the schema, audited
-execution paths, performed checks and limitations. No new dependencies or native
-Apple apps/model runtime were introduced. Use synthetic isolated development only.
+execution paths, performed checks and limitations. That earlier backend phase introduced no native Apple app/model runtime; the later Qwen integration adds those paths as documented above. Use synthetic isolated development only.

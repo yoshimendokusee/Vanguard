@@ -8,11 +8,13 @@ Synthetic data only. Qwen is an extraction assistant, never the triage authority
 
 | Method/path | Purpose |
 | --- | --- |
+| `GET /api/ai/health` | Verified local artifact/import identity and fresh token generation; 200 ready or 503 unavailable. |
+| `POST /api/triage/:id/ai-extract` | Extract current stored transcript and append an immutable, idempotent revision. |
 | `GET /api/ai/status` | Can the hub reach Ollama, and is the configured model listed? |
 | `POST /api/ai/extract` | Transcript in, validated observations + evidence + deterministic provisional triage out. |
 | `POST /api/ai/triage-assist` | Same as extract, plus a reviewable draft (`injuries` string + provisional triage). |
 
-The watch never calls Ollama directly. It calls these hub routes. `127.0.0.1`
+The legacy Flutter preview client calls the hub routes. Native Apple capture now uses local llama.cpp first, with optional paired-iPhone fallback. Apple devices never call Ollama directly. `127.0.0.1`
 on a watch or phone means that device itself, not the hospital computer. Use the
 hub laptop LAN IP (for example `http://192.168.8.10:3000`) and keep the hub and
 Ollama on the same hospital computer or LAN. Never expose Ollama to the internet.
@@ -55,7 +57,7 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
       "device": "hospital-browser",
       "sttEngine": "typed/hub-form",
       "sttRuntime": "hub-ai-v1",
-      "extraction": null
+      "extraction": {"model":"Qwen3-0.6B","revision":"50968a4468ef4233ed78cd7c3de230dd1d61a56b","runtime":"ollama","artifactSha256":"ac2d97712095a558e31573f62f466a3f9d93990898b0ec79d7c974c1780d524a","execution":"local"}
     }
   },
   "evidence": {
@@ -102,10 +104,8 @@ Rules every client can rely on:
 - `provisional` comes from deterministic `assessRisk`, not from the model.
   `requiresVerification` and `advisoryOnly` are always true. The model never
   assigns urgency, declares death, or diagnoses.
-- `processing.provenance.extraction` is `null` for this hub path. It does not
-  claim on-device weights; never invent a revision or checksum.
-- Save through the existing `POST /api/sync-triage` after human review. The AI
-  routes never write to SQLite themselves.
+- `processing.provenance.extraction` records the verified repository artifact and imported local Ollama blob. `processing.evidence` carries source/excerpt/contradiction references labeled model-inferred; the older top-level evidence strings stay compatible.
+- Preview routes remain advisory. Save with exact original processing through `/api/sync-triage`, or invoke `/api/triage/:id/ai-extract` for a current persisted report. No review checkbox gates storage; generated claims remain unverified in clinical assessment.
 
 ## Status response
 
@@ -132,7 +132,7 @@ keeps working either way.
 | --- | --- | --- |
 | 400 | `invalid-transcript` | Missing or empty transcript. |
 | 400 | `transcript-too-long` | Over `AI_MAX_TRANSCRIPT`. Shorten and retry; the report stays local. |
-| 502 | `model-missing` | Ollama is up but has no `qwen3:0.6b`. Run `ollama pull qwen3:0.6b` on the hub computer. |
+| 502 | `model-missing` | Ollama is up but has no `qwen3:0.6b`. Run `scripts/qwen-setup.sh` to import the verified repository GGUF locally. |
 | 503 | `ollama-unreachable` | Start Ollama on the hub computer; capture stays local. |
 | 504 | `ollama-timeout` | One bounded call per request, no retries. Shorten the transcript and retry. |
 | 502 | `invalid-model-json`, `empty-model-response`, `invalid-model-schema`, `inference-failed` | Unusable model reply. Nothing was stored. |
@@ -151,10 +151,17 @@ the hub logs only the error code and transcript length.
    hub computer. Internet and LAN are different things.
 5. Hub or Ollama down: graceful error, board and capture keep working.
 
-## What is not claimed
+## Native and persisted integration
 
-No on-device Qwen on Watch or iPhone in this branch. `watch/apple` holds the
-request/response types and the existing STT/recovery library, not a complete
-native app, WatchConnectivity transfer, or measured on-device inference. Real
-hardware still needs a native target, signing, and the feasibility gates in
-`docs/qwen-agent-handoff.md`. No BLE, Supabase, or React dashboard is added.
+See `QWEN_INTEGRATION.md` for native iOS/watchOS CPU inference, model packaging,
+SQLite-first capture, bounded Watch Connectivity fallback and per-platform evidence.
+Both simulators generated tokens independently; physical-device behavior remains
+unverified. Watch offline speech recognition is not implemented. Qwen is not STT.
+
+Persisted extraction takes `{requestId: UUID, baseRevision: integer}` at
+`POST /api/triage/:id/ai-extract`. It uses the current stored transcript, appends
+machine provenance/evidence and returns the updated report. Identical retries are
+idempotent; stale/concurrent corrected revisions return 409. Originals and prior
+corrections remain unchanged. Native/LLM failures retain pending capture/history.
+
+No browser-native Qwen, new cloud dependency, BLE or React replacement is claimed.

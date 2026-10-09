@@ -34,3 +34,8 @@ watch/assets/models/*
 .build/
 .swiftpm/
 qa/windows-results.txt
+
+# Prepared local runtimes, native frameworks, isolated QA output.
+.runtime/
+watch/apple/.native/
+watch/apple/DerivedData/

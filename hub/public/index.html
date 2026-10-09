@@ -476,7 +476,8 @@
       <p class="hint" id="ai-state" role="status"></p>
       <div id="ai-result" hidden></div>
       <div id="ai-review" hidden>
-        <h3>Review and correct</h3>
+        <h3>Provisional extraction</h3>
+        <p class="hint">Machine findings remain unverified. Use Evidence and corrections on a saved report to record qualified review.</p>
         <div class="ai-grid">
           <label>Breathing <select id="ai-obs-breathing"><option value="normal">normal</option><option value="abnormal">abnormal</option><option value="absent">absent</option><option value="unknown">unknown</option></select></label>
           <label>Consciousness <select id="ai-obs-consciousness"><option value="alert">alert</option><option value="unresponsive">unresponsive</option><option value="unknown">unknown</option></select></label>
@@ -485,13 +486,12 @@
         </div>
         <div class="ai-grid">
           <label>Pickup location <input id="ai-location" type="text" maxlength="200" placeholder="Barangay"></label>
-          <label>Patients <input id="ai-count" type="number" min="1" max="99" value="1"></label>
+          <label>Patients <input id="ai-count" type="number" min="1" max="99" placeholder="Unknown"></label>
           <label>Age group <select id="ai-age"><option>Infant</option><option>Child</option><option>Adult</option><option>Elderly</option><option selected>Unspecified</option></select></label>
           <label>ETA (min) <input id="ai-eta" type="number" min="1" max="720" placeholder="—"></label>
         </div>
-        <label class="ck"><input type="checkbox" id="ai-confirm"> <span>I reviewed the extraction and evidence — save as an inbound report</span></label>
         <div class="ai-row">
-          <button type="button" class="ai-btn" id="ai-save">Save reviewed report</button>
+          <button type="button" class="ai-btn" id="ai-save">Save provisional report</button>
         </div>
         <p class="hint" id="ai-save-state" role="status"></p>
       </div>
@@ -992,6 +992,12 @@
     return box;
   }
 
+  function newUUID() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16)); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128;
+    const hex = [...bytes].map(byte => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+
   async function openEvidence(r) {
     const dialog = el('dialog', 'evidence-dialog');
     dialog.setAttribute('aria-label', 'Report evidence and corrections');
@@ -1007,6 +1013,21 @@
       const detail = await response.json();
       content.replaceChildren(el('h2', '', 'Original evidence'), el('pre', '', detail.raw_text));
       content.append(el('p', 'note', `Encounter: ${detail.encounter_id} · hospital receipt recorded · clinical verification required`));
+      const extract = el('button', 'btn primary', 'Extract this report with Qwen'); extract.type = 'button';
+      const aiState = el('p', 'note'); aiState.setAttribute('role', 'status');
+      const requestId = newUUID();
+      extract.onclick = async () => {
+        extract.disabled = true; aiState.textContent = 'Extracting locally; original report is already stored…';
+        try {
+          const response = await fetch(`/api/triage/${r.id}/ai-extract`, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requestId, baseRevision: detail.revision }) });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || data.error || 'Inference failed');
+          dialog.close(); await load(); await openEvidence(data.report);
+        } catch (error) { aiState.textContent = error.message + '. Original remains stored; retry or reload after a correction.'; }
+        finally { extract.disabled = false; }
+      };
+      content.append(extract, aiState);
       for (const revision of detail.history) {
         const item = el('details', 'rnote');
         item.append(el('summary', '', `Revision ${revision.revision} · ${revision.kind} · ${revision.actor} · ${fmt(revision.created_at)}`),
@@ -1518,13 +1539,13 @@
     var textEl = $('ai-text'), stateEl = $('ai-state'), resultEl = $('ai-result'), reviewEl = $('ai-review');
     var extractBtn = $('ai-extract'), assistBtn = $('ai-assist'), saveBtn = $('ai-save');
     var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
-    var busy = false;
+    var busy = false, lastExtraction = null, saveAttempt = null;
     var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
     function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
     async function refreshStatus() {
       try {
-        var s = await (await fetch('/api/ai/status')).json();
-        if (s && s.available) { setConn(true, 'AI ready'); return; }
+        var s = await (await fetch('/api/ai/health')).json();
+        if (s && s.inference_available) { setConn(true, 'AI ready'); return; }
         setConn(false, 'AI unavailable');
         stateEl.textContent = (s && s.error === 'model-missing')
           ? 'Qwen model is missing on the hospital computer. The board still works.'
@@ -1588,6 +1609,7 @@
       if (busy) return;
       var transcript = textEl.value;
       if (!transcript.trim()) { stateEl.textContent = 'Type a transcript first.'; return; }
+      lastExtraction = null; saveAttempt = null; reviewEl.hidden = true;
       busy = true; extractBtn.disabled = true; assistBtn.disabled = true;
       stateEl.textContent = 'Working — asking local Qwen…';
       try {
@@ -1597,69 +1619,48 @@
         });
         var data = await res.json().catch(function () { return null; });
         if (!res.ok || !data || data.ok !== true) { stateEl.textContent = errText(data, res); return; }
+        lastExtraction = data;
         setConn(true, 'AI ready');
         stateEl.textContent = 'Ready — review the extraction below before saving.';
         renderResult(data);
       } catch (e) { stateEl.textContent = 'Could not reach the hub; the board still works.'; }
-      busy = false; extractBtn.disabled = false; assistBtn.disabled = false;
+      finally { busy = false; extractBtn.disabled = false; assistBtn.disabled = false; }
     }
     extractBtn.onclick = function () { run('extract'); };
     assistBtn.onclick = function () { run('triage-assist'); };
-    // Mirror of hub/risk.js assessRisk (server stays the source of truth).
-    function aiProvisional(o) {
-      var reasons = [];
-      if (o.breathing === 'abnormal' || o.breathing === 'absent') reasons.push('Breathing: ' + o.breathing);
-      if (o.consciousness === 'unresponsive') reasons.push('Unresponsive');
-      if (o.severeBleeding === 'present') reasons.push('Severe bleeding reported');
-      if (reasons.length) return { triage: 'Immediate', reason: reasons.join('; ') };
-      if (o.walking === 'unable') return { triage: 'Delayed', reason: 'Unable to walk; other critical findings not established' };
-      if (o.walking === 'able' && o.breathing === 'normal' && o.consciousness === 'alert' && o.severeBleeding === 'absent') {
-        return { triage: 'Minor', reason: 'Walking, alert, normal breathing, no severe bleeding reported' };
-      }
-      return { triage: 'Unassessed', reason: 'Insufficient explicit observations; qualified assessment required' };
-    }
-    function injuriesFrom(o) {
-      var out = [];
-      if (o.breathing === 'absent') out.push('Not breathing');
-      else if (o.breathing === 'abnormal') out.push('Difficulty breathing');
-      if (o.consciousness === 'unresponsive') out.push('Unconscious');
-      if (o.severeBleeding === 'present') out.push('Severe bleeding');
-      if (o.walking === 'unable') out.push('Non-ambulatory');
-      if (o.walking === 'able') out.push('Ambulatory');
-      return out.length ? out.join(', ') : 'Unspecified';
-    }
     saveBtn.onclick = async function () {
-      if (!$('ai-confirm').checked) { saveStateEl.textContent = 'Tick the review box first — nothing was saved.'; return; }
+      if (!lastExtraction || lastExtraction.processing.originalTranscript !== textEl.value) { saveStateEl.textContent = 'Transcript changed; extract it again before saving.'; return; }
       var loc = $('ai-location').value.trim();
       if (!loc) { saveStateEl.textContent = 'Enter a pickup location first.'; return; }
-      var pc = parseInt($('ai-count').value, 10); if (!Number.isInteger(pc) || pc < 1 || pc > 99) pc = 1;
+      var pc = $('ai-count').value === '' ? null : Number($('ai-count').value);
+      if (pc !== null && (!Number.isInteger(pc) || pc < 1 || pc > 99)) { saveStateEl.textContent = 'Patients must be 1–99 or unknown.'; return; }
       var ages = ['Infant', 'Child', 'Adult', 'Elderly', 'Unspecified'];
       var ag = $('ai-age').value; if (ages.indexOf(ag) === -1) ag = 'Unspecified';
       var etaRaw = $('ai-eta').value.trim();
       var eta = etaRaw === '' ? null : parseInt(etaRaw, 10);
       if (eta !== null && (!Number.isInteger(eta) || eta < 1 || eta > 720)) { saveStateEl.textContent = 'ETA must be 1–720 minutes or blank.'; return; }
-      var obs = { breathing: $('ai-obs-breathing').value, consciousness: $('ai-obs-consciousness').value, severeBleeding: $('ai-obs-bleeding').value, walking: $('ai-obs-walking').value };
-      var prov = aiProvisional(obs);
+      var prov = { triage: 'Unassessed' };
+      var report = { location: loc, injuries: 'Unspecified', triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
+        rawText: lastExtraction.processing.originalTranscript, processing: lastExtraction.processing };
+      var signature = JSON.stringify(report);
+      if (!saveAttempt || saveAttempt.signature !== signature) saveAttempt = { signature: signature, report: Object.assign(report, { localId: Date.now(), createdAt: new Date().toISOString(), reportId: newUUID(), encounterId: newUUID() }) };
       saveBtn.disabled = true; saveStateEl.textContent = 'Saving…';
       try {
         var res = await fetch('/api/sync-triage', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ watchId: 'HUB-AI', reports: [{
-            localId: Date.now() % 1000000000, location: loc.slice(0, 200), injuries: injuriesFrom(obs),
-            triage: prov.triage, patientCount: pc, ageGroup: ag, etaMinutes: eta,
-            rawText: textEl.value.slice(0, 1000), createdAt: new Date().toISOString()
-          }] })
+          body: JSON.stringify({ watchId: 'HUB-AI', reports: [saveAttempt.report] })
         });
         var data = await res.json().catch(function () { return null; });
         if (!res.ok || !data || data.ok !== true) { saveStateEl.textContent = 'Save failed; nothing was stored.'; return; }
         if (data.rejected && data.rejected.length) { saveStateEl.textContent = 'Hub refused the report: ' + data.rejected[0].reason; return; }
         saveStateEl.textContent = 'Saved as inbound (' + prov.triage + ', provisional) — verify clinically.';
-        $('ai-confirm').checked = false;
+        if (!data.ackLocalIds || data.ackLocalIds.indexOf(saveAttempt.report.localId) === -1) throw new Error('No explicit receipt');
         if (typeof toast === 'function') toast('AI report saved', prov.triage + ' · verify clinically', prov.triage);
         if (typeof load === 'function') load();
-      } catch (e) { saveStateEl.textContent = 'Could not reach the hub; nothing was saved.'; }
-      saveBtn.disabled = false;
+      } catch (e) { saveStateEl.textContent = 'Receipt unavailable; retain this form and retry the same report.'; }
+      finally { saveBtn.disabled = false; }
     };
+    ['ai-obs-breathing', 'ai-obs-consciousness', 'ai-obs-bleeding', 'ai-obs-walking'].forEach(function (id) { $(id).disabled = true; });
     refreshStatus();
   })();
 </script>

@@ -37,7 +37,8 @@ jobs:
           node --test .github/scripts/validate-repository.test.js
           node .github/scripts/validate-repository.js
           git show --format= --check --diff-merges=first-parent HEAD
-          bash -n fake-watch.sh
+          bash -n fake-watch.sh scripts/qwen-*.sh
+          node --check scripts/qwen-check.cjs
       - name: Workflow syntax and expression validation
         run: |
           curl --fail --silent --show-error --location --retry 3 \
@@ -117,7 +118,7 @@ jobs:
         run: flutter analyze --no-pub
       - name: Parser tests
         run: flutter test --no-pub
-      # Existing Dart regression checks only. No watchOS/iOS targets exist yet.
+      # Dart regression only; native Apple builds/inference are separate local checks.
 
   docker:
     name: Compose and container tests
@@ -139,6 +140,7 @@ jobs:
           docker run --rm --network none --env DB_PATH=:memory: \
             --mount "type=bind,source=$PWD/docs,target=/docs,readonly" \
             --mount "type=bind,source=$PWD/watch/lib,target=/watch/lib,readonly" \
+            --mount "type=bind,source=$PWD/models,target=/models,readonly" \
             vanguard-ci:local npm test
 
   gate:

@@ -17,9 +17,9 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 
 | Area | Target | Actual code and gap |
 | --- | --- | --- |
-| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. No watchOS target. Hardware execution unverified. |
-| Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive or LLM runtime is bundled. Qwen implementation belongs to a teammate; automatic reporting does not require pre-send review. |
-| Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; no complete companion application/iOS project or durable adapter exists. Legacy Android code does not establish iPhone support. |
+| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. Native SwiftUI watchOS target, local CPU Qwen and SQLite now exist in `watch/apple`; simulator generation passed. Physical inference and offline Watch STT remain unverified/unimplemented respectively. |
+| Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. Pinned repository GGUF, local Ollama and vendored CPU llama.cpp are integrated; machine claims stay unverified and deterministic rules remain authoritative; automatic reporting does not require pre-send review. |
+| Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; native SwiftUI iPhone target, SQLite adapter, Qwen runtime and bounded Watch Connectivity job/result transfer now exist; physical speech/paired transfer are unverified. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
 | Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta` with sqflite v1→v2 upgrade; hub `triage_reports` with WAL and numbered transactional migrations. Hub v2 stores patient/encounter revisions, original processing and assessment/receipt history. Neither database is encrypted; no retention policy. |
 | Hospital LAN | Offline receiving API + dashboard | Express, SQLite, local HTML/CSS/JS, SSE + polling and deterministic provisional priority. Structured evidence, encounter links, immutable corrections and provisional overrides are persisted through hub v2. HTTP without auth/TLS. |
@@ -73,9 +73,10 @@ Supabase CLI.
 ## Integrity limits of the prototype
 
 - The watch ID has only four hexadecimal digits. IDs can collide; it is not a
-  trusted identity. Timestamp monotonicity is only in memory for one process;
-  restart plus clock rollback can collide with an old report. A duplicate with
-  different normalized content is rejected without ACK; identity collisions still require a storage upgrade. These are gaps in the target
+  trusted identity. Both Flutter and native Apple writers now reserve monotonically
+  increasing timestamps against persisted rows in a write transaction. A duplicate
+  with different normalized content is rejected without ACK; device ID collisions
+  still require a coordinated identity migration. These are gaps in the target
   data-integrity guarantee, not solved by the existing replay tests.
 - The server caps batches at 500 reports and JSON bodies at 1 MB. The watch sends
   batches of at most 100 rows with a 900 KiB body cap and foreground backoff.
@@ -137,7 +138,7 @@ Schema ownership and reserved migration paths are in
 The local `pr-ci.yml` adds repository/policy validation, formatting, secret scans,
 documented HTTP/dashboard contract tests, existing hub/parser tests, Flutter
 analysis, syntax checks and Compose/container checks. It adds no Android build.
-Complete Apple app targets are absent. The native library builds and recovery state tests have been run on simulators locally; speech/model execution, clinical correctness and physical hardware behavior remain unverified. Main protection was applied and verified
+The original foundation had no complete Apple app targets. Later Qwen app targets are documented below; historical native library builds/recovery tests were simulator checks; speech/model execution, clinical correctness and physical hardware behavior remain unverified. Main protection was applied and verified
 through GitHub APIs; publication/hosted execution of the new workflow is pending.
 See `GITHUB_WORKFLOW.md` and `../.github/branch-policy.md` for the current gate.
 See `reverse-engineering.md` for dated evidence, gaps and the next work order.
@@ -189,3 +190,36 @@ are implemented inside the same modular monolith. Transcript corrections invalid
 stale findings and overrides; readiness suggestions no longer use invalidated source
 findings. See `api-contract.md` and `backend-completion.md` for schema, lifecycle,
 checks performed for this request and unresolved clinical/platform requirements.
+
+
+## Qwen implementation update — 2026-10-09
+
+`models/qwen3-0.6b` contains the actual pinned 396,705,472-byte Q4_K_M conversion
+of official Qwen3-0.6B, tracked with Git LFS. GGUF embeds tokenizer/metadata;
+manifest, SHA-256 and licenses are local. Explicit initial setup prepares weights,
+images and native runtime; normal startup never downloads models.
+
+The hub verifies artifact and imported Ollama blob identity before extraction.
+`/api/ai/health` generates fresh tokens; `/api/ai/status` retains an exact-tag check.
+A report's `/api/triage/:id/ai-extract` appends idempotent/optimistic extraction to
+existing SQLite v2 history; concurrent corrections reject stale output. Original
+transcripts, explicit encounters and provenance are preserved. Machine claims
+cannot establish clinical urgency; automatic saving has no manual approval gate.
+Docker adds an internal-only Ollama runtime with read-only model mounts and a
+separate imported-model volume. Existing hub services/data paths remain intact.
+
+`watch/apple/Vanguard.xcodeproj` supplies iOS/watchOS SwiftUI apps. `QwenEngine`
+uses vendored CPU llama.cpp, bounded native contexts, cached loading, actor execution,
+cancellation/deadlines and physical-device memory preflight. Native captures and
+original speech are saved to a separate sandbox SQLite file before inference or
+relay. Failed work remains pending; explicit LAN ACKs alone advance hospital
+receipt state. Watch attempts local text inference first and optionally transfers
+pending text/audio to iPhone through Watch Connectivity. Watch offline STT remains
+unimplemented; on-device iPhone Speech support depends on hardware/locale assets.
+
+Both simulator apps generated real tokens and persisted synthetic processing.
+The actual Watch device target also compiled unsigned against its SDK. These checks
+do not prove physical Watch memory, speech, thermals, background transfer or delivery.
+See `QWEN_INTEGRATION.md`, `QWEN_AUDIT.md` and `QWEN_RESULTS.md` for exact status,
+resource measurements, setup and scripts. The system remains a synthetic prototype
+with unauthenticated HTTP and unencrypted storage, not a real-patient deployment.
