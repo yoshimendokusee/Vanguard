@@ -24,7 +24,7 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 | Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta` with sqflite v1→v2 upgrade; hub `triage_reports` with WAL and numbered transactional migrations. Hub v2 stores patient/encounter revisions, original processing and assessment/receipt history. Neither database is encrypted; no retention policy. |
 | Hospital LAN | Offline receiving API + dashboard | Express, SQLite, local HTML/CSS/JS, SSE + polling and deterministic provisional priority. Structured evidence, encounter links, immutable corrections and provisional overrides are persisted through hub v2. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One service: `server.js` HTTP, `sync.js` ingest, `db.js` migrations, `processing.js`/`risk.js` validation and rules, `clinical.js` report history and `records.js` patient/encounter workflows. Do not split into services. Add feature modules as features arrive. |
-| Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies or build step. Retain it until a separately tested replacement exists. |
+| Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies. Docker development now adds Vite for its vanilla CSS/JavaScript; production assets are built and served by Express. Retain it until a separately tested replacement exists. |
 | Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
 | Repository | Monorepo + Compose + CI | Existing `watch/` and `hub/` form a small monorepo. Foundation adds root Compose, documentation and checks for those applications only. |
 
@@ -128,10 +128,10 @@ companion phone using measured device memory, battery and latency.
 Current paths are `watch/`, `hub/`, `docs/` and `fake-watch.sh`. The larger proposed
 `apps/`, `services/` and `packages/` layout remains a possible migration, not an
 instruction to move working code now. `compose.yaml` includes the existing hub
-Compose file, which builds one service containing the API and dashboard and mounts
+Compose file, which builds the existing API/production dashboard and local Ollama, plus a development-only Vite frontend through `hub/compose.dev.yaml`, and mounts
 `hub/data` at `/data`. Root include requires
 [Compose 2.20.3 or later](https://docs.docker.com/compose/how-tos/multiple-compose-files/include/).
-Both entry points share that data directory; run only one at a time.
+Root development uses localhost:3301 with a same-origin API/SSE proxy to hub:3000. The legacy `hub/` entry point serves optimized assets on port 3000 without Vite. Both default to localhost API binding and share that data directory; run only one at a time. See `docker-development.md` for performed checks and platform limits.
 
 Schema ownership and reserved migration paths are in
 `database/migrations/README.md`; `openDb` applies numbered hub migrations transactionally.
