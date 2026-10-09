@@ -20,17 +20,17 @@ class TriageRow {
   });
 
   factory TriageRow.fromMap(Map<String, Object?> m) => TriageRow(
-        id: m['id'] as int,
-        location: m['location'] as String,
-        injuries: m['injuries'] as String,
-        triage: m['triage'] as String,
-        patientCount: m['patient_count'] as int,
-        ageGroup: m['age_group'] as String,
-        etaMinutes: m['eta_minutes'] as int?,
-        rawText: m['raw_text'] as String,
-        createdAt: m['created_at'] as String,
-        synced: (m['sync_status'] as int) == 1,
-      );
+    id: m['id'] as int,
+    location: m['location'] as String,
+    injuries: m['injuries'] as String,
+    triage: m['triage'] as String,
+    patientCount: m['patient_count'] as int,
+    ageGroup: m['age_group'] as String,
+    etaMinutes: m['eta_minutes'] as int?,
+    rawText: m['raw_text'] as String,
+    createdAt: m['created_at'] as String,
+    synced: (m['sync_status'] as int) == 1,
+  );
 
   final int id;
   final String location;
@@ -75,7 +75,8 @@ class TriageDb {
             sync_status INTEGER NOT NULL DEFAULT 0
           )''');
         await db.execute(
-            'CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)');
+          'CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)',
+        );
       },
     );
 
@@ -98,8 +99,10 @@ class TriageDb {
     var ts = DateTime.now().millisecondsSinceEpoch;
     if (ts <= _lastTs) ts = _lastTs + 1;
     _lastTs = ts;
-    final createdAt =
-        DateTime.fromMillisecondsSinceEpoch(ts, isUtc: true).toIso8601String();
+    final createdAt = DateTime.fromMillisecondsSinceEpoch(
+      ts,
+      isUtc: true,
+    ).toIso8601String();
 
     final id = await _db.insert('triage_logs', {
       'location': r.location,
@@ -126,21 +129,26 @@ class TriageDb {
     );
   }
 
-  Future<List<TriageRow>> pending() async => (await _db.query('triage_logs',
-          where: 'sync_status = 0', orderBy: 'id ASC'))
-      .map(TriageRow.fromMap)
-      .toList();
+  Future<List<TriageRow>> pending() async => (await _db.query(
+    'triage_logs',
+    where: 'sync_status = 0',
+    orderBy: 'id ASC',
+  )).map(TriageRow.fromMap).toList();
 
   Future<int> pendingCount() async =>
-      Sqflite.firstIntValue(await _db.rawQuery(
-          'SELECT COUNT(*) FROM triage_logs WHERE sync_status = 0')) ??
+      Sqflite.firstIntValue(
+        await _db.rawQuery(
+          'SELECT COUNT(*) FROM triage_logs WHERE sync_status = 0',
+        ),
+      ) ??
       0;
 
   Future<void> markSynced(Iterable<int> ids) async {
     if (ids.isEmpty) return;
     final marks = List.filled(ids.length, '?').join(',');
     await _db.rawUpdate(
-        'UPDATE triage_logs SET sync_status = 1 WHERE id IN ($marks)',
-        ids.toList());
+      'UPDATE triage_logs SET sync_status = 1 WHERE id IN ($marks)',
+      ids.toList(),
+    );
   }
 }

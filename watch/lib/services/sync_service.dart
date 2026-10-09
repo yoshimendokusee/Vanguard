@@ -7,14 +7,14 @@ import '../db/triage_db.dart';
 
 /// Hospital hub address on the internet-free router. Override at build time:
 ///   flutter run --dart-define=HUB_URL=http://192.168.8.10:3000
-const hubUrl = String.fromEnvironment('HUB_URL',
-    defaultValue: 'http://192.168.8.10:3000');
+const hubUrl = String.fromEnvironment(
+  'HUB_URL',
+  defaultValue: 'http://192.168.8.10:3000',
+);
 
 class SyncOutcome {
   const SyncOutcome.ok(this.sent, this.duplicates) : error = null;
-  const SyncOutcome.failed(this.error)
-      : sent = 0,
-        duplicates = 0;
+  const SyncOutcome.failed(this.error) : sent = 0, duplicates = 0;
 
   final int sent;
   final int duplicates;
@@ -24,7 +24,7 @@ class SyncOutcome {
 
 class SyncService {
   SyncService(this._db, {http.Client? client})
-      : _client = client ?? http.Client();
+    : _client = client ?? http.Client();
 
   final TriageDb _db;
   final http.Client _client;
@@ -50,7 +50,7 @@ class SyncService {
             'etaMinutes': r.etaMinutes,
             'rawText': r.rawText,
             'createdAt': r.createdAt,
-          }
+          },
       ],
     });
 
