@@ -918,7 +918,7 @@ import './hub-client.js';
   // Draft setups are optional: the board works without them.
   fetch('/setups.json').then((res) => (res.ok ? res.json() : null))
     .then((data) => { if (data && data.setups) Object.assign(PREP_DRAFT, data.setups); })
-    .then(() => { if (rows.length) render(); }).catch(() => {});
+    .then(() => { if (rows.length) render(); }).catch(() => {}).finally(load);
   load();
   loadCloud();
   connect();
