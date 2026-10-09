@@ -166,7 +166,7 @@
   .app[data-view="settings"] :is(.catbar, #sline, #filters, #alert, #view-panel, .note, .search, .left) { display: none; }
   .app:not([data-view="settings"]) #settings { display: none; }
   /* On the way filters by level inside the board, so the category tab row steps aside there */
-  .app[data-view="inbound"] .catbar { display: none; }
+  .app:is([data-view="inbound"], [data-view="arrived"], [data-view="cancelled"]) .catbar { display: none; }
   .settings { padding: var(--s5); gap: var(--s5); }
   @media (min-width: 1181px) { .app[data-view="settings"] .panel-main { grid-column: 2 / -1; } }
   .foot-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dim); margin-bottom: var(--s1); }
@@ -251,6 +251,24 @@
   .fold[hidden] { display: none; }
   .bkey { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s4); margin-top: var(--s2); font-size: 0.8125rem; color: var(--dim); }
   .bkey > span { display: inline-flex; align-items: center; gap: 6px; }
+  /* Arrived and Cancelled: totals by level and the cancelled urgent reports to check */
+  #hist-sec { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s3); }
+  #hist-sec[hidden] { display: none; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: var(--s2); }
+  .tile { display: grid; align-content: start; gap: 6px; min-height: 96px; padding: var(--s3) var(--s4); border: 0; border-radius: var(--r-lg); background: var(--cbg); color: var(--cfg); text-align: left; }
+  .tile.Unassessed { box-shadow: inset 0 0 0 1px var(--line); }
+  .tile:hover { filter: brightness(0.97); }
+  .tile[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--cac); }
+  .tile .th { display: flex; align-items: center; gap: 7px; font-size: 0.875rem; font-weight: 600; }
+  .tile b { font-size: 1.75rem; font-weight: 600; letter-spacing: -0.03em; line-height: 1; }
+  .tblks { display: flex; flex-wrap: wrap; gap: 3px; }
+  .tb { width: 10px; height: 10px; border-radius: 3px; background: var(--cac); }
+  .tile .plus { color: var(--cfg); }
+  .check { padding: var(--s4); border-radius: var(--r-lg); background: var(--warn-bg); color: var(--warn-fg); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s2); }
+  .check[hidden] { display: none; }
+  .check h3 { font-size: 1rem; font-weight: 600; }
+  .check p { font-size: 0.875rem; }
+  .check .entry { background: var(--panel); color: var(--text); }
 
   /* ---------- buttons ---------- */
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--s2); min-height: 44px; padding: var(--s2) var(--s4); border-radius: var(--r-md); font-weight: 600; border: 1px solid var(--dim); background: transparent; color: var(--text); white-space: nowrap; }
@@ -284,6 +302,9 @@
   .item .tm { grid-area: time; text-align: right; font-weight: 600; line-height: 1.2; }
   .item .tm small { display: block; font-weight: 400; color: var(--dim); font-size: 0.8125rem; }
   .item .chev { grid-area: chev; width: 9px; height: 9px; justify-self: center; border-right: 2px solid var(--dim); border-bottom: 2px solid var(--dim); transform: translateY(-2px) rotate(45deg); transition: transform var(--dur-fast) var(--ease); }
+  .ehead { display: flex; align-items: center; gap: var(--s2); padding-right: var(--s2); }
+  .ehead .item { flex: 1; min-width: 0; }
+  .ehead .btn { flex: none; min-height: 44px; }
   .item[aria-expanded="true"] .chev { transform: translateY(2px) rotate(225deg); }
   .entry { background: var(--panel-2); border-radius: var(--r-lg); margin-bottom: var(--s2); }
   .entry.open { box-shadow: inset 0 0 0 2px var(--accent); }
@@ -349,6 +370,9 @@
     .seg { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   }
   @media (max-width: 440px) {
+    .ehead { flex-wrap: wrap; padding-right: 0; }
+    .ehead .item { flex: 1 1 100%; }
+    .ehead .btn { margin: 0 var(--s3) var(--s3); }
     .item { grid-template-columns: 1fr auto 1rem; grid-template-areas: "chip time chev" "who who who"; }
     .settings { flex-direction: column; align-items: stretch; }
     .switch { justify-content: space-between; white-space: normal; }
@@ -436,6 +460,11 @@
         <div class="bscroll"><div class="board" id="board" role="group" aria-label="Patients by level and time. Use the left and right arrow keys to change the time."></div></div>
         <div class="fold" id="fold" hidden></div>
         <div class="bkey"><span><i class="blk Immediate"><i class="shape Immediate"></i></i>One block is one patient</span><span id="bnote"></span></div>
+      </section>
+      <section id="hist-sec" aria-labelledby="hist-h" hidden>
+        <h2 class="sr-only" id="hist-h">Summary by level</h2>
+        <div class="tiles" id="tiles" role="group" aria-label="Filter by level"></div>
+        <div class="check" id="check" hidden></div>
       </section>
       <section aria-labelledby="list-h">
         <h2 class="sec-title" id="list-h" tabindex="-1">Patients</h2>
@@ -697,14 +726,15 @@
     const inbound = rows.filter((r) => r.status === 'inbound');
     announceStatus(inbound);
     renderNav();
-    const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : visible();
+    const list = loadState === 'loading' ? [] : view === 'inbound' ? inboundList() : isHistory() ? historyRows() : visible();
     renderSummary(inbound, list);
     renderCats();
     renderFilters();
     renderAlert();
     autoId = view === 'inbound' ? (priorityPatient(list.filter((r) => r.status === 'inbound')) || {}).id ?? null : null;
     const board = renderBoard(list); // On the way: the reports in the chosen time block; other views: the whole list
-    renderList(board || list);
+    const hist = renderHistory(list); // always runs, so it can hide itself when leaving Arrived or Cancelled
+    renderList(board || hist || list);
     renderPrep(inbound);
     for (const r of rows) seen.add(r.id);
     if (loadState === 'ok') firstLoad = false;
@@ -737,6 +767,16 @@
       return;
     }
     const q = query.trim();
+    if (isHistory()) {
+      const bits = [];
+      if (cat) bits.push(LABEL[cat]);
+      if (q) bits.push(`matching “${q.length > 24 ? q.slice(0, 23) + '…' : q}”`);
+      const verb = view === 'arrived' ? 'arrived' : 'were cancelled';
+      s.textContent = list.length
+        ? `${plural(patients(list), 'patient')} in ${plural(list.length, 'report')} ${verb}${bits.length ? ', ' + bits.join(', ') : ''}`
+        : bits.length ? `No reports match: ${bits.join(', ')}` : view === 'arrived' ? 'No one has arrived yet' : 'Nothing has been cancelled';
+      return;
+    }
     const bits = [VIEW_TITLE[view]];
     if (cat && view !== 'inbound') bits.push(LABEL[cat]);
     if (q) bits.push(`matching “${q.length > 24 ? q.slice(0, 23) + '…' : q}”`);
@@ -1063,6 +1103,91 @@
     restoreFocus(row === 'hc' ? `hc:${bsel}` : `cell:${row}:${bsel}`);
   });
 
+  // ---------- Arrived and Cancelled ----------
+  // Totals by level (one block per patient, also the level filter) and a "Check these first" group for
+  // cancelled urgent reports. The hub does not record when a report was marked, so times are when it was received.
+  const HISTORY = ['arrived', 'cancelled'];
+  const isHistory = () => HISTORY.includes(view);
+  const URGENT_CHECK = ['Immediate', 'Unassessed'];
+  let histTitle = '', histQuiet = false;
+  // Rows for these views: filtered by search and level, newest first.
+  function historyRows() {
+    return inboundList().filter((r) => !cat || category(r) === cat)
+      .sort((a, b) => Date.parse(b.received_at) - Date.parse(a.received_at));
+  }
+  // Returns the reports for the main list (the urgent cancelled ones move up into the check group).
+  function renderHistory(list) {
+    const sec = $('hist-sec');
+    const base = isHistory() && loadState !== 'loading' ? inboundList() : [];
+    sec.hidden = !base.length;
+    histQuiet = false;
+    histTitle = 'Newest first';
+    if (sec.hidden) return isHistory() ? list : null;
+
+    // level tiles: totals, one block per patient, and the level filter
+    const scope = base;
+    const tiles = $('tiles');
+    tiles.replaceChildren();
+    for (const t of TRIAGE) {
+      const rs = scope.filter((r) => category(r) === t), n = patients(rs);
+      if (t === 'Deceased' && !n && cat !== t) continue;
+      const b = el('button', `tile ${t}`);
+      b.type = 'button';
+      b.dataset.fk = `tile:${t}`;
+      b.setAttribute('aria-pressed', String(cat === t));
+      const th = el('span', 'th');
+      th.append(shape(t), document.createTextNode(LABEL[t]));
+      const blks = el('span', 'tblks');
+      blks.setAttribute('aria-hidden', 'true');
+      let left = 24;
+      for (const r of rs) for (let i = 0; i < r.patient_count && left > 0; i++, left--) blks.append(el('i', 'tb'));
+      if (n > 24) blks.append(el('span', 'plus', `+${num(n - 24)}`));
+      b.append(th, el('b', '', num(n)), blks);
+      b.onclick = () => setCat(cat === t ? null : t);
+      tiles.append(b);
+    }
+
+    // cancelled Immediate or Unassessed reports come first, with a one-tap Reopen
+    const check = $('check');
+    check.replaceChildren();
+    const urgent = view === 'cancelled' && !cat ? list.filter((r) => URGENT_CHECK.includes(category(r))).sort((x, y) => RANK[category(x)] - RANK[category(y)]) : []; // Immediate first, then newest
+    check.hidden = !urgent.length;
+    if (urgent.length) {
+      check.append(el('h3', '', 'Check these first'),
+        el('p', '', `${plural(urgent.length, 'cancelled report')} ${urgent.length === 1 ? 'was' : 'were'} Immediate or Unassessed. Reopen any that were cancelled by mistake.`));
+      for (const r of urgent) check.append(entryEl(r, { quick: true }));
+      histTitle = 'Other cancelled';
+      histQuiet = true;
+    }
+    return urgent.length ? list.filter((r) => !urgent.includes(r)) : list;
+  }
+  // One patient row: a button that opens that patient's needs; history rows show when the hub received the report.
+  function entryEl(r, opts = {}) {
+    const isNew = !firstLoad && !seen.has(r.id);
+    const open = isOpen(r);
+    const entry = el('div', `entry${open ? ' open' : ''}`);
+    const head = el('div', 'ehead');
+    const it = el('button', `item${isNew ? ' fresh' : ''}`);
+    it.type = 'button';
+    it.dataset.fk = `item:${r.id}`;
+    it.setAttribute('aria-expanded', String(open));
+    if (open) it.setAttribute('aria-controls', `d-${r.id}`);
+    const chip = el('span', `chip ${category(r)}`);
+    chip.append(shape(category(r)), document.createTextNode(LABEL[category(r)]));
+    const who = el('span', 'iw', `${noun(r)}, ${r.injuries}`);
+    who.append(el('small', '', `From ${r.location}${r.id === autoId ? ' · Priority patient' : ''}`));
+    let tm;
+    if (isHistory()) { tm = el('div', 'tm', fmt(r.received_at)); tm.append(el('small', '', `received ${ago(r.received_at)}`)); }
+    else tm = timeBlock(r, 'tm');
+    it.append(chip, who, tm, el('i', 'chev'));
+    it.onclick = () => { expanded[r.id] = !isOpen(r); render(); };
+    head.append(it);
+    if (opts.quick) head.append(actionBtn(r, 'Reopen', 'inbound', '', 'check')); // one tap, no need to open the row
+    entry.append(head);
+    if (open) { const d = renderDetail(r); d.id = `d-${r.id}`; entry.append(d); }
+    return entry;
+  }
+
   function renderList(list) {
     const out = $('list');
     out.replaceChildren();
@@ -1077,6 +1202,7 @@
       return;
     }
 
+    if (!list.length && histQuiet) return; // the Check these first group already holds every report
     if (!list.length) {
       const e = el('div', 'empty');
       const filtered = (view !== 'inbound' && cat) || query.trim();
@@ -1098,7 +1224,7 @@
     const page = rest.slice(0, limit);
     const groups = view === 'inbound'
       ? [[boardTitle || 'Patients', () => true]]
-      : [[VIEW_TITLE[view], () => true]];
+      : [[isHistory() ? histTitle : VIEW_TITLE[view], () => true]];
 
     for (const [name, test] of groups) {
       const part = page.filter(test);
@@ -1106,25 +1232,7 @@
       const head = el('div', 'grp');
       head.append(el('b', '', name), el('span', '', plural(patients(part), 'patient')));
       out.append(head);
-      for (const r of part) {
-        const isNew = !firstLoad && !seen.has(r.id);
-        const open = isOpen(r);
-        const entry = el('div', `entry${open ? ' open' : ''}`);
-        const it = el('button', `item${isNew ? ' fresh' : ''}`);
-        it.type = 'button';
-        it.dataset.fk = 'item:' + r.id;
-        it.setAttribute('aria-expanded', String(open));
-        if (open) it.setAttribute('aria-controls', `d-${r.id}`);
-        const chip = el('span', `chip ${category(r)}`);
-        chip.append(shape(category(r)), document.createTextNode(LABEL[category(r)]));
-        const who = el('span', 'iw', `${noun(r)}, ${r.injuries}`);
-        who.append(el('small', '', `From ${r.location}${r.id === autoId ? ' · Priority patient' : ''}`));
-        it.append(chip, who, timeBlock(r, 'tm'), el('i', 'chev'));
-        it.onclick = () => { expanded[r.id] = !isOpen(r); render(); };
-        entry.append(it);
-        if (open) { const d = renderDetail(r); d.id = `d-${r.id}`; entry.append(d); }
-        out.append(entry);
-      }
+      for (const r of part) out.append(entryEl(r));
     }
     if (rest.length > limit) {
       const more = el('button', 'btn more', `Show ${Math.min(PAGE, rest.length - limit)} more (${num(rest.length - limit)} not shown)`);
