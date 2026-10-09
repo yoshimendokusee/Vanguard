@@ -2,13 +2,6 @@
 import Foundation
 import Speech
 
-public struct LocalTranscript: Sendable {
-    public let originalText: String
-    public let segmentConfidences: [Float]
-    public let engine: String
-    public let runtime: String
-}
-
 /// iPhone fallback only. Speech.framework is absent from the watchOS 27 SDK.
 @MainActor
 public final class OnDeviceTranscriber {

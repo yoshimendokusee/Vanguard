@@ -17,7 +17,7 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 
 | Area | Target | Actual code and gap |
 | --- | --- | --- |
-| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. Native SwiftUI watchOS target, local CPU Qwen and SQLite now exist in `watch/apple`; simulator generation passed. Physical inference and offline Watch STT remain unverified/unimplemented respectively. |
+| Watch | Offline Apple Watch capture, transcription/extraction, persistence and automatic LAN reporting | `watch/`: legacy Flutter Android project; Vosk wrapper, deterministic Taglish parser, SQLite queue, haptics and automatic foreground LAN retry. Native SwiftUI watchOS target uses local Whisper tiny multilingual STT, Qwen and SQLite; physical accuracy, memory, latency and delivery remain unverified. |
 | Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. Pinned repository GGUF, local Ollama and vendored CPU llama.cpp are integrated; machine claims stay unverified and deterministic rules remain authoritative; automatic reporting does not require pre-send review. |
 | Mobile | Paired iPhone offline processing fallback | Native `watch/apple` library provides on-device iPhone STT and fallback recovery ports; native SwiftUI iPhone target, SQLite adapter, Qwen runtime and bounded Watch Connectivity job/result transfer now exist; physical speech/paired transfer are unverified. Build-time `HUB_URL` (and optional publishable-only Supabase values) flow from `watch/apple/Config/*.xcconfig` through `Config/Info.plist` to `AppConfiguration`; a saved in-app hub URL overrides it. Package tests and both simulator builds passed on macOS on 2026-10-10; see [Apple hub URL verification](apple-hub-url-verification.md). Apple app Supabase settings remain empty for hub-owned backup. The configured shared hub uses the Mac's Wi-Fi hostname; see [shared hub setup](shared-hub-setup.md) for current binding, credential and signed simulator evidence. Legacy Android code does not establish iPhone support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
@@ -179,8 +179,13 @@ not on Apple hardware.
 fallback exists. `FallbackProcessor` separates application recovery from the teammate's
 `FallbackRepository` and Qwen/STT processor. A failed commit leaves pending input intact.
 These are real library features, not complete native apps or paired Watch transfer.
-The watchOS SDK lacks Speech.framework; local Watch STT requires a different proven
-runtime. No continuous background execution or physical-device claim is made.
+The watchOS SDK lacks Speech.framework; the Watch now uses a bundled CPU-only
+`whisper.cpp` multilingual tiny q5_1 model and runs its speech/extraction pipeline
+before offering a failed run to the paired iPhone. iPhone transcription remains
+available as fallback when Watch recognition or extraction fails. Model integrity
+is checked at build time; physical Watch support, accuracy, memory, latency and
+thermals remain unverified. No continuous background execution or physical-device
+claim is made.
 
 See `implementation-report.md` for current checks/blockers, `qwen-agent-handoff.md`
 and `database-team-handoff.md` for integration ownership, and `windows-qa.md` for
@@ -263,9 +268,9 @@ original. Only an explicit scoped receipt removes an outbox entry.
 Apple Qwen stays entirely local. Shared readiness states measure token generation;
 LAN URL validation, device credentials, bounded foreground retries and receipt
 validation are separate. Native tokens use Keychain. iPhone transcribes locally
-when the Speech runtime/locale supports it; Watch audio uses the existing paired
-fallback because Watch offline STT is still unimplemented. Hardware execution is
-unverified. Manual URL/token pairing is the reliable LAN configuration fallback;
+when the Speech runtime/locale supports it; Watch transcribes locally first and
+uses the paired iPhone only when recognition or extraction fails. Hardware
+execution is unverified. Manual URL/token pairing is the reliable LAN configuration fallback;
 automatic Bonjour discovery is not implemented across Docker/native networks.
 
 LAN binding now requires server-side per-user/device credentials. Device principals

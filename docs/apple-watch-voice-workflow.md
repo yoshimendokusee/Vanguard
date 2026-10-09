@@ -8,8 +8,8 @@ setups are unreviewed drafts, and the hospital hub's HTTP/SQLite storage remains
 ## What the app does
 
 ```
-Watch microphone ─▶ CAF audio saved to SQLite-referenced file ─▶ (Watch has no offline speech recognition)
-   ─▶ paired iPhone: on-device speech (en-US + fil-PH, best confidence) ─▶ immutable transcript
+Watch microphone ─▶ CAF audio saved to SQLite-referenced file ─▶ Watch Whisper tiny multilingual (offline)
+   ─▶ immutable transcript ─▶ paired iPhone fallback if Watch recognition or extraction fails
    ─▶ local Qwen3-0.6B: four observations (breathing, consciousness, severe bleeding, walking)
    ─▶ confirmation against the transcript (ported hub rules) ─▶ deterministic triage (ported hub rules)
    ─▶ quote-grounded symptoms and details (location, patients, age group, ETA)
@@ -73,8 +73,13 @@ VANGUARD_LIVE_MODEL_DIR=models/qwen3-0.6b VANGUARD_TEST_HUB_URL=http://127.0.0.1
 VANGUARD_SCREENSHOT_DIR=docs/qa/apple-watch-voice-workflow swift test --filter WatchScreenshotTests
 ```
 
-`swift test` needs the native libraries: `PLATFORMS="macos iphoneos iphonesimulator watchos" bash scripts/qwen-native-build.sh`
-(CMake required; the script's `PLATFORMS` override skips `watchsimulator`, which needs a watchOS Simulator SDK).
+`swift test` and Watch builds need both native libraries. Run
+`PLATFORMS="macos iphoneos iphonesimulator watchos" bash scripts/qwen-native-build.sh`
+and `./scripts/whisper-watch-build.sh` (CMake required). The Whisper build creates
+CPU-only Watch device and simulator slices from the pinned vendored source. Its
+bundled multilingual model is 31 MB; retrieve it with
+`git lfs pull --include='models/whisper-tiny-q5_1/*.bin'`. No physical Watch has
+been tested.
 
 ## Evidence matrix (PASS / FAIL / BLOCKED)
 
@@ -84,7 +89,7 @@ VANGUARD_SCREENSHOT_DIR=docs/qa/apple-watch-voice-workflow swift test --filter W
 | Recording captures real microphone input | **BLOCKED** | `MicrophoneRecorder` compiles for iOS and the watchOS device SDK. Controller behavior is tested with a fake microphone. A real-microphone test exists (`MicrophoneRecorderTests`) but the simulator test host cannot be granted microphone permission non-interactively, so it skipped. |
 | Waveform responds to microphone input | **PASS** (logic) / **BLOCKED** (hardware) | Levels come only from the recorder interface, normalized by `AudioLevel`, and tests assert only reported values are shown. Not observed with real audio. |
 | Audio persists safely | **PASS** (store/files) / **BLOCKED** (crash recovery) | Capture and file exist before the first sample; silence and interruption keep the file. CAF stays readable after a crash in theory; not tested. |
-| Offline speech recognition | **BLOCKED / unsupported on Watch** | watchOS has no Speech framework. iPhone on-device recognition (`en-US`, `fil-PH`, best confidence) is implemented and its selection logic tested; real recognition needs the iPhone's speech assets and permission and was not run. |
+| Offline speech recognition | **Implemented / hardware blocked** | Watch uses bundled multilingual `whisper.cpp` tiny q5_1; iPhone still uses on-device Speech (`en-US`, `fil-PH`). Synthetic path tests and Watch SDK build do not prove physical Watch accuracy, memory or latency. |
 | iPhone fallback | **PASS** (logic) / **BLOCKED** (transfer) | Pending-then-recovered flow and retained audio tested with stubs. `WatchRelay` compiles for both platforms; paired WatchConnectivity transfer was not run. |
 | Qwen local inference | **PASS** on this Mac's CPU / **BLOCKED** on Watch and iPhone | Real Qwen3-0.6B (llama.cpp CPU, verified weights) ran 7 synthetic reports at about 2 s each. Memory, latency and thermals on Watch hardware are unknown. |
 | Deterministic triage | **PASS** | Swift port matches the hub for all 108 combinations; unknown never becomes Minor. |
