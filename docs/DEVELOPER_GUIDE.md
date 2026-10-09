@@ -51,7 +51,8 @@ Design principles, in priority order:
 **In scope:** medical triage reports from rescuers to a hospital: patient count, age group,
 findings, START category, pickup location, ETA.
 **Out of scope:** rescue dispatch/logistics (boats, rope, food), patient identity or medical
-records, routing between multiple hospitals, authentication.
+records, routing between multiple hospitals. Supabase authentication applies only to
+optional cloud report sync; the LAN hub remains unauthenticated.
 
 > ⚠ This is a hackathon-grade prototype and decision-support tool. It is **not** a validated
 > clinical triage system. A clinician must confirm every patient on arrival.
@@ -67,7 +68,7 @@ records, routing between multiple hospitals, authentication.
  │         (speech_     (nlp/            (db/triage_db)     │ ─────▶ │  /api/sync-triage    │             │
  │          service)    triage_parser)         │            │  LAN   │                      ▼             │
  │                                             ▼            │        │             SSE push ─▶ ED board   │
- │                                  SyncService (HTTP POST) │        │              (public/index.html)   │
+ │                        SyncService (HTTP) + Supabase    │        │              (public/index.html)   │
  └──────────────────────────────────────────────────────────┘        └────────────────────────────────────┘
         └── haptics confirm save ──┘             both joined to the same internet-free Wi-Fi router
 ```
@@ -80,11 +81,13 @@ sequenceDiagram
     participant W as Watch app
     participant DB as Watch SQLite
     participant H as Hub (Express)
+    participant S as Supabase
     participant ED as ED board
 
     R->>W: tap, speak, tap
     W->>W: Vosk transcript → TriageParser
     W->>DB: INSERT (sync_status = 0)
+    Note over W,DB: cloud owner is captured from the signed-in account; otherwise remains unassigned
     W-->>R: haptic pattern (saved / immediate / unrecognized)
     Note over W,H: later, when both are on the same Wi-Fi
     R->>W: tap SEND TO HOSPITAL
@@ -93,6 +96,11 @@ sequenceDiagram
     H-->>W: {ackLocalIds, inserted, duplicates, rejected}
     W->>DB: UPDATE sync_status = 1 for acked ids only
     H-->>ED: SSE "triage" event → board reloads
+    opt when online and signed in
+        W->>S: authenticated upsert by report UUID
+        S-->>W: upserted report UUIDs
+        W->>DB: UPDATE cloud_sync_status = 1 for acknowledged UUIDs
+    end
 ```
 
 **Key architectural decisions**
@@ -125,8 +133,9 @@ vanguard-wrist/
 │   │   ├── db/triage_db.dart           sqflite queue + watch ID
 │   │   └── services/
 │   │       ├── speech_service.dart     Vosk wrapper (OfflineSpeech)
-│   │       └── sync_service.dart       HTTP sync client (SyncService)
-│   ├── test/triage_parser_test.dart    12 parser tests
+│   │       ├── sync_service.dart       Hospital LAN sync client
+│   │       └── cloud_sync_service.dart Supabase Auth + cloud sync
+│   ├── test/                         Parser and cloud payload tests
 │   └── android/               Manifest + Gradle (Wear OS config)
 └── hub/                       Node.js hospital hub
     ├── server.js              Express app, routes, SSE (exports createApp)
@@ -152,6 +161,8 @@ vanguard-wrist/
 | **Haptic feedback** | See table below. Lets a rescuer confirm a save without looking at the screen. | `main.dart` `_buzz` |
 | **Offline queue** | Every report is stored in SQLite with `sync_status = 0` and an automatic UTC timestamp. | `triage_db.dart` |
 | **Send to hospital** | Sends all unsent rows; shows `SENT n (m dup)`, or a short error (`NO HOSPITAL HUB ON NETWORK`, `HUB UNREACHABLE`, …). Disabled while listening or already sending. | `sync_service.dart` |
+| **Supabase sync** | Separately upserts signed-in user's pending rows in batches of 100 by UUID. Cloud sync state is independent of hub sync. Offline and failed uploads remain pending; sign-in, local save, startup and the ONLINE button trigger sync. | `cloud_sync_service.dart` |
+| **Cloud ownership** | A report captures the current Supabase user ID locally. Unowned rows require explicit confirmation before assignment/upload; rows owned by another user are excluded. | `triage_db.dart`, `main.dart` |
 | **Watch ID** | A random `W-XXXX` ID is generated on first launch and persisted in a `meta` table. Shown in the header. | `triage_db.dart` |
 | **Demo phrase** | Long-press the header (`W-XXXX · N PENDING`) while idle to run a built-in sample report with no microphone. | `main.dart` `_demoPhrase` |
 
@@ -281,7 +292,7 @@ The authoritative list is `_injuries` in the source; this table is a summary.
 
 ## 6. Data model
 
-### 6.1 Watch: `triage_logs` (sqflite, DB file `vanguard.db`, schema version 1)
+### 6.1 Watch: `triage_logs` (sqflite, DB file `vanguard.db`, schema version 2)
 
 | Column | Type | Notes |
 |---|---|---|
@@ -295,8 +306,13 @@ The authoritative list is `_injuries` in the source; this table is a summary.
 | `raw_text` | TEXT | Original transcript, always kept. |
 | `created_at` | TEXT | ISO-8601 UTC, millisecond precision. Increasing within one process (the insert bumps by 1 ms); the last timestamp is not restored after restart. Half of the hub's idempotency key. |
 | `sync_status` | INTEGER | `0` = unsent, `1` = hub acknowledged. |
+| `report_id` | TEXT | Stable UUID used as the Supabase idempotency key. |
+| `cloud_owner_id` | TEXT, nullable | Supabase Auth user ID captured at local save, or assigned after explicit confirmation for unowned rows. |
+| `cloud_sync_status` | INTEGER | `0` = not acknowledged by Supabase, `1` = cloud upsert returned this UUID. Independent of `sync_status`. |
 
 Plus `meta(key, value)` holding `watch_id`. The other half of the idempotency key.
+Version-1 rows are upgraded in place with new UUIDs and remain locally queued.
+Their cloud owner remains null until a signed-in user explicitly confirms assignment.
 
 ### 6.2 Hub: `triage_reports` (SQLite, `better-sqlite3`, WAL mode)
 
@@ -308,14 +324,16 @@ Same fields, snake_case, plus:
 | `received_at` | Hub clock (ISO UTC) at ingest. |
 | `status` | `inbound` (default) / `arrived` / `cancelled`. |
 | constraints | `CHECK` on `triage`, `status`, `patient_count BETWEEN 1 AND 99`; `UNIQUE(watch_id, created_at)`. |
+| schema version | `PRAGMA user_version`; baseline SQL is `hub/migrations/0001_initial_schema.sql`. |
 
 Two clocks are stored on purpose: `created_at` is *when the rescuer spoke* (watch clock),
 `received_at` is *when the hub heard* (hub clock). The gap is the offline delay.
 
-> **No migrations.** `db.js` uses `CREATE TABLE IF NOT EXISTS`; the watch uses `onCreate` only
-> at `version: 1`. Changing a schema means writing a real migration (bump the sqflite
-> `version` and add `onUpgrade`; add a transactional versioned upgrade on the hub).
-> Follow [the reserved migration layout](../database/migrations/README.md).
+> **Migration status.** The watch upgrades version-1 databases to version 2 in place,
+> adding stable report UUIDs and separate cloud ownership/sync columns. The hub
+> applies numbered SQL migrations transactionally and adopts compatible legacy
+> databases without dropping reports. Follow
+> [the migration guide](../database/migrations/README.md) for future changes.
 > Never wipe a persistent database as an upgrade strategy.
 
 ---
@@ -398,6 +416,8 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 |---|---|---|---|
 | `HUB_URL` | `--dart-define` (watch) | `http://192.168.8.10:3000` | Where the watch sends reports. **Compile-time**, so rebuild to change it. |
 | `VOSK_MODEL` | `--dart-define` (watch) | `assets/models/vosk-model-small-en-us-0.15.zip` | Which bundled Vosk model zip to load. |
+| `SUPABASE_URL` | `--dart-define` (watch) | unset | Supabase project URL; must use HTTPS. |
+| `SUPABASE_ANON_KEY` | `--dart-define` (watch) | unset | Supabase publishable/anon key. Never use a service-role key in a client. |
 | `PORT` | env (hub) | `3000` | Listen port. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
@@ -416,7 +436,13 @@ Android (`watch/android/app/src/main/AndroidManifest.xml`, `build.gradle.kts`):
 ## 9. Setup, run, test
 
 **Prerequisites:** Flutter (Dart ≥ 3.13) and an Android SDK for the watch; **Node ≥ 22** for
-the hub (`better-sqlite3` 13 requires it); Docker optional.
+the hub (`better-sqlite3` 13 requires it); Docker optional. Supabase cloud sync also
+requires a project with the checked-in schema migration applied and email Auth enabled.
+
+Apply the Supabase migration to the intended project using the procedure in
+`supabase/migrations/README.md`. Configure the watch at build/run time with
+`SUPABASE_URL` and `SUPABASE_ANON_KEY`. The watch can still capture locally when
+these are unset; cloud sync is disabled.
 
 ### Hub
 
@@ -435,9 +461,15 @@ docker compose up --build                 # build once while online; image runs 
 cd watch
 flutter pub get
 flutter analyze
-flutter test                              # 12 parser tests
-flutter run --dart-define=HUB_URL=http://<hub-ip>:3000
+flutter test                              # parser, migration and cloud payload tests
+flutter run --dart-define=HUB_URL=http://<hub-ip>:3000 \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<publishable-or-anon-key>
 ```
+
+Apply the migration in `supabase/migrations/` to your project and enable email
+authentication before supplying the URL and publishable/anon key. Cloud sync
+remains optional; do not pass a service-role key to the watch app.
 
 Speech model: download a zip from <https://alphacephei.com/vosk/models> into
 `watch/assets/models/` (the folder is declared in `pubspec.yaml`; zips are git-ignored).
@@ -448,6 +480,9 @@ The app unpacks it to app storage on first launch, so the first start is slow.
 | Suite | Covers | Does **not** cover |
 |---|---|---|
 | `watch/test/triage_parser_test.dart` | Every extractor, tier precedence, supersession, fuzzy-match guard, empty/garbage input. | UI, DB, speech, sync client. |
+| `watch/test/triage_db_migration_test.dart` | Upgrading/reopening a populated v1 SQLite database, preserving watch ID/report fields/hub sync state, generating UUIDs/default cloud state, and rollback on migration DDL failure. | Android SQLite behavior and real storage-device failures. |
+| `watch/test/cloud_sync_service_test.dart` | Supabase payload field mapping and stable report UUID. | Live Auth, network retries, remote RLS policies. |
+| `hub/db.test.js` | Fresh schema migration, idempotent reopen, populated legacy DB adoption, incompatible-schema rejection, and transactional rollback. | Production hub database backup/restore procedures. |
 | `hub/sync.test.js` | Ingest, ack semantics, duplicate and cross-watch handling, timestamp normalisation, validation/rejection, defaults, ordering, status endpoint. | SSE, static board, Docker, concurrency, the browser UI. |
 
 **Conventions:** keep `triage_parser.dart` free of Flutter imports; add a test with every
@@ -533,13 +568,13 @@ long-press demo phrase tested as a fallback · `./fake-watch.sh` ready as a back
 |---|---|
 | Patient identity | No structured name field. Arbitrary raw transcripts can contain identifying information; findings and locations are sensitive. |
 | Transport | Plain HTTP on a closed LAN. No TLS. |
-| Authentication | **None.** Anyone with network access can read reports, submit them or change statuses. Synthetic isolated demos only; not acceptable for real patient use or shared/public networks. |
+| Authentication | Supabase cloud rows require Auth and RLS and are restricted to their owner. The LAN hub has **no authentication**: anyone with network access can read reports, submit them or change statuses. Synthetic isolated demos only; not acceptable for real patient use or shared/public networks. |
 | Input handling | Server-side validation and length caps; board renders with `textContent` (no HTML injection from transcripts). SQL uses prepared statements. |
 | Audio | Processed on-device by Vosk; **never stored and never transmitted.** Only the transcript text is saved and sent. |
 | Data at rest | Unencrypted SQLite on both the watch and the hub laptop. |
 
-Before any real deployment: add a shared-secret/API-key header or mutual TLS, encrypt
-storage, define retention, and review privacy law (e.g. the Philippines' Data Privacy Act).
+Before any real deployment: authenticate/authorize the LAN hub, protect storage and
+transports, define retention, and review privacy law (e.g. the Philippines' Data Privacy Act).
 
 ---
 
@@ -570,7 +605,8 @@ appears on the hub) run through a **web build with in-memory stand-ins for Vosk 
   (`-keep class com.sun.jna.* { *; }`) if you enable minification; the project doesn't add them.
 - **Dependency pins:** `vosk_flutter` 0.3.48 constrains `http` to 0.13.x and
   `permission_handler` to 10.x; don't bump those independently.
-- **No hospital routing, no multi-hub fan-out, no authentication.**
+- **No hospital routing or multi-hub fan-out.** The LAN hub has no authentication;
+  Supabase cloud sync has email/password Auth and per-user RLS.
 
 ---
 

@@ -8,20 +8,21 @@ live pre-arrival board: how many casualties are coming, how bad, what they need,
 when they arrive. This describes the implemented prototype, not hardware-verified
 operation or clinical validation. No speech model is bundled in this checkout.
 
-The approved target adds mobile BLE relay, Supabase sync, local LLM extraction and
-a React/TypeScript/Tailwind dashboard. Those components are **not implemented**.
-The existing watch, hub and plain HTML dashboard remain in their current paths.
+The watch also supports optional, authenticated Supabase sync. Mobile BLE relay,
+local LLM extraction, Supabase Realtime and a React/TypeScript/Tailwind dashboard
+are not implemented. The existing watch, hub and plain HTML dashboard remain in
+their current paths.
 
 ```
 vanguard-wrist/
 ├── AGENTS.md                 AI agent guardrails
 ├── docs/                     Architecture, actual API, conventions, audit, legacy guide
 ├── .github/                  PR/issue templates and CI
-├── database/migrations/      Reserved watch/hub migration history; no runner yet
-├── supabase/migrations/      Reserved cloud path; no cloud schema yet
+├── database/migrations/      Migration ownership and upgrade guide
+├── supabase/migrations/      PostgreSQL report table and RLS migration
 ├── compose.yaml              Includes the existing hub Docker Compose service
 ├── watch/   Flutter app (Wear OS): Vosk STT → triage_parser.dart → sqflite → HTTP send
-├── hub/     Node + Express + SQLite: POST /api/sync-triage, ED pre-arrival board, Docker
+├── hub/     Node + Express + SQLite migrations: POST /api/sync-triage, ED board, Docker
 └── fake-watch.sh   curl stand-in for a watch (demo backup / hub smoke test)
 ```
 
@@ -78,10 +79,13 @@ for your area.
 
 - Single tap = start/stop dictation (big high-contrast button, glove-friendly).
 - Live transcript scrolls as you speak. Stopping parses, saves to `triage_logs`
-  (`sync_status = false`), and shows the parsed card.
+  and shows the parsed card. Local save does not depend on a network.
 - **Haptics:** saved = 2 short · **Immediate = 3 long** · heard-but-not-understood = 4 rapid · silence = 1 long.
 - **SEND TO HOSPITAL** pushes the unsent queue; a report is only marked sent when the hub
   acknowledges it. Safe to tap repeatedly.
+- **ONLINE** separately upserts reports for the signed-in Supabase user. Failed/offline
+  uploads remain pending and can be retried. Cloud account and report ownership are separate
+  from the hospital sync status.
 - Long-press the `W-XXXX · N PENDING` header to run a sample report with no microphone
   (demo fail-safe).
 
@@ -126,18 +130,31 @@ Do not use `fake-watch.sh` against a database containing real reports.
 Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
 `HUB_BIND_ADDRESS` for Compose; native Node uses `PORT`, `DB_PATH` and
 `HOSPITAL_NAME` and does not auto-load `.env`. Inside Docker, port 3000 and
-`/data/vanguard.db` remain fixed. `HUB_URL` and `VOSK_MODEL` are watch compile-time
-defines; `.env` does not automatically configure Flutter.
+`/data/vanguard.db` remain fixed. `HUB_URL`, `VOSK_MODEL`, `SUPABASE_URL` and
+`SUPABASE_ANON_KEY` are watch compile-time defines; `.env` does not automatically
+configure Flutter.
 
 ## Watch app
 
 ```bash
 cd watch
-flutter pub get --enforce-lockfile
+flutter pub get
 flutter analyze
-flutter test                     # 12 parser tests
-flutter run --dart-define=HUB_URL=http://192.168.8.10:3000
+flutter test                     # parser, database migration and cloud payload tests
+flutter run \
+  --dart-define=HUB_URL=http://192.168.8.10:3000 \
+  --dart-define=SUPABASE_URL=https://<project-ref>.supabase.co \
+  --dart-define=SUPABASE_ANON_KEY=<publishable-or-anon-key>
 ```
+
+Create a Supabase project, then apply the checked-in migration as described in
+[supabase/migrations/README.md](supabase/migrations/README.md). Enable the email
+provider in Supabase Auth. The app supports email/password sign-in and sign-up;
+email confirmation may be required by the project's Auth settings. Use only the
+publishable/anon key in Flutter. Do not pass a service-role key to `--dart-define`.
+The Supabase button syncs automatically after local saves made while signed in,
+on app startup when a session exists, and when tapped. It does not run a
+background connectivity watcher.
 
 The app requires Dart >= 3.13.2 and < 4; CI pins the locally checked Flutter 3.47.5
 (Dart 3.13.4). An Android SDK is required to build/install. Provision the speech
@@ -179,15 +196,19 @@ watch. A companion phone is a target fallback requiring implementation/testing.
   or other identifying information. HTTP has no auth/TLS and SQLite is unencrypted.
   Use synthetic development data; access controls and protected storage/transport
   are required before real patient use.
-- Watch sync sends the entire queue; the hub rejects over 500 reports or over 1 MB.
-  No automatic batching, background sync, cloud or BLE exists.
+- Watch-to-hub sync sends the entire queue; the hub rejects over 500 reports or over 1 MB.
+  Cloud uploads use batches of 100. Neither route has a background connectivity watcher;
+  cloud retries happen on local save, startup with a session, or an explicit tap.
 - A four-hex-digit watch ID and process-local timestamp ordering can collide across
   devices/restarts/clock rollback. Returned ACK IDs are not authenticated/scoped.
-- No migrations are applied by this foundation; current schemas are unchanged.
+- Existing watch databases are upgraded in place to schema version 2. The Supabase
+  migration is not applied automatically; review and apply it to your own project.
+- Reports made while signed out and version-1 rows have no cloud owner. The app asks
+  before assigning these unowned local reports to the signed-in account for upload.
 - Air-gapped devices have no NTP: ETA countdowns depend on the watch clock and are approximate.
 - This is a hackathon prototype, not a validated clinical triage tool.
 
-CI runs hub tests, watch analysis/parser tests, shell/JS syntax checks and Compose
+CI runs hub tests, watch analysis/tests, shell/JS syntax checks and Compose
 build/container tests. Native builds and device acceptance are not CI checks yet.
 Use feature branches and reviewed PRs; repository administrators must separately
 configure branch protection for the named checks. `AGENTS.md` is guidance, not a

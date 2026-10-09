@@ -17,11 +17,11 @@ mobile applications use Flutter and native SDKs outside Docker.
 | Local AI | Offline STT + lightweight local LLM extraction + deterministic triage + human review | Vosk integration and keyword/fuzzy parser exist. No model archive is bundled, no LLM runtime or explicit pre-save review/confirmation screen exists. |
 | Mobile | Flutter Android/iOS relay clients | No companion application or iOS project. Watch Android code does not establish mobile support. |
 | Offline relay | Authenticated/encrypted BLE store-and-forward | No BLE dependency, permissions, protocol, durable relay queue, fragmentation, hop/expiry controls or return acknowledgment path. |
-| Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta`; hub `triage_reports` with WAL. No migration runner, encryption or retention policy. |
+| Local data | SQLite first on clients and hospital | Watch `triage_logs` + `meta` with sqflite v1→v2 upgrade; hub `triage_reports` with WAL and numbered transactional baseline migrations. Neither database is encrypted; no retention policy. |
 | Hospital LAN | Offline receiving API + dashboard | `hub/`: Express, SQLite, static HTML/CSS/JS dashboard, SSE + polling. No external dashboard assets. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One small service: `server.js` routes, `sync.js` validation/ingest, `db.js` persistence. Do not split into services. Add feature modules as features arrive. |
 | Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies or build step. Retain it until a separately tested replacement exists. |
-| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | No Supabase client, deployment config, schema, RLS or cloud sync. Reserved migration path is documentation only. |
+| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
 | Repository | Monorepo + Compose + CI | Existing `watch/` and `hub/` form a small monorepo. Foundation adds root Compose, documentation and checks for those applications only. |
 
 ## Implemented three-tier flow
@@ -31,8 +31,9 @@ Presentation: Wear OS Flutter screen                 Hospital HTML board
                         |                                  |
 Application: Vosk -> keyword parser -> report        Express routes + ingest
                         |                                  |
-Data:        watch SQLite -> manual HTTP LAN POST -> hospital SQLite
-                                      <- ACK IDs --        |
+Data:        watch SQLite -> HTTP LAN POST -> hospital SQLite
+                  |                   <- ACK IDs --        |
+                  +-> Supabase upsert (authenticated, per-user RLS)
                                                    SSE event / poll
 ```
 
@@ -43,13 +44,28 @@ network call in capture. Speech needs a separately provisioned Vosk model ZIP.
 The default asset path selects the English model; model language accuracy,
 watch RAM, permissions and startup behavior require real-device testing.
 
-`watch/lib/services/sync_service.dart` sends all pending rows to
+`watch/lib/services/sync_service.dart` sends all pending hospital rows to
 `POST /api/sync-triage`, with an eight-second timeout. Only returned `ackLocalIds`
 are marked synced. `hub/sync.js` validates each report and ingests valid rows in
 a transaction. Duplicate reports are also acknowledged. `hub/db.js` deduplicates
 on watch identity and normalized UTC creation timestamp. Invalid reports stay
 pending. The dashboard fetches rows, updates statuses and refreshes through SSE
 with a ten-second polling fallback. See `api-contract.md` for the existing API.
+
+`watch/lib/services/cloud_sync_service.dart` separately upserts UUID-keyed
+reports to Supabase using the signed-in user's session. SQLite records remain
+the local source of truth; cloud sync state does not change LAN sync state.
+Reports created while signed out and pre-upgrade rows have no cloud owner.
+Uploading those rows requires explicit confirmation to assign them to the
+current account. An upload is acknowledged only after Supabase returns the
+upserted report IDs.
+
+The hub applies `hub/migrations/0001_initial_schema.sql` transactionally and
+tracks its schema with SQLite `PRAGMA user_version`. Existing compatible
+databases are adopted at version 1 without dropping records; incompatible
+unversioned schemas fail explicitly. The watch v2 upgrade is implemented through
+sqflite's `onUpgrade`; the Supabase migration is tracked separately by the
+Supabase CLI.
 
 ## Integrity limits of the prototype
 
@@ -89,9 +105,15 @@ See [Apple's background behavior](https://developer.apple.com/library/archive/do
 and [Android's background BLE guidance](https://developer.android.com/develop/connectivity/bluetooth/ble/background).
 
 Supabase is an eventual online sync route, not a prerequisite for local capture
-or an offline hospital hub. Introduce Auth, scoped roles, RLS, versioned migrations
-and conflict/delivery semantics together. Keep server credentials out of clients.
-An optional Python/FastAPI AI service or relay simulator is allowed only when
+or an offline hospital hub. The watch saves first to SQLite, assigns each report
+a stable UUID, and retries Supabase upserts by that ID. Each local row records
+the authenticated account that owned it at capture time; unowned rows from
+signed-out capture or before this upgrade require explicit user confirmation
+before assignment to an account. Supabase RLS limits each account to its own
+rows. The LAN hub remains a separate route with its existing legacy identity.
+Realtime, protected local storage/transports and trusted hospital-delivery
+semantics are not implemented. Keep server credentials out of clients. An
+optional Python/FastAPI AI service or relay simulator is allowed only when
 needed; a server AI service cannot satisfy the offline client requirement.
 A local LLM extracts explicit facts with uncertainty; deterministic rules and
 qualified review govern provisional triage. Decide placement on watch versus
@@ -109,7 +131,7 @@ Both entry points share that data directory; run only one at a time.
 
 Schema ownership and reserved migration paths are in
 `database/migrations/README.md`; no migration is applied by this foundation.
-CI runs existing hub/parser tests, Flutter analysis, syntax checks, Compose
+CI runs existing hub and watch tests, Flutter analysis, syntax checks, Compose
 validation and container build/tests. It does not establish native builds,
 speech quality, clinical correctness, BLE reliability or hosted branch protection.
 See `reverse-engineering.md` for dated evidence, gaps and the next work order.

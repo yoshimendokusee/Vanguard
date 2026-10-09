@@ -92,5 +92,8 @@ ETA is minutes after creation, so delayed sync or clock skew affects the countdo
 
 `sync_status = 1` on the watch means acknowledgment by this LAN endpoint;
 `status = arrived` is a separate operator action at the hub. Neither is a
-cryptographically verified delivery receipt. Cloud and BLE schemas/endpoints
-are not implemented; specify and test them before adding consumers.
+cryptographically verified delivery receipt. Supabase is an independent watch
+sync path, not part of this HTTP API: it uses `report_id` UUID upserts, a separate
+`cloud_sync_status`, and owner-scoped RLS. See
+`supabase/migrations/README.md` for the cloud table setup. BLE schemas/endpoints
+are not implemented.
