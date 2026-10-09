@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Vanguard ED Pre-Arrival Board</title>
+<style>
+  /* No external fonts/CDNs: this page must work with zero internet. */
+  :root {
+    --bg: #0b0e12; --panel: #141a21; --line: #26303b; --text: #eef2f6; --dim: #8b98a7;
+    --imm: #ff1744; --del: #ffd600; --min: #00e676; --dec: #b0bec5; --una: #ffffff; --accent: #4fc3f7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+           padding: 14px 20px; border-bottom: 2px solid var(--accent); background: var(--panel); }
+  header h1 { margin: 0; font-size: 19px; letter-spacing: 1.5px; }
+  header small { color: var(--dim); }
+  .spacer { flex: 1; }
+  .conn { font-size: 12px; padding: 4px 10px; border-radius: 99px; border: 1px solid var(--line); }
+  .conn.live { color: var(--min); border-color: var(--min); }
+  .conn.down { color: var(--imm); border-color: var(--imm); }
+
+  .surge { display: grid; grid-template-columns: minmax(180px, 1.1fr) repeat(5, minmax(100px, 1fr)); gap: 12px; padding: 16px 20px 0; }
+  .tile { background: var(--panel); border: 1px solid var(--line); border-top-width: 5px; border-radius: 8px; padding: 10px 14px; }
+  .tile b { display: block; font-size: 30px; line-height: 1.1; }
+  .tile span { color: var(--dim); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .tile.total { border-top-color: var(--accent); }
+  .tile.total b { font-size: 38px; }
+  .tile.Immediate { border-top-color: var(--imm); } .tile.Immediate b { color: var(--imm); }
+  .tile.Unassessed { border-top-color: var(--una); }
+  .tile.Delayed { border-top-color: var(--del); } .tile.Delayed b { color: var(--del); }
+  .tile.Minor { border-top-color: var(--min); } .tile.Minor b { color: var(--min); }
+  .tile.Deceased { border-top-color: var(--dec); } .tile.Deceased b { color: var(--dec); }
+
+  .prep { margin: 12px 20px 0; padding: 10px 14px; background: var(--panel); border: 1px solid var(--line);
+          border-radius: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .prep h2 { margin: 0 8px 0 0; font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); font-weight: 600; }
+  .chip { background: #1e2731; border: 1px solid var(--line); border-radius: 99px; padding: 3px 11px; font-size: 13px; }
+  .chip b { color: var(--accent); margin-left: 4px; }
+  .soon { color: var(--del); font-weight: 700; }
+
+  .tabs { display: flex; gap: 8px; padding: 16px 20px 8px; }
+  .tabs button { background: transparent; color: var(--dim); border: 1px solid var(--line);
+                 border-radius: 6px; padding: 6px 14px; font: inherit; cursor: pointer; }
+  .tabs button.on { color: #000; background: var(--accent); border-color: var(--accent); font-weight: 700; }
+
+  main { padding: 0 20px 40px; display: grid; gap: 10px; }
+  .card { display: grid; grid-template-columns: 130px 1fr 150px auto; gap: 14px; align-items: center;
+          background: var(--panel); border: 1px solid var(--line); border-left: 8px solid var(--una);
+          border-radius: 8px; padding: 12px 16px; }
+  .card.Immediate { border-left-color: var(--imm); } .card.Delayed { border-left-color: var(--del); }
+  .card.Minor { border-left-color: var(--min); } .card.Deceased { border-left-color: var(--dec); }
+  .card.done { opacity: .45; }
+  .card.fresh { animation: flash 2.5s ease-out; }
+  @keyframes flash { from { background: #3a1d22; } to { background: var(--panel); } }
+  .badge { font-weight: 800; letter-spacing: 1px; font-size: 13px; text-align: center; padding: 6px 0; border-radius: 6px; color: #000; background: var(--una); }
+  .Immediate .badge { background: var(--imm); color: #fff; } .Delayed .badge { background: var(--del); }
+  .Minor .badge { background: var(--min); } .Deceased .badge { background: var(--dec); }
+  .count { text-align: center; font-size: 22px; font-weight: 800; margin-top: 4px; }
+  .count small { display: block; font-size: 11px; font-weight: 500; color: var(--dim); }
+  .inj { font-size: 17px; font-weight: 700; }
+  .loc { color: var(--accent); font-weight: 600; margin-top: 2px; }
+  .needs { color: var(--dim); font-size: 13px; margin-top: 2px; }
+  .raw { color: var(--dim); font-style: italic; margin-top: 4px; font-size: 13px; }
+  .meta { color: var(--dim); font-size: 12px; margin-top: 4px; }
+  .eta { text-align: center; }
+  .eta b { display: block; font-size: 22px; }
+  .eta span { color: var(--dim); font-size: 12px; }
+  .eta.late b { color: var(--imm); } .eta.due b { color: var(--del); }
+  .actions { display: flex; flex-direction: column; gap: 6px; min-width: 100px; }
+  .actions button { font: inherit; font-weight: 700; padding: 7px 10px; border-radius: 6px; cursor: pointer;
+                    border: 1px solid var(--line); background: #1e2731; color: var(--text); }
+  .actions button.go { background: var(--accent); color: #000; border-color: var(--accent); }
+  .tag { font-size: 11px; letter-spacing: 1px; text-transform: uppercase; color: var(--dim); text-align: center; }
+  .empty { color: var(--dim); text-align: center; padding: 60px 0; }
+  .note { color: var(--dim); font-size: 12px; padding: 0 20px 24px; }
+  @media (max-width: 900px) { .surge { grid-template-columns: repeat(3, 1fr); } .card { grid-template-columns: 1fr; } .actions { flex-direction: row; } }
+</style>
+</head>
+<body>
+<header>
+  <h1 id="hospital">ED PRE-ARRIVAL BOARD</h1>
+  <small>Inbound flood casualties · air-gapped LAN</small>
+  <div class="spacer"></div>
+  <span id="conn" class="conn down">connecting…</span>
+</header>
+
+<section class="surge">
+  <div class="tile total"><b id="n-total">0</b><span>Patients inbound · <span id="n-reports">0</span> reports</span></div>
+  <div class="tile Immediate"><b id="n-Immediate">0</b><span>Immediate</span></div>
+  <div class="tile Unassessed"><b id="n-Unassessed">0</b><span>Unassessed</span></div>
+  <div class="tile Delayed"><b id="n-Delayed">0</b><span>Delayed</span></div>
+  <div class="tile Minor"><b id="n-Minor">0</b><span>Minor</span></div>
+  <div class="tile Deceased"><b id="n-Deceased">0</b><span>Deceased</span></div>
+</section>
+
+<section class="prep" id="prep"></section>
+
+<nav class="tabs">
+  <button data-f="inbound" class="on">Inbound</button>
+  <button data-f="all">All</button>
+  <button data-f="arrived">Arrived</button>
+</nav>
+
+<main id="list"></main>
+
+<p class="note">
+  Triage categories are START-style and come from a rescuer's spoken report, interpreted by keyword matching on a
+  watch. They are advisory: confirm every patient on arrival. “Unassessed” means the report was saved but not understood.
+  ETAs use the watch clock, which has no network time on an air-gapped LAN, so treat countdowns as approximate.
+</p>
+
+<script>
+  // What to get ready for, per finding (advisory; edit freely, no watch update needed).
+  const PREP = {
+    'Not breathing': 'Resus bay',
+    'Difficulty breathing': 'Oxygen / airway',
+    'Drowning': 'Airway + warming',
+    'Unconscious': 'Neuro obs',
+    'Severe bleeding': 'Blood / OR',
+    'Head injury': 'CT / neurosurgery',
+    'Chest pain': 'ECG / cardiology',
+    'Electrocution': 'Cardiac monitor',
+    'Pregnant / labor': 'OB / delivery',
+    'Fracture': 'X-ray / ortho',
+    'Laceration': 'Suturing',
+    'Bleeding': 'Haemostasis',
+    'Hypothermia': 'Active warming',
+    'Burn': 'Burn care',
+    'Snakebite': 'Antivenom',
+    'Weak / dehydrated': 'IV fluids',
+  };
+  const TRIAGE = ['Immediate', 'Unassessed', 'Delayed', 'Minor', 'Deceased'];
+
+  let rows = [];
+  let filter = 'inbound';
+  const seen = new Set();
+  let firstLoad = true;
+
+  const $ = (id) => document.getElementById(id);
+  const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  function el(tag, cls, text) {
+    const n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text; // textContent: transcripts are untrusted
+    return n;
+  }
+
+  const etaAt = (r) => (r.eta_minutes ? Date.parse(r.created_at) + r.eta_minutes * 60000 : null);
+
+  /** minutes until arrival (negative = overdue), or null if no ETA was given */
+  function minsLeft(r) {
+    const t = etaAt(r);
+    return t === null ? null : Math.round((t - Date.now()) / 60000);
+  }
+
+  async function load() {
+    rows = await (await fetch('/api/triage')).json();
+    render();
+  }
+
+  function summarize() {
+    const inbound = rows.filter((r) => r.status === 'inbound');
+    const byTriage = Object.fromEntries(TRIAGE.map((t) => [t, 0]));
+    const needs = {};
+    let soon = 0;
+    for (const r of inbound) {
+      byTriage[r.triage] += r.patient_count;
+      if (r.triage !== 'Deceased') {
+        const seenNeeds = new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean));
+        if (r.age_group === 'Child' || r.age_group === 'Infant') seenNeeds.add('Paediatrics');
+        for (const n of seenNeeds) needs[n] = (needs[n] || 0) + r.patient_count;
+      }
+      const m = minsLeft(r);
+      if (m !== null && m <= 30 && r.triage !== 'Deceased') soon += r.patient_count;
+    }
+    return { inbound, byTriage, needs, soon };
+  }
+
+  function renderSummary() {
+    const { inbound, byTriage, needs, soon } = summarize();
+    $('n-total').textContent = inbound.reduce((s, r) => s + r.patient_count, 0);
+    $('n-reports').textContent = inbound.length;
+    for (const t of TRIAGE) $('n-' + t).textContent = byTriage[t];
+
+    const prep = $('prep');
+    prep.replaceChildren(el('h2', '', 'Prepare for'));
+    const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);
+    if (!sorted.length) prep.append(el('span', 'note', 'Nothing inbound.'));
+    for (const [name, n] of sorted) {
+      const c = el('span', 'chip', name);
+      c.append(el('b', '', '×' + n));
+      prep.append(c);
+    }
+    if (soon) prep.append(el('span', 'soon', `  ·  ${soon} patient${soon > 1 ? 's' : ''} due within 30 min`));
+  }
+
+  function etaBlock(r) {
+    const box = el('div', 'eta');
+    const m = minsLeft(r);
+    if (r.status !== 'inbound') return box;
+    if (m === null) { box.append(el('b', '', 'ETA ?'), el('span', '', 'not stated')); return box; }
+    if (m > 1) box.append(el('b', '', `${m} min`), el('span', '', 'until arrival'));
+    else if (m >= -2) { box.classList.add('due'); box.append(el('b', '', 'DUE NOW'), el('span', '', fmt(etaAt(r)))); }
+    else { box.classList.add('late'); box.append(el('b', '', `+${-m} min`), el('span', '', 'past ETA')); }
+    return box;
+  }
+
+  function render() {
+    renderSummary();
+    const shown = rows.filter((r) => (filter === 'all' ? true : r.status === filter));
+    const list = $('list');
+    list.replaceChildren();
+    if (!shown.length) list.append(el('div', 'empty', 'No reports. Waiting for rescue watches to send…'));
+
+    for (const r of shown) {
+      const isNew = !firstLoad && !seen.has(r.id);
+      seen.add(r.id);
+      const card = el('div', `card ${r.triage}${r.status !== 'inbound' ? ' done' : ''}${isNew ? ' fresh' : ''}`);
+
+      const left = el('div');
+      left.append(el('div', 'badge', r.triage.toUpperCase()));
+      const count = el('div', 'count', '×' + r.patient_count);
+      if (r.age_group !== 'Unspecified') count.append(el('small', '', r.age_group));
+      left.append(count);
+      card.append(left);
+
+      const body = el('div');
+      body.append(el('div', 'inj', r.injuries));
+      body.append(el('div', 'loc', 'From ' + r.location));
+      const needs = [...new Set(r.injuries.split(',').map((s) => PREP[s.trim()]).filter(Boolean))];
+      if (needs.length && r.triage !== 'Deceased') body.append(el('div', 'needs', 'Prepare: ' + needs.join(' · ')));
+      if (r.raw_text) body.append(el('div', 'raw', '“' + r.raw_text + '”'));
+      body.append(el('div', 'meta', `${r.watch_id} · reported ${fmt(r.created_at)} · received ${fmt(r.received_at)} · ${r.status}`));
+      card.append(body);
+
+      card.append(etaBlock(r));
+
+      const actions = el('div', 'actions');
+      if (r.status === 'inbound') {
+        actions.append(btn(r.id, 'Arrived', 'arrived', true), btn(r.id, 'Cancel', 'cancelled'));
+      } else {
+        actions.append(el('div', 'tag', r.status), btn(r.id, 'Reopen', 'inbound'));
+      }
+      card.append(actions);
+      list.append(card);
+    }
+    firstLoad = false;
+
+    function btn(id, label, status, primary) {
+      const b = el('button', primary ? 'go' : '', label);
+      b.onclick = async () => {
+        await fetch(`/api/triage/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        load();
+      };
+      return b;
+    }
+  }
+
+  document.querySelectorAll('.tabs button').forEach((b) => {
+    b.onclick = () => {
+      filter = b.dataset.f;
+      document.querySelectorAll('.tabs button').forEach((x) => x.classList.toggle('on', x === b));
+      render();
+    };
+  });
+
+  fetch('/api/config').then((r) => r.json()).then((c) => {
+    $('hospital').textContent = c.hospital.toUpperCase();
+    document.title = c.hospital + ' · Pre-Arrival Board';
+  }).catch(() => {});
+
+  // Live push; the poll is a safety net if the stream drops.
+  function connect() {
+    const es = new EventSource('/api/events');
+    es.onopen = () => { $('conn').textContent = '● LIVE'; $('conn').className = 'conn live'; };
+    es.addEventListener('triage', load);
+    es.onerror = () => { $('conn').textContent = 'reconnecting…'; $('conn').className = 'conn down'; };
+  }
+  load().catch(() => {});
+  connect();
+  setInterval(() => load().catch(() => {}), 10000);
+  setInterval(render, 15000); // keep ETA countdowns ticking between polls
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+node_modules/
+.dart_tool/
+build/
+*.zip
