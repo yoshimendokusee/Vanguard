@@ -45,7 +45,7 @@ test('documented LAN example works end to end with the shipped dashboard', async
     assert.equal(page.status, 200);
     const html = await page.text();
     assert.equal(html, fs.readFileSync(path.join(__dirname, 'public/index.html'), 'utf8'));
-    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+    const scripts = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)];
     assert.ok(scripts.length > 0);
     for (const [index, script] of scripts.entries()) new vm.Script(script[1], { filename: `dashboard-${index}.js` });
     const parser = fs.readFileSync(path.join(__dirname, '../watch/lib/nlp/triage_parser.dart'), 'utf8');
