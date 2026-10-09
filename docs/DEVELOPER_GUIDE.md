@@ -424,7 +424,7 @@ the hub (`better-sqlite3` 13 requires it); Docker optional.
 ```bash
 cd hub
 npm ci
-npm test                                  # 7 tests, in-memory SQLite, real HTTP server on an ephemeral port
+npm test                                  # 9 tests, synthetic in-memory/temporary SQLite and loopback HTTP
 npm start                                 # http://localhost:3000, prints LAN URLs
 HOSPITAL_NAME="St. Luke's ED" PORT=4000 npm start
 docker compose up --build                 # build once while online; image runs offline
@@ -450,6 +450,7 @@ The app unpacks it to app storage on first launch, so the first start is slow.
 |---|---|---|
 | `watch/test/triage_parser_test.dart` | Every extractor, tier precedence, supersession, fuzzy-match guard, empty/garbage input. | UI, DB, speech, sync client. |
 | `hub/sync.test.js` | Ingest, ack semantics, duplicate and cross-watch handling, timestamp normalisation, validation/rejection, defaults, ordering, status endpoint. | SSE, static board, Docker, concurrency, the browser UI. |
+| `hub/contract.test.js` | Documented API request/response, sender fields, served dashboard JS syntax, SSE headers, populated hub reopen/deduplication. | Browser rendering, speech/native hardware, future schema upgrades. |
 
 **Conventions:** keep `triage_parser.dart` free of Flutter imports; add a test with every
 vocabulary change; hub tests open `openDb(':memory:')` and call `createApp(db)`, so no files or

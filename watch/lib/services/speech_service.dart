@@ -31,8 +31,10 @@ class OfflineSpeech {
   Future<void> init() async {
     final modelPath = await ModelLoader().loadFromAssets(voskModelAsset);
     final model = await _vosk.createModel(modelPath);
-    final recognizer =
-        await _vosk.createRecognizer(model: model, sampleRate: 16000);
+    final recognizer = await _vosk.createRecognizer(
+      model: model,
+      sampleRate: 16000,
+    );
     _service = await _vosk.initSpeechService(recognizer);
   }
 
