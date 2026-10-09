@@ -423,6 +423,9 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 | `HOST` | env (hub) | `0.0.0.0` | Listen address; use `127.0.0.1` for local-only access. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
+| `SUPABASE_URL`, `SUPABASE_ANON_KEY` | env (hub) | unset | Hub cloud backup target and publishable key (the same names are separate watch build defines). |
+| `SUPABASE_HUB_EMAIL`, `SUPABASE_HUB_PASSWORD` | env (hub) | unset | Dedicated Supabase Auth user the hub signs in as; RLS applies. Server-side only. Any missing value keeps cloud backup off. |
+| `CLOUD_SYNC_INTERVAL_MS` | env (hub) | `30000` | Online retry interval (min 5000); failures back off up to 10 minutes. |
 
 Android (`watch/android/app/src/main/AndroidManifest.xml`, `build.gradle.kts`):
 
@@ -487,7 +490,6 @@ The app unpacks it to app storage on first launch, so the first start is slow.
 | `watch/test/triage_db_migration_test.dart` | Upgrading/reopening a populated v1 SQLite database, preserving watch ID/report fields/hub sync state, generating UUIDs/default cloud state, and rollback on migration DDL failure. | Android SQLite behavior and real storage-device failures. |
 | `watch/test/cloud_sync_service_test.dart` | Supabase payload field mapping, stable report UUID, and missing/non-HTTPS/secret-key configuration disabling cloud sync. | Live Auth, network retries, remote RLS policies. |
 | `watch/test/ai_service_test.dart` | Hub AI client: fail-fast on hub/AI failure, rejection of out-of-schema observations, non-deterministic or non-advisory urgency, altered transcripts and non-local/unpinned extraction provenance; missing observations stay unknown. | Any real Qwen inference (hub Ollama or on-device). |
-| `watch/test/setup_device_test.dart` | `.env` parsing, `env.json` values, rejection of placeholder/duplicate/partial/non-HTTPS/secret values, adb device listing, value masking. | Real `flutter build`/`adb install` runs and device hardware. |
 | `hub/db.test.js` | Fresh schema migration, idempotent reopen, populated legacy DB adoption, incompatible-schema rejection, and transactional rollback. | Production hub database backup/restore procedures. |
 | `hub/sync.test.js` | Ingest, ack semantics, duplicate and cross-watch handling, timestamp normalisation, validation/rejection, defaults, ordering, status endpoint. | SSE, static board, Docker, concurrency, the browser UI. |
 | `hub/contract.test.js` | Documented API request/response, sender fields, served dashboard JS syntax, SSE headers, populated hub reopen/deduplication. | Browser rendering, speech/native hardware, future schema upgrades. |
@@ -607,22 +609,7 @@ long-press demo phrase tested as a fallback · `./fake-watch.sh` ready as a back
 4. **First sign-in needs internet.** Supabase sign-in/sign-up happens online.
    After that the session is stored on the device. Signing in is only needed for
    cloud sync; capture never requires it.
-5. **Automated alternative to steps 2–3.** With `HUB_URL`, `SUPABASE_URL` and
-   `SUPABASE_ANON_KEY` set in the git-ignored root `.env`:
-
-   ```bash
-   cd watch
-   dart run tool/setup_device.dart            # validate .env, write env.json
-   dart run tool/setup_device.dart --build    # + flutter build apk
-   dart run tool/setup_device.dart --install  # + install on every authorized adb device
-   ```
-
-   The tool rejects placeholders, duplicated keys with different values, a
-   partial or non-HTTPS Supabase configuration and secret/service-role keys.
-   It prints values only masked. It looks for `adb` under `ANDROID_HOME`,
-   `ANDROID_SDK_ROOT`, the default Android SDK location and `PATH`. Each
-   installed device still needs one online sign-in for cloud sync.
-6. **Offline behavior.** Every report is saved to local SQLite first, before any
+5. **Offline behavior.** Every report is saved to local SQLite first, before any
    transport. LAN sync to `HUB_URL` and Supabase sync are independent. Each retries
    later and leaves rows queued until it is explicitly acknowledged. Supabase upload
    needs internet **and** a signed-in user. Otherwise rows stay queued, and rows

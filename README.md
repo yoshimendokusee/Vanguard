@@ -137,6 +137,29 @@ Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
 `SUPABASE_ANON_KEY` are watch compile-time defines; `.env` does not automatically
 configure Flutter.
 
+### Supabase cloud backup (hub)
+
+The hub is the only component that needs Supabase settings. Watch, iPhone and
+dashboard clients talk to the hub over the LAN. The hub uploads to Supabase
+whenever it has internet. `.env` is git-ignored, but the hub reads it from disk on
+the hospital computer, so it connects without the file being in Git.
+
+1. In Supabase: apply `supabase/migrations/` (see its README), then go to
+   **Authentication → Users → Add user** and create a dedicated hub account
+   (email + password, auto-confirm).
+2. In the root `.env` (copy `.env.example`): set `SUPABASE_URL`,
+   `SUPABASE_ANON_KEY` (publishable key), `SUPABASE_HUB_EMAIL` and
+   `SUPABASE_HUB_PASSWORD`. Never use a secret/service-role key. Quote values
+   that contain `$` or `#` in single quotes.
+3. Start the hub: `docker compose up --build` from the root, or natively
+   `cd hub && node --env-file=../.env server.js`. The board header shows
+   `Cloud synced`, `Cloud · N queued`, `Cloud offline` or `Cloud off`, plus a
+   **Sync to cloud** button.
+
+Reports always save to hub SQLite first. Offline, they stay queued and upload
+automatically once online. Leaving any value empty keeps the hub LAN-only. Use
+synthetic data only: the LAN API and SQLite are unauthenticated and unencrypted.
+
 ## Local AI (Qwen via Ollama, hub-local)
 
 Qwen `qwen3:0.6b` runs on the hospital computer through Ollama. The hub calls it
@@ -200,12 +223,6 @@ publishable/anon key in Flutter. Do not pass a service-role key to `--dart-defin
 The Supabase button syncs automatically after local saves made while signed in,
 on app startup when a session exists, and when tapped. It does not run a
 background connectivity watcher.
-
-To configure, build and install in one step from the git-ignored root `.env`
-(`HUB_URL`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`), run
-`cd watch && dart run tool/setup_device.dart --install`. It writes the
-git-ignored `watch/env.json`, builds the APK and installs it on every authorized
-adb device. Use `--build` to skip installing, or no flag to only write `env.json`.
 
 The app requires Dart >= 3.13.2 and < 4; CI pins the locally checked Flutter 3.47.5
 (Dart 3.13.4). An Android SDK is required to build/install. Provision the speech

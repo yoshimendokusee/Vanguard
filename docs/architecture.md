@@ -25,7 +25,7 @@ Preserve the existing Flutter/Wear OS prototype while adding real Apple targets.
 | Hospital LAN | Offline receiving API + dashboard | Express, SQLite, local HTML/CSS/JS, SSE + polling and deterministic provisional priority. Structured evidence, encounter links, immutable corrections and provisional overrides are persisted through hub v2. HTTP without auth/TLS. |
 | Backend | Node/Express modular monolith | One service: `server.js` HTTP, `sync.js` ingest, `db.js` migrations, `processing.js`/`risk.js` validation and rules, `clinical.js` report history and `records.js` patient/encounter workflows. Do not split into services. Add feature modules as features arrive. |
 | Dashboard | React + TypeScript + Tailwind | Current dashboard is `hub/public/index.html`, with no React/TypeScript/Tailwind dependencies or build step. Retain it until a separately tested replacement exists. |
-| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
+| Cloud | Supabase PostgreSQL/Auth/Realtime + idempotent sync | Watch has authenticated, owner-scoped upsert sync to `triage_reports` with RLS and a versioned SQL migration. The hub (`hub/cloud.js`) backs up received source reports to the same table as its own Supabase Auth user, using the publishable key and RLS; the dashboard shows its status through the hub. Realtime, server-side delivery confirmation and protected local storage are not implemented. |
 | Repository | Monorepo + Compose + CI | Existing `watch/` and `hub/` form a small monorepo. Foundation adds root Compose, documentation and checks for those applications only. |
 
 ## Implemented three-tier flow
@@ -62,6 +62,21 @@ Reports created while signed out and pre-upgrade rows have no cloud owner.
 Uploading those rows requires explicit confirmation to assign them to the
 current account. An upload is acknowledged only after Supabase returns the
 upserted report IDs.
+
+`hub/cloud.js` is the hub's optional Supabase backup. Devices and the dashboard
+never hold Supabase credentials. The hub reads `SUPABASE_URL`,
+`SUPABASE_ANON_KEY`, `SUPABASE_HUB_EMAIL` and `SUPABASE_HUB_PASSWORD` from
+its git-ignored `.env`, then signs in as a dedicated Supabase Auth user, so RLS
+scopes its rows to that account. Secret/service-role keys are refused. Each
+received report is queued in `cloud_sync` (migration 0003) with a UUID generated
+once and reused for every retry. Only UUIDs that Supabase returns are marked
+synced. Offline, timeout, sign-in or server failures keep everything queued with
+backoff (interval doubling up to 10 minutes). A row-level 400/409/RLS refusal is
+isolated, recorded as rejected and retried only on an explicit dashboard sync.
+The immutable source report is uploaded. Hub revisions, overrides and status are
+not uploaded. This UUID is distinct from the watch's own cloud UUID, so a report
+sent by both routes appears twice in Supabase, once per owning account. A cloud
+upload is a backup, not hospital delivery or clinical review.
 
 The hub applies `hub/migrations/0001_initial_schema.sql` transactionally and
 tracks its schema with SQLite `PRAGMA user_version`. Version 2 adds related clinical history and backfills every existing report atomically. Existing compatible

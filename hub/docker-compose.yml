@@ -5,6 +5,12 @@ services:
       - "${HUB_BIND_ADDRESS:-0.0.0.0}:${HUB_PORT:-3000}:3000"
     environment:
       HOSPITAL_NAME: "${HOSPITAL_NAME:-Receiving Hospital · Emergency Department}"
+      # Optional Supabase backup; empty values keep the hub LAN-only.
+      SUPABASE_URL: "${SUPABASE_URL:-}"
+      SUPABASE_ANON_KEY: "${SUPABASE_ANON_KEY:-}"
+      SUPABASE_HUB_EMAIL: "${SUPABASE_HUB_EMAIL:-}"
+      SUPABASE_HUB_PASSWORD: "${SUPABASE_HUB_PASSWORD:-}"
+      CLOUD_SYNC_INTERVAL_MS: "${CLOUD_SYNC_INTERVAL_MS:-30000}"
     volumes:
       - ./data:/data
     restart: unless-stopped

@@ -41,7 +41,7 @@ function temporaryDatabase(t) {
 test('creates a fresh hub database from the initial migration and reopens it', (t) => {
   const file = temporaryDatabase(t);
   const db = openDb(file);
-  assert.strictEqual(db.pragma('user_version', { simple: true }), 2);
+  assert.strictEqual(db.pragma('user_version', { simple: true }), 3);
   assert.deepStrictEqual(
     db.pragma('table_info(triage_reports)').map((column) => column.name),
     ['id', 'watch_id', 'location', 'injuries', 'triage', 'patient_count',
@@ -50,7 +50,7 @@ test('creates a fresh hub database from the initial migration and reopens it', (
   db.close();
 
   const reopened = openDb(file);
-  assert.strictEqual(reopened.pragma('user_version', { simple: true }), 2);
+  assert.strictEqual(reopened.pragma('user_version', { simple: true }), 3);
   assert.strictEqual(
     reopened.prepare('SELECT COUNT(*) AS count FROM triage_reports').get().count,
     0,
@@ -83,7 +83,7 @@ test('adopts a populated legacy database without changing reports or status', (t
   legacy.close();
 
   const db = openDb(file);
-  assert.strictEqual(db.pragma('user_version', { simple: true }), 2);
+  assert.strictEqual(db.pragma('user_version', { simple: true }), 3);
   const rows = db.prepare('SELECT * FROM triage_reports').all();
   assert.strictEqual(rows.length, 1);
   assert.deepStrictEqual(
@@ -211,6 +211,52 @@ test('version 2 migration failure rolls back and preserves a populated version 1
   assert.equal(unchanged.pragma('user_version', { simple: true }), 1);
   assert.deepEqual(unchanged.prepare('SELECT * FROM triage_reports').all(), before);
   assert.equal(unchanged.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'report_evidence'").get().n, 0);
+  unchanged.close();
+});
+
+function populatedVersion2(t, extraSql = '') {
+  const file = temporaryDatabase(t);
+  const db = openDb(file);
+  ingestBatch(db, 'W-V2', [{ localId: 1, location: 'Synthetic pickup', injuries: 'Severe bleeding',
+    triage: 'Immediate', rawText: 'Synthetic v2 report', createdAt: '2026-10-09T00:00:00.000Z' }]);
+  db.prepare("UPDATE triage_reports SET status = 'arrived'").run();
+  db.close();
+  // Synthetic stand-in for a database written by the v2 binary.
+  const v2 = new Database(file);
+  v2.exec(`DROP TABLE cloud_sync; ${extraSql}`);
+  v2.pragma('user_version = 2');
+  const before = {
+    reports: v2.prepare('SELECT * FROM triage_reports').all(),
+    revisions: v2.prepare('SELECT * FROM report_revisions').all(),
+    events: v2.prepare('SELECT * FROM report_events').all(),
+  };
+  v2.close();
+  return { file, before };
+}
+
+test('upgrades populated version 2 to cloud sync state without changing reports or history', (t) => {
+  const { file, before } = populatedVersion2(t);
+  let db = openDb(file);
+  assert.equal(db.pragma('user_version', { simple: true }), 3);
+  assert.deepEqual(db.prepare('SELECT * FROM triage_reports').all(), before.reports);
+  assert.deepEqual(db.prepare('SELECT * FROM report_revisions').all(), before.revisions);
+  assert.deepEqual(db.prepare('SELECT * FROM report_events').all(), before.events);
+  assert.equal(db.prepare('SELECT COUNT(*) AS n FROM cloud_sync').get().n, 0, 'Nothing is marked as uploaded by the upgrade');
+  db.close();
+  db = openDb(file);
+  assert.deepEqual(db.prepare('SELECT * FROM triage_reports').all(), before.reports);
+  assert.deepEqual(ingestBatch(db, 'W-V2', [{ localId: 1, location: 'Synthetic pickup', injuries: 'Severe bleeding',
+    triage: 'Immediate', rawText: 'Synthetic v2 report', createdAt: '2026-10-09T00:00:00.000Z' }]).ackLocalIds, [1]);
+  db.close();
+});
+
+test('version 3 migration failure rolls back and preserves a populated version 2 database', (t) => {
+  const { file, before } = populatedVersion2(t, 'CREATE TABLE cloud_sync (existing TEXT);');
+  assert.throws(() => openDb(file), /already exists/);
+  const unchanged = new Database(file);
+  assert.equal(unchanged.pragma('user_version', { simple: true }), 2);
+  assert.deepEqual(unchanged.prepare('SELECT * FROM triage_reports').all(), before.reports);
+  assert.equal(unchanged.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE name = 'idx_cloud_sync_pending'").get().n, 0);
   unchanged.close();
 });
 

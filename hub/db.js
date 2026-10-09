@@ -119,6 +119,8 @@ function assertClinicalSchema(db) {
       OR NOT EXISTS (SELECT 1 FROM report_revisions v WHERE v.report_id = r.id AND v.revision = 0) LIMIT 1`).get()) {
     throw new Error('Hub clinical history is incomplete; refusing to open database');
   }
+  db.prepare(`SELECT c.report_id, c.cloud_report_id, c.queued_at, c.synced_at, c.owner_id, c.rejected_reason
+    FROM cloud_sync c JOIN triage_reports r ON r.id = c.report_id LIMIT 0`);
 }
 
 function openDb(file = process.env.DB_PATH || path.join(__dirname, 'data', 'vanguard.db')) {

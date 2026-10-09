@@ -56,6 +56,13 @@ existing feature. Read `docs/api-contract.md` for integrations and
 
 - Hub: `cd hub && npm ci && npm test`; watch: `cd watch && flutter pub get &&
   flutter analyze && flutter test`. Run the checks relevant to the change.
+- On Windows with Node 24, `npm ci` fails (no `better-sqlite3` 13 prebuild, no
+  C++ tools). Run hub tests in the Node 22 image instead:
+  `docker build -t vanguard-hub-test ./hub` then `docker run --rm -e DB_PATH=:memory:
+  -e LIVE_AI=0 -v <repo>/docs:/docs:ro -v <repo>/watch/lib:/watch/lib:ro
+  vanguard-hub-test node --test` (contract tests read `docs/` and `watch/lib/`).
+- Hub Supabase backup reads `SUPABASE_*` from the git-ignored root `.env`; plain
+  `docker run --env-file` keeps quotes literally, so use Compose or `node --env-file`.
 - Docker changes: validate both Compose files, build, and run hub tests in the
   image using an in-memory database. Do not run demos against an existing data store.
 - New non-trivial logic requires a meaningful regression test or self-check.
