@@ -2,9 +2,9 @@ services:
   hub:
     build: .
     ports:
-      - "3000:3000"
+      - "${HUB_BIND_ADDRESS:-0.0.0.0}:${HUB_PORT:-3000}:3000"
     environment:
-      HOSPITAL_NAME: "Receiving Hospital · Emergency Department"
+      HOSPITAL_NAME: "${HOSPITAL_NAME:-Receiving Hospital · Emergency Department}"
     volumes:
       - ./data:/data
     restart: unless-stopped

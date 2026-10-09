@@ -1,0 +1,25 @@
+name: Feature request
+description: Define a scoped feature and its offline acceptance criteria.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User need and scope
+      description: Explain the user flow, affected existing modules and what completion means. Link the approved architecture.
+    validations:
+      required: true
+  - type: textarea
+    id: integration
+    attributes:
+      label: Contracts, storage and security
+      description: Identify callers, schema upgrades, queue/ACK semantics, validation and access controls.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance checks
+      description: Cover offline capture, restart, retry/duplicate handling and relevant device/OS/background states. State hardware limits without promising BLE reliability.
+    validations:
+      required: true

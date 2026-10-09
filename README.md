@@ -1,21 +1,38 @@
-# Vanguard-Wrist (MVP): offline medical triage → hospital pre-arrival
+# Vanguard-Wrist: offline medical triage → hospital pre-arrival
 
 A rescuer taps a Wear OS watch and describes the patient(s) out loud. The watch
 transcribes **on-device** (Vosk), extracts a structured medical triage report with a
 deterministic Taglish keyword pipeline, queues it in SQLite, and, once it reaches an
 internet-free Wi-Fi router, sends it to a Dockerized hospital hub. The ED sees a
 live pre-arrival board: how many casualties are coming, how bad, what they need, and
-when they arrive.
+when they arrive. This describes the implemented prototype, not hardware-verified
+operation or clinical validation. No speech model is bundled in this checkout.
+
+The approved target adds mobile BLE relay, Supabase sync, local LLM extraction and
+a React/TypeScript/Tailwind dashboard. Those components are **not implemented**.
+The existing watch, hub and plain HTML dashboard remain in their current paths.
 
 ```
 vanguard-wrist/
-├── docs/    Developer guide: architecture, API, data model, extending, troubleshooting
+├── AGENTS.md                 AI agent guardrails
+├── docs/                     Architecture, actual API, conventions, audit, legacy guide
+├── .github/                  PR/issue templates and CI
+├── database/migrations/      Reserved watch/hub migration history; no runner yet
+├── supabase/migrations/      Reserved cloud path; no cloud schema yet
+├── compose.yaml              Includes the existing hub Docker Compose service
 ├── watch/   Flutter app (Wear OS): Vosk STT → triage_parser.dart → sqflite → HTTP send
 ├── hub/     Node + Express + SQLite: POST /api/sync-triage, ED pre-arrival board, Docker
 └── fake-watch.sh   curl stand-in for a watch (demo backup / hub smoke test)
 ```
 
-> **Developers:** see the full [Developer Guide](docs/DEVELOPER_GUIDE.md).
+| Document | Responsibility |
+| --- | --- |
+| [Architecture](docs/architecture.md) | Source of truth: approved target versus actual code |
+| [API contract](docs/api-contract.md) | Implemented LAN requests, responses and retry behavior |
+| [Conventions](docs/conventions.md) / [AGENTS.md](AGENTS.md) | Contributor and agent guardrails |
+| [Reverse-engineering report](docs/reverse-engineering.md) | Dated verification, evidence, gaps and next steps |
+| [Migration layout](database/migrations/README.md) | Schema owners and safe upgrade requirements |
+| [Developer Guide](docs/DEVELOPER_GUIDE.md) | Detailed prototype feature reference; historical claims are labeled |
 
 ## What one spoken sentence produces
 
@@ -79,38 +96,69 @@ for your area.
 - Set the hospital name: `HOSPITAL_NAME="Santiago District Hospital · ED"` (env var).
 
 ```bash
+# From the repository root; Docker Compose >= 2.20.3
+cp .env.example .env             # defaults to localhost access
+docker compose config --quiet
+docker compose up --build        # build while online; runtime needs no internet
+# For a LAN demo, set HUB_BIND_ADDRESS to the laptop LAN IP in .env, then recreate.
+# Without .env, existing all-interface binding on port 3000 is retained.
+# Stop with docker compose down; never delete data to resolve a startup problem.
+
+# Or native Node, from the repository root:
 cd hub
-docker compose up --build        # build once WHILE ONLINE; runs offline afterwards
-# or:  npm install && npm start
-npm test                         # 7 tests
-../fake-watch.sh                 # sends a sample Immediate report (run twice quickly → duplicate)
+npm ci
+npm test                         # 7 tests, in-memory databases
+node --env-file=../.env server.js # .env must exist; npm start uses defaults/shell env
+# Separate terminal, repository root, against a disposable synthetic demo database:
+./fake-watch.sh http://localhost:3000
 ```
 
 Board: `http://<laptop-lan-ip>:3000` (the hub prints its LAN IPs on start).
-Requires Node 22+ (`better-sqlite3` 13).
+Requires Node 22+ (`better-sqlite3` 13); locally checked with Node 24.20.0,
+Docker uses Node 22. Docker installs the committed lockfile with `npm ci`.
+The API and dashboard run in one container; there is no React build/service.
+Root Compose and `cd hub && docker compose up --build` both use `hub/data`.
+Use one entry point at a time; project names differ, but data and ports are shared.
+To load root configuration with the legacy entry point, use
+`cd hub && docker compose --env-file ../.env up --build`.
+Do not use `fake-watch.sh` against a database containing real reports.
+
+Configuration: `.env.example` documents `HOSPITAL_NAME`, `HUB_PORT` and
+`HUB_BIND_ADDRESS` for Compose; native Node uses `PORT`, `DB_PATH` and
+`HOSPITAL_NAME` and does not auto-load `.env`. Inside Docker, port 3000 and
+`/data/vanguard.db` remain fixed. `HUB_URL` and `VOSK_MODEL` are watch compile-time
+defines; `.env` does not automatically configure Flutter.
 
 ## Watch app
 
 ```bash
 cd watch
-flutter pub get
+flutter pub get --enforce-lockfile
+flutter analyze
 flutter test                     # 12 parser tests
 flutter run --dart-define=HUB_URL=http://192.168.8.10:3000
 ```
+
+The app requires Dart >= 3.13.2 and < 4; CI pins the locally checked Flutter 3.47.5
+(Dart 3.13.4). An Android SDK is required to build/install. Provision the speech
+asset **before** running the app; missing assets cause `MODEL ERROR` and disable
+normal recording and the header demo flow. Android SDK is absent on the audited Mac.
 
 Give the hub laptop a DHCP reservation on the router so `HUB_URL` never changes. Android
 config already includes mic/internet/vibrate permissions, cleartext HTTP (the LAN has no
 TLS), the Wear OS watch flag, and `minSdk 26`.
 
-### ⚠ The Tagalog speech model
+### Speech models
 
-There is **no Vosk Tagalog model under 50 MB**. Vosk publishes `vosk-model-small-en-us-0.15`
-(41 MB) and `vosk-model-tl-ph-generic-0.6` (**~329 MB**). The default is the small English
-model, which hears English terms (drowning, fracture, unconscious) but will mangle Tagalog.
-For real Taglish use the 329 MB model: put its zip in `watch/assets/models/` and run with
-`--dart-define=VOSK_MODEL=assets/models/vosk-model-tl-ph-generic-0.6.zip`. Test on the real
-watch early: RAM may not allow it. Fallback: run the same app on a phone.
-Models: <https://alphacephei.com/vosk/models>.
+`watch/assets/models/` contains only `.gitkeep`. Download the chosen model ZIP
+separately and keep it uncommitted. The default code path is
+`assets/models/vosk-model-small-en-us-0.15.zip`. The
+[Vosk catalogue](https://alphacephei.com/vosk/models) lists this English model as
+40M and `vosk-model-tl-ph-generic-0.6` as 320M (no small Filipino model listed).
+To choose the latter, place the ZIP in that folder and pass
+`--dart-define=VOSK_MODEL=assets/models/vosk-model-tl-ph-generic-0.6.zip`.
+Language accuracy, model loading, memory and battery use remain unverified on the
+watch. A companion phone is a target fallback requiring implementation/testing.
 
 ## Demo script
 
@@ -124,12 +172,23 @@ Models: <https://alphacephei.com/vosk/models>.
 
 ## Known limits
 
-- **Verified so far:** `flutter analyze` clean; 12 parser tests; 7 hub tests; the hub run for
-  real and its board exercised in a browser; and the watch UI flow (dictate → parse → save →
-  send → appears on the hub) run through a **web preview with stand-ins for Vosk and SQLite**.
-  **Not run:** Vosk, sqflite, haptics, the Android/Wear OS build, or the Docker image: they need
-  an Android SDK/device and Docker, which weren't available.
-- **No patient identity** is collected (no names), but reports travel over unauthenticated
-  HTTP on a closed LAN. Fine for a sealed router; add auth/TLS before any real use.
+- Current verification and gaps are recorded in the dated
+  [reverse-engineering report](docs/reverse-engineering.md). Historical browser/mock
+  claims in the old guide do not establish native watch behavior.
+- There are no structured patient-name fields, but transcripts can contain names
+  or other identifying information. HTTP has no auth/TLS and SQLite is unencrypted.
+  Use synthetic development data; access controls and protected storage/transport
+  are required before real patient use.
+- Watch sync sends the entire queue; the hub rejects over 500 reports or over 1 MB.
+  No automatic batching, background sync, cloud or BLE exists.
+- A four-hex-digit watch ID and process-local timestamp ordering can collide across
+  devices/restarts/clock rollback. Returned ACK IDs are not authenticated/scoped.
+- No migrations are applied by this foundation; current schemas are unchanged.
 - Air-gapped devices have no NTP: ETA countdowns depend on the watch clock and are approximate.
 - This is a hackathon prototype, not a validated clinical triage tool.
+
+CI runs hub tests, watch analysis/parser tests, shell/JS syntax checks and Compose
+build/container tests. Native builds and device acceptance are not CI checks yet.
+Use feature branches and reviewed PRs; repository administrators must separately
+configure branch protection for the named checks. `AGENTS.md` is guidance, not a
+technical enforcement mechanism.

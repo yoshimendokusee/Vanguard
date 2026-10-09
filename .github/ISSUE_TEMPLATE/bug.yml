@@ -1,0 +1,23 @@
+name: Bug report
+description: Report a reproducible Vanguard-Wrist failure using synthetic data.
+title: "[Bug] "
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps, expected behavior and actual behavior
+      description: Include the affected watch/hub flow and synthetic example. Do not include patient transcripts, credentials or database dumps.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment and connectivity
+      description: Commit, app, device/OS, SDK/runtime versions, model, LAN/internet state and foreground/background state.
+    validations:
+      required: true
+  - type: textarea
+    id: persistence
+    attributes:
+      label: Persistence, delivery and evidence
+      description: Did pending reports survive? Was an acknowledgment received? Include sanitized errors and checks actually run.

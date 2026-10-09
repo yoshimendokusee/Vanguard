@@ -2,3 +2,30 @@ node_modules/
 .dart_tool/
 build/
 *.zip
+
+# Local configuration, secrets, health data and generated output
+.DS_Store
+.env
+.env.*
+!.env.example
+*.db
+*.db-*
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+*.db.bak
+*.sqlite.bak
+*.sqlite3.bak
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+key.properties
+coverage/
+*.log
+# Downloaded speech/LLM model weights; retain the asset directory placeholder.
+watch/assets/models/*
+!watch/assets/models/.gitkeep

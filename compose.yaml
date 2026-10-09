@@ -1,0 +1,3 @@
+# Reuse the existing service and its hub/data path; requires Compose >= 2.20.3.
+include:
+  - ./hub/docker-compose.yml

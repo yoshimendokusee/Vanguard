@@ -1,5 +1,12 @@
 # Vanguard-Wrist Developer Guide
 
+**Prototype reference, reconciled 2026-10-09.** Read
+[architecture.md](architecture.md) for the approved target versus actual code,
+[api-contract.md](api-contract.md) for the current LAN contract and
+[reverse-engineering.md](reverse-engineering.md) for checks run in this audit.
+Historical verification below is prior documentation, not evidence of current
+hardware execution. The approved target extends the scope described here.
+
 Everything a new contributor needs: what the system does, how the pieces fit, the data
 contracts between them, how to run and test each part, how to extend it safely, and what is
 still unverified. For a quick start and the demo script, see the [README](../README.md).
@@ -286,7 +293,7 @@ The authoritative list is `_injuries` in the source; this table is a summary.
 | `age_group` | TEXT | `Infant` / `Child` / `Adult` / `Elderly` / `Unspecified`. |
 | `eta_minutes` | INTEGER | Nullable; minutes after `created_at`. |
 | `raw_text` | TEXT | Original transcript, always kept. |
-| `created_at` | TEXT | ISO-8601 UTC, millisecond precision. **Strictly increasing per watch** (the insert bumps by 1 ms on collision). Half of the hub's idempotency key. |
+| `created_at` | TEXT | ISO-8601 UTC, millisecond precision. Increasing within one process (the insert bumps by 1 ms); the last timestamp is not restored after restart. Half of the hub's idempotency key. |
 | `sync_status` | INTEGER | `0` = unsent, `1` = hub acknowledged. |
 
 Plus `meta(key, value)` holding `watch_id`. The other half of the idempotency key.
@@ -307,7 +314,9 @@ Two clocks are stored on purpose: `created_at` is *when the rescuer spoke* (watc
 
 > **No migrations.** `db.js` uses `CREATE TABLE IF NOT EXISTS`; the watch uses `onCreate` only
 > at `version: 1`. Changing a schema means writing a real migration (bump the sqflite
-> `version` and add `onUpgrade`; add `ALTER TABLE` on the hub) or wiping the dev DB.
+> `version` and add `onUpgrade`; add a transactional versioned upgrade on the hub).
+> Follow [the reserved migration layout](../database/migrations/README.md).
+> Never wipe a persistent database as an upgrade strategy.
 
 ---
 
@@ -413,7 +422,7 @@ the hub (`better-sqlite3` 13 requires it); Docker optional.
 
 ```bash
 cd hub
-npm install
+npm ci
 npm test                                  # 7 tests, in-memory SQLite, real HTTP server on an ephemeral port
 npm start                                 # http://localhost:3000, prints LAN URLs
 HOSPITAL_NAME="St. Luke's ED" PORT=4000 npm start
@@ -503,7 +512,7 @@ age-group map, then use a Vosk model for that language.
 watch to it. Reserve a fixed IP for the laptop in the router's DHCP settings and bake it in
 with `--dart-define=HUB_URL=…`. The URL is compile-time, so a changed IP means a rebuild.
 
-**Hub:** run `docker compose up --build` **once while online** (it runs `npm install`);
+**Hub:** run `docker compose up --build` **once while online** (it runs `npm ci`);
 after that the image runs fully offline. Data persists in `hub/data/` via the volume. The
 hub logs its LAN addresses at startup. If it started offline with no network interface up,
 restart it after joining the router.
@@ -522,9 +531,9 @@ long-press demo phrase tested as a fallback · `./fake-watch.sh` ready as a back
 
 | Topic | State |
 |---|---|
-| Patient identity | **Not collected.** No names or IDs; only age group, findings, count, location. |
+| Patient identity | No structured name field. Arbitrary raw transcripts can contain identifying information; findings and locations are sensitive. |
 | Transport | Plain HTTP on a closed LAN. No TLS. |
-| Authentication | **None.** Anyone on the Wi-Fi can `POST` reports or `PATCH` statuses. Fine on a sealed router; **not acceptable on any shared network.** |
+| Authentication | **None.** Anyone with network access can read reports, submit them or change statuses. Synthetic isolated demos only; not acceptable for real patient use or shared/public networks. |
 | Input handling | Server-side validation and length caps; board renders with `textContent` (no HTML injection from transcripts). SQL uses prepared statements. |
 | Audio | Processed on-device by Vosk; **never stored and never transmitted.** Only the transcript text is saved and sent. |
 | Data at rest | Unencrypted SQLite on both the watch and the hub laptop. |
@@ -536,12 +545,12 @@ storage, define retention, and review privacy law (e.g. the Philippines' Data Pr
 
 ## 13. Verification status and known limitations
 
-**Verified:** `flutter analyze` (clean); 12 parser tests; 7 hub tests; the real hub running
+**Historical verification reported by the original author (not rerun as a browser/hardware check here):** `flutter analyze` (clean); 12 parser tests; 7 hub tests; the real hub running
 with seeded data and its board exercised in a browser (ordering, tiles, countdowns,
 the Arrived button, live push of a new report without a reload); the watch UI flow (dictate → parse → save → send →
 appears on the hub) run through a **web build with in-memory stand-ins for Vosk and SQLite**.
 
-**Not verified (needs a device, Android SDK, or Docker):**
+**Historical unverified list; see the dated audit for current Docker verification:**
 
 - Vosk transcription on a real Wear OS device, including model load time and RAM headroom.
 - `sqflite` persistence, `vibration` haptics, microphone permission flow.
@@ -551,9 +560,10 @@ appears on the hub) run through a **web build with in-memory stand-ins for Vosk 
 
 **Limitations to design around**
 
-- **No small Tagalog model exists.** Vosk's only Tagalog model is `vosk-model-tl-ph-generic-0.6`
-  (~329 MB); the only sub-50 MB model is English. The default bundles English, so English
-  medical terms work and Tagalog does not. Treat Taglish accuracy as unproven until tested.
+- **No model is bundled.** The default asset path selects a small English model;
+  the [Vosk catalogue](https://alphacephei.com/vosk/models) lists the Filipino model
+  `vosk-model-tl-ph-generic-0.6` at 320M. Provision an appropriate asset separately
+  and treat speech/Taglish accuracy and watch memory use as unproven until tested.
 - **Clock drift:** air-gapped devices have no NTP. ETA countdowns use `created_at` (watch
   clock) against the viewing browser's clock, so a skewed watch skews the countdown.
 - **Release builds:** `vosk_flutter` documents JNA ProGuard keep-rules
@@ -577,7 +587,7 @@ appears on the hub) run through a **web build with in-memory stand-ins for Vosk 
 | `npm install` fails building `better-sqlite3` | Old version on a new Node. Use `^13.0.3`; Node ≥ 22. |
 | Board says `reconnecting…` | SSE stream dropped; it retries every 2 s and polls every 10 s meanwhile. Check the hub process. |
 | Hub crashes on start after a schema change | Old SQLite file with the previous columns. Delete `hub/data/vanguard.db*` (dev) or write a migration. |
-| Two reports collapsed into one | They had identical `created_at` from the same `watchId`. The watch prevents this; hand-built test payloads must use distinct timestamps. |
+| Two reports collapsed into one | Identical normalized `created_at` and `watchId`. Ordering is process-local; clock rollback after restart or colliding four-hex-digit watch IDs can collide. Preserve data and investigate; do not reset storage. |
 
 ---
 
