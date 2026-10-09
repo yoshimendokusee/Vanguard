@@ -96,19 +96,19 @@
   .app > * { min-width: 0; }
 
   /* ---------- teal rail ---------- */
-  .rail { background: var(--rail); color: var(--on-rail); border-radius: var(--r-2xl); margin: var(--s3); padding: var(--s5) var(--s2); display: flex; flex-direction: column; align-items: stretch; gap: var(--s5); }
+  .rail { background: var(--rail); color: var(--on-rail); border-radius: var(--r-2xl); margin: var(--s3); padding: var(--s5) var(--s2); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: var(--s5); }
   /* the rail never scrolls away with the page: pinned to the viewport, and scrolls on its own only if it cannot fit */
-  .rail { position: sticky; top: var(--s3); align-self: start; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-y: auto; overscroll-behavior: contain; }
+  .rail { position: sticky; top: var(--s3); align-self: start; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   @media (min-width: 1200px) { .rail { height: calc(100vh - 4 * var(--s3)); height: calc(100dvh - 4 * var(--s3)); } } /* page padding: keeps the pinned rail from being pushed up at the end of the page */
-  .rail .word { font-size: 1rem; font-weight: 600; text-align: center; line-height: 1.2; }
+  .rail .word { font-size: 0.9375rem; font-weight: 600; text-align: center; line-height: 1.2; align-self: start; }
   .vtabs { display: grid; gap: var(--s2); }
-  .railbtn { display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 76px; padding: var(--s2) 4px; border: 0; border-radius: var(--r-xl); background: transparent; color: var(--on-rail); font-weight: 500; font-size: 0.75rem; line-height: 1.2; text-align: center; }
+  .railbtn { display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 76px; padding: var(--s2) 4px; border: 0; border-radius: 999px; background: transparent; color: var(--on-rail); font-weight: 400; font-size: 0.75rem; line-height: 1.2; text-align: center; }
   .railbtn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .railbtn:hover { background: rgba(0, 0, 0, 0.18); }
   .railbtn:active { background: rgba(0, 0, 0, 0.28); }
-  .railbtn[aria-selected="true"], .railbtn[aria-expanded="true"] { background: var(--rail-active-bg); color: var(--rail-active-fg); }
+  .railbtn[aria-selected="true"], .railbtn[aria-expanded="true"] { background: var(--rail-active-bg); color: var(--rail-active-fg); font-weight: 600; }
   .railbtn .n { font-weight: 700; }
-  .rail .gear { margin-top: auto; }
+  .rail .gear { align-self: end; }
   .rail :focus-visible { outline-color: var(--on-rail); }
 
   /* ---------- left column of cards ---------- */
@@ -300,9 +300,9 @@
   @media (max-width: 1180px) {
     .app { grid-template-columns: minmax(0, 1fr); }
     .left { display: contents; }
-    .rail { position: static; height: auto; overflow: visible; order: 0; flex-direction: row; flex-wrap: wrap; align-items: center; margin: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); padding: var(--s2) var(--s3) var(--s3); gap: var(--s2); }
-    .rail .word { text-align: left; font-size: 1.125rem; }
-    .rail .gear { order: 2; margin-top: 0; margin-left: auto; min-height: 48px; grid-auto-flow: column; gap: var(--s2); padding: 0 var(--s4); }
+    .rail { display: flex; position: static; height: auto; overflow: visible; order: 0; flex-direction: row; flex-wrap: wrap; align-items: center; margin: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); padding: var(--s2) var(--s3) var(--s3); gap: var(--s2); }
+    .rail .word { text-align: left; font-size: 1.125rem; align-self: auto; }
+    .rail .gear { order: 2; align-self: auto; margin-top: 0; margin-left: auto; min-height: 48px; grid-auto-flow: column; gap: var(--s2); padding: 0 var(--s4); }
     .rail .gear svg { width: 22px; height: 22px; }
     .vtabs { order: 3; flex: 1 1 100%; grid-template-columns: repeat(auto-fit, minmax(min(4rem, 100%), 1fr)); }
     .railbtn { min-height: 64px; border-radius: var(--r-lg); }
@@ -314,11 +314,11 @@
   @media (max-width: 1180px) and (min-width: 600px) and (orientation: landscape) {
     .app { grid-template-columns: 6.75rem minmax(0, 1fr); }
     .rail { position: sticky; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-y: auto; order: 0; grid-column: 1; grid-row: 1 / span 12; flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: var(--s3); border-radius: var(--r-2xl); padding: var(--s5) var(--s2); gap: var(--s5); }
-    .rail .word { text-align: center; font-size: 1rem; }
-    .rail .gear { order: 0; margin: auto 0 0; min-height: 76px; grid-auto-flow: row; gap: 4px; padding: var(--s2) 4px; }
+    .rail .word { text-align: center; font-size: 0.9375rem; }
+    .rail .gear { order: 0; align-self: end; margin: 0; min-height: 76px; grid-auto-flow: row; gap: 4px; padding: var(--s2) 4px; }
     .rail .gear svg { width: 26px; height: 26px; }
     .vtabs { order: 0; flex: none; grid-template-columns: none; }
-    .railbtn { min-height: 76px; border-radius: var(--r-xl); }
+    .railbtn { min-height: 76px; border-radius: 999px; }
     .hero, .panel-main, #due, #prep { grid-column: 2; }
   }
   @media (max-height: 560px) and (orientation: landscape) {
