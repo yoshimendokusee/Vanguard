@@ -1582,7 +1582,6 @@ import './hub-client.js';
   }
 
   readUrl();
-  render();
   // Draft setups are optional: the board works without them.
   fetch('/setups.json').then((res) => (res.ok ? res.json() : null))
     .then((data) => { if (data && data.setups) Object.assign(PREP_DRAFT, data.setups); })
