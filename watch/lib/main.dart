@@ -21,19 +21,12 @@ class VanguardWristApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'Vanguard-Wrist',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData.dark(useMaterial3: true),
+    theme: buildTheme(Brightness.light),
+    darkTheme: buildTheme(Brightness.dark),
+    themeMode: ThemeMode.system,
     home: const TriageScreen(),
   );
 }
-
-/// START colours.
-Color triageColor(String triage) => switch (triage) {
-  TriageParser.immediate => const Color(0xFFFF1744),
-  TriageParser.delayed => const Color(0xFFFFD600),
-  TriageParser.minor => const Color(0xFF00E676),
-  TriageParser.deceased => const Color(0xFFB0BEC5),
-  _ => Colors.white, // Unassessed
-};
 
 enum _Phase { loading, idle, listening, error }
 
@@ -197,8 +190,8 @@ class _TriageScreenState extends State<TriageScreen> {
                 onLongPress: _demoPhrase,
                 child: Text(
                   '${_db?.watchId ?? '…'}  ·  $_pending PENDING',
-                  style: const TextStyle(
-                    color: Colors.white70,
+                  style: TextStyle(
+                    color: c.dim,
                     fontSize: 11,
                     letterSpacing: 1,
                   ),
@@ -226,9 +219,9 @@ class _TriageScreenState extends State<TriageScreen> {
                             color: listening
                                 ? c.listening
                                 : _phase == _Phase.idle
-                                ? const Color(0xFF00E5FF)
-                                : Colors.grey.shade800,
-                            border: Border.all(color: Colors.white, width: 4),
+                                ? c.accent
+                                : c.panel,
+                            border: Border.all(color: c.text, width: 4),
                           ),
                           child: Icon(
                             listening ? Icons.stop_rounded : Icons.mic_rounded,
@@ -318,14 +311,23 @@ class _SavedCard extends StatelessWidget {
     return SingleChildScrollView(
       child: Column(
         children: [
-          Text(
-            '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
-            style: TextStyle(
-              color: triageColor(row.triage),
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+            decoration: BoxDecoration(
+              color: style.background,
+              borderRadius: BorderRadius.circular(8),
+              border: unassessed ? Border.all(color: style.accent) : null,
+            ),
+            child: Text(
+              '${row.triage.toUpperCase()}  ×${row.patientCount}$age',
+              style: TextStyle(
+                color: style.foreground,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
+          const SizedBox(height: 2),
           Text(
             row.injuries,
             textAlign: TextAlign.center,
