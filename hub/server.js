@@ -3,6 +3,8 @@ const os = require('os');
 const path = require('path');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
+const { riskForRow } = require('./risk');
+const { aiConfig, aiStatus, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
 
@@ -82,6 +84,61 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
     res.json({ ok: true });
   });
 
+  // --- local AI (Qwen via Ollama): extraction assistant, never the triage authority ---
+  app.get('/api/ai/status', async (_req, res) => {
+    try {
+      res.json(await aiStatus());
+    } catch {
+      const cfg = aiConfig();
+      res.json({ ok: true, available: false, model: cfg.model, modelAvailable: false, error: 'ollama-unreachable', promptVersion: cfg.promptVersion, maxTranscript: cfg.maxTranscript });
+    }
+  });
+
+  const parseAiBody = (req) => {
+    const cfg = aiConfig();
+    const checked = validateTranscriptInput(req.body, cfg.maxTranscript);
+    if (checked.error) return { errorRes: { ok: false, ...checked.error }, cfg };
+    return {
+      transcript: checked.transcript,
+      provenance: {
+        device: req.body && req.body.device,
+        sttEngine: req.body && req.body.sttEngine,
+        sttRuntime: req.body && req.body.sttRuntime,
+      },
+      cfg,
+    };
+  };
+
+  const aiFailure = (res, err, transcriptLen) => {
+    if (err instanceof AiError) {
+      console.log(`[ai] ${err.code} (transcript ${transcriptLen} chars)`);
+      return res.status(err.httpStatus).json({ ok: false, error: err.code, message: err.message });
+    }
+    console.log(`[ai] inference-failed (transcript ${transcriptLen} chars)`);
+    return res.status(502).json({ ok: false, error: 'inference-failed', message: 'Local AI inference failed' });
+  };
+
+  app.post('/api/ai/extract', async (req, res) => {
+    const parsed = parseAiBody(req);
+    if (parsed.errorRes) return res.status(400).json(parsed.errorRes);
+    try {
+      const result = await extractEmergency(parsed.transcript, parsed.provenance);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      aiFailure(res, err, parsed.transcript.length);
+    }
+  });
+
+  app.post('/api/ai/triage-assist', async (req, res) => {
+    const parsed = parseAiBody(req);
+    if (parsed.errorRes) return res.status(400).json(parsed.errorRes);
+    try {
+      const result = await triageAssist(parsed.transcript, parsed.provenance);
+      res.json({ ok: true, ...result });
+    } catch (err) {
+      aiFailure(res, err, parsed.transcript.length);
+    }
+  });
   app.get('/api/triage/:id', (req, res) => res.json(reportView(db, req.params.id, true)));
   app.post('/api/triage/:id/revisions', (req, res) => {
     const result = reviseReport(db, req.params.id, req.body);
@@ -113,13 +170,18 @@ function createApp(db, { hospital = process.env.HOSPITAL_NAME || 'Receiving Hosp
 
 if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
+  const host = process.env.HOST || '0.0.0.0';
   const app = createApp(openDb());
-  app.listen(port, '0.0.0.0', () => {
-    console.log(`Vanguard hospital hub listening on :${port}`);
-    for (const addrs of Object.values(os.networkInterfaces())) {
-      for (const a of addrs || []) {
-        if (a.family === 'IPv4' && !a.internal) console.log(`  LAN: http://${a.address}:${port}`);
+  app.listen(port, host, () => {
+    if (host === '0.0.0.0') {
+      console.log(`Vanguard hospital hub listening on :${port}`);
+      for (const addrs of Object.values(os.networkInterfaces())) {
+        for (const a of addrs || []) {
+          if (a.family === 'IPv4' && !a.internal) console.log(`  LAN: http://${a.address}:${port}`);
+        }
       }
+    } else {
+      console.log(`Vanguard hospital hub listening on http://${host}:${port}`);
     }
   });
 }

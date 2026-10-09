@@ -420,6 +420,7 @@ minute, so a second run in the same minute is a duplicate and a later run is a n
 | `SUPABASE_URL` | `--dart-define` (watch) | unset | Supabase project URL; must use HTTPS. |
 | `SUPABASE_ANON_KEY` | `--dart-define` (watch) | unset | Supabase publishable/anon key. Never use a service-role key in a client. |
 | `PORT` | env (hub) | `3000` | Listen port. |
+| `HOST` | env (hub) | `0.0.0.0` | Listen address; use `127.0.0.1` for local-only access. |
 | `DB_PATH` | env (hub) | `hub/data/vanguard.db` (`/data/vanguard.db` in Docker) | SQLite file. `:memory:` works (used by tests). |
 | `HOSPITAL_NAME` | env (hub) | `Receiving Hospital · Emergency Department` | Board title. |
 
@@ -451,7 +452,8 @@ these are unset; cloud sync is disabled.
 cd hub
 npm ci
 npm test                                  # 9 tests, synthetic in-memory/temporary SQLite and loopback HTTP
-npm start                                 # http://localhost:3000, prints LAN URLs
+HOST=127.0.0.1 npm start                  # local-only at http://localhost:3000
+npm start                                 # all interfaces; prints LAN URLs
 HOSPITAL_NAME="St. Luke's ED" PORT=4000 npm start
 docker compose up --build                 # build once while online; image runs offline
 ```
