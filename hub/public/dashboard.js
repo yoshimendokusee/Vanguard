@@ -1292,21 +1292,6 @@ import './hub-client.js';
     if (pagerNav && totalItems > 0) {
       renderPagerControls(pagerNav, totalItems, totalPages);
     }
-
-    // Next
-    const nextBtn = el('button', 'pager-btn', 'Next ›');
-    nextBtn.disabled = currentPage === totalPages;
-    nextBtn.onclick = () => { currentPage = Math.min(totalPages, currentPage + 1); render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
-    btns.append(nextBtn);
-
-    // Last
-    const lastBtn = el('button', 'pager-btn', '»');
-    lastBtn.title = 'Last Page';
-    lastBtn.disabled = currentPage === totalPages;
-    lastBtn.onclick = () => { currentPage = totalPages; render(); $('list-h')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }); };
-    btns.append(lastBtn);
-
-    container.append(info, btns);
   }
 
   function renderPagerControls(container, totalItems, totalPages) {
@@ -1360,16 +1345,25 @@ import './hub-client.js';
 
   function renderPrep(inbound) {
     const box = $('prep');
+    if (!box) return;
     box.replaceChildren(el('h2', '', 'Teams to alert'));
     if (loadState === 'loading') { box.append(el('div', 'skel')); return; }
+
+    const targetReports = (view === 'inbound' || view === 'dashboard')
+      ? inbound
+      : (visible().length ? visible() : rows);
+
     const needs = {};
-    for (const r of inbound) {
+    for (const r of targetReports) {
       if (category(r) === 'Deceased') continue;
-      for (const n of readyItems(r)) needs[n] = (needs[n] || 0) + countOf(r);
+      const items = readyItems(r).length ? readyItems(r) : needsOf(r);
+      for (const n of items) {
+        needs[n] = (needs[n] || 0) + (countOf(r) || 1);
+      }
     }
     const sorted = Object.entries(needs).sort((a, b) => b[1] - a[1]);
     if (!sorted.length) { box.append(el('p', 'hint', 'No teams needed right now.')); return; }
-    box.append(el('p', 'hint', 'Known patient counts for everyone still on the way; unknown counts are excluded.'));
+    box.append(el('p', 'hint', 'Known patient counts for selected section; unknown counts excluded.'));
     box.lastChild.style.marginBottom = '12px';
     const max = sorted[0][1];
     const wrap = el('div', 'mini-rows');
@@ -1377,7 +1371,7 @@ import './hub-client.js';
       const m = el('div', 'mini');
       m.append(el('span', 'name', name), el('span', 'v', num(n)));
       const track = el('div', 'track'), fill = el('i');
-      fill.style.width = `${Math.round((n / max) * 100)}%`;
+      fill.style.width = `${Math.round((n / (max || 1)) * 100)}%`;
       track.append(fill); m.append(track); wrap.append(m);
     }
     box.append(wrap);
@@ -1583,10 +1577,11 @@ import './hub-client.js';
 
   readUrl();
   render();
+  load();
   // Draft setups are optional: the board works without them.
   fetch('/setups.json').then((res) => (res.ok ? res.json() : null))
-    .then((data) => { if (data && data.setups) Object.assign(PREP_DRAFT, data.setups); })
-    .catch(() => {}).finally(load);
+    .then((data) => { if (data && data.setups) { Object.assign(PREP_DRAFT, data.setups); render(); } })
+    .catch(() => {});
   loadCloud();
   connect();
   setInterval(load, 10000);
@@ -1609,7 +1604,11 @@ import './hub-client.js';
     var saveStateEl = $('ai-save-state'), connEl = $('ai-conn');
     var busy = false, lastExtraction = null, saveAttempt = null, lastApplied = null;
     var OBS_LABEL = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
-    function setConn(available, label) { connEl.textContent = label; connEl.className = 'conn ' + (available ? 'live' : 'down'); }
+    function setConn(available, label) {
+      if (!connEl) return;
+      connEl.textContent = label;
+      connEl.className = 'conn ' + (available ? 'live' : 'down');
+    }
     async function refreshStatus() {
       try {
         var s = await (await VanguardApi.request('/api/ai/health')).json();
