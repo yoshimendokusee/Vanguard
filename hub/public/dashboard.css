@@ -121,6 +121,9 @@
 
 /* ---------- Reset & Base ---------- */
 *, *::before, *::after { box-sizing: border-box; }
+html {
+  scroll-behavior: smooth;
+}
 body {
   margin: 0;
   background: var(--bg);
@@ -450,7 +453,7 @@ button:disabled { cursor: not-allowed; }
   .app[data-navpos="top"] .rail {
     grid-column: 1 / -1;
     position: sticky;
-    top: 0;
+    top: var(--s3);
     z-index: 90;
     height: auto;
     max-height: none;
@@ -462,6 +465,9 @@ button:disabled { cursor: not-allowed; }
     border-radius: var(--r-xl);
     padding: var(--s2) var(--s4);
     gap: var(--s3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.22), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(12px);
+    transition: all var(--dur-base) var(--ease);
   }
   .app[data-navpos="top"] .brand {
     flex: 0 0 auto;
@@ -528,6 +534,34 @@ button:disabled { cursor: not-allowed; }
   flex-direction: column;
   gap: var(--s4);
   align-content: start;
+  position: sticky;
+  top: var(--s3);
+  align-self: start;
+  max-height: calc(100vh - 2 * var(--s3));
+  max-height: calc(100dvh - 2 * var(--s3));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  overscroll-behavior: contain;
+  z-index: 40;
+}
+.left::-webkit-scrollbar {
+  width: 4px;
+}
+.left::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+.left::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.app[data-navpos="top"] .left {
+  position: sticky;
+  top: calc(72px + 2 * var(--s3));
+  align-self: start;
+  max-height: calc(100vh - 84px - 2 * var(--s3));
+  max-height: calc(100dvh - 84px - 2 * var(--s3));
 }
 .card {
   background: var(--panel);
