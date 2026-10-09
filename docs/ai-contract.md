@@ -13,6 +13,7 @@ Synthetic data only. Qwen is an extraction assistant, never the triage authority
 | `GET /api/ai/status` | Can the hub reach Ollama, and is the configured model listed? |
 | `POST /api/ai/extract` | Transcript in, validated observations + evidence + deterministic provisional triage out. |
 | `POST /api/ai/triage-assist` | Same as extract, plus a reviewable draft (`injuries` string + provisional triage). |
+| `POST /api/knowledge/lookup` | `{ transcript }` in, matched Filipino/English terminology entries out. 503 `knowledge-unavailable` if the pack is not loaded. |
 
 The legacy Flutter preview client calls the hub routes. Native Apple capture now uses local llama.cpp first, with optional paired-iPhone fallback. Apple devices never call Ollama directly. `127.0.0.1`
 on a watch or phone means that device itself. Save a configured hospital LAN origin
@@ -83,7 +84,7 @@ Flutter sends `{ transcript, device }`. Swift sends the same JSON via `AiRequest
     "advisoryOnly": true
   },
   "model": "qwen3:0.6b",
-  "promptVersion": "vanguard-extract-v1"
+  "promptVersion": "vanguard-extract-v2"
 }
 ```
 
@@ -123,6 +124,86 @@ Rules every client can rely on:
   `execution: "local"`. Missing observation keys stay `unknown`. Swift
   `AiContract` preserves provenance/evidence and downgrades unsupported observation enums to unknown; complete native processing validation occurs in `NativeProcessing`.
 
+## Offline terminology retrieval (RAG)
+
+Extraction responses add `retrieval: { packId, packVersion, reviewStatus, entryCount, matches[] }`
+(`null` when disabled). Each match is `{ id, matched, filipino, english, medicalTerm, category, negated }`.
+`negated` is true when a denial word ("no", "not", "walang", "hindi") directly precedes the phrase.
+The response lists every match; the prompt gets one meaning per phrase and omits negated ones.
+
+- The pack is `hub/rag/medical_terms.json` (override with `RAG_KNOWLEDGE_FILE`; disable
+  with `RAG_ENABLED=0`). It is indexed into an in-memory SQLite FTS5 table at first use,
+  so there is no network call and no change to `vanguard.db`.
+- Matched terms are appended to the Qwen prompt as a word-meaning glossary labeled "not
+  patient evidence". They never confirm a finding: observations still require an exact
+  transcript excerpt, and provisional triage still comes only from `assessRisk`.
+- The shipped pack (`0.3.0-draft`) has about 1,200 entries across anatomy, symptoms, signs,
+  injuries, mechanisms of injury, conditions and history. Its Filipino/English translations
+  were written by the development team from general knowledge, not taken from a clinical
+  source, and may be wrong or incomplete. Where Filipino rescuers normally use the English
+  word, the `filipino` field is that English word. Phrases that match ordinary speech
+  (for example "back", "yes", "left") are deliberately excluded.
+- Matching is whole-phrase and exact: a misspelling or an unlisted word form will not
+  match. A phrase inside a longer matched phrase is not reported separately; entries that
+  share the same phrase are all returned. At most five terms go into the prompt. The
+  glossary can influence what the model writes, but every finding still needs an exact
+  transcript excerpt, so it cannot add a finding the transcript does not state.
+- Pack entries may contain only `id, phrases, filipino, english, medicalTerm, category`
+  (`category` is symptom, sign, injury, mechanism, condition, anatomy or history);
+  urgency, triage or guideline fields are rejected at load, and an invalid pack disables
+  retrieval (extraction continues without a glossary).
+- The shipped pack is `reviewStatus: "unreviewed-draft"`: starter vocabulary not reviewed
+  by a clinician or translator. No clinical guidelines or protocols are shipped. Supply
+  those only from an authoritative, versioned, clinician-reviewed source.
+- Retrieval runs in the hub only. The Apple/watch apps do not yet ship or search a pack.
+- Prompt version is `vanguard-extract-v2` (v1 had no glossary).
+
+## Prefilled report fields
+
+Extraction and triage-assist responses also carry `fields` (`location`, `patientCount`,
+`ageGroup`, `etaMinutes`, `injuries`), `fieldEvidence` (the exact transcript text each value
+came from), `fieldNotes`, `locationBasis` (`explicit` for Barangay/Purok/Sitio, `inferred`
+for an "in/sa/near X" guess) and `legacy` (`{ triage, reason, version }`).
+
+- Implemented in `hub/intake.js` with plain pattern matching and the terminology pack. No
+  model output is used for these fields, nothing is invented, and unstated values stay `null`
+  (`ageGroup` stays `Unspecified`). Values are limited to what the hub's report validator
+  accepts (count 1-99, ETA 1-720 minutes, injuries up to 300 characters).
+- ETA needs an arrival cue next to the minutes ("ETA", "away", "out", "papunta"); a duration
+  such as "unconscious for 10 minutes" is not an ETA. Ages map to Infant (under 1 year),
+  Child (1-12), Adult (18-59) and Elderly (60+); 13-17 and mixed groups stay unspecified.
+- Location is the least reliable field. An inferred location is only a guess and the dashboard
+  says so. Roofs, stairs, body parts, hospitals and conditions are rejected, but the reviewer
+  must still check it.
+- `injuries` lists the labels from the four validated findings first, then non-denied
+  pack terms in the injury, condition, mechanism and symptom categories.
+- `legacy` is the hospital's existing legacy finding rules (`riskForRow`) applied to those
+  injury terms as they would be saved with triage `Unassessed`. Those rules can raise urgency
+  (for example "Chest pain", "Head injury", "Drowning" are Immediate) but never lower it. It is
+  a preview: the dashboard never saves AI-derived injury terms automatically, and the pack's terms are unreviewed.
+- The dashboard keeps the offline-first flow: the typed original is stored locally before Qwen
+  runs and is sent automatically as `Unassessed`. After extraction it fills only **blank**
+  location, patient count, age group and ETA from `fields` (anything the person typed wins, and
+  a guessed `inferred` location is shown but not saved), stores that version, then sends it.
+  The evidence quote for each filled value is shown. `injuries` is saved as typed, otherwise
+  `Unspecified`: terms found in the transcript are shown as a suggestion with the legacy-rule
+  preview, but are not saved automatically, because the legacy rules can raise urgency and no
+  person reviews the report before it is sent. Turning that on is a decision for a clinician.
+
+## Draft board setups
+
+`hub/public/setups.json` maps about 470 pack terms to "get ready" resource labels (for example
+Concussion: CT / neurosurgery, Neuro obs). It lists rooms, teams and equipment only, never
+treatments, doses or urgency, and is marked `unreviewed-draft`. The board loads it optionally;
+the hospital's own `PREP` table in `dashboard.js` always wins, and the board shows a notice when
+a checklist uses draft setups.
+
+Limit: because injuries are saved as `Unspecified` unless typed, AI-saved reports currently get
+no draft suggestions either. The board shows no readiness checklist for a report whose findings are not current, which
+includes any report saved with AI processing (`source_findings_current` is false). So these
+setups appear for reports without attached AI processing, not yet for ones saved from the AI
+panel. Changing that is a clinical-safety decision tracked in the architecture notes.
+
 ## Status response
 
 ```json
@@ -135,7 +216,7 @@ Rules every client can rely on:
   "modelAvailable": true,
   "modelsSeen": 1,
   "error": null,
-  "promptVersion": "vanguard-extract-v1",
+  "promptVersion": "vanguard-extract-v2",
   "maxTranscript": 4000
 }
 ```

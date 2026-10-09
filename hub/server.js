@@ -5,7 +5,7 @@ const { existsSync } = require('node:fs');
 const { openDb } = require('./db');
 const { ingestBatch, MAX_BATCH } = require('./sync');
 const { riskForRow } = require('./risk');
-const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, AiError } = require('./ai');
+const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, glossaryFor, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
 const { randomUUID } = require('node:crypto');
@@ -165,6 +165,15 @@ function createApp(db, {
     }
   });
 
+  // Offline terminology lookup. POST so patient text never appears in a URL or access log.
+  app.post('/api/knowledge/lookup', (req, res) => {
+    const checked = validateTranscriptInput(req.body, aiConfig().maxTranscript);
+    if (checked.error) return res.status(400).json({ ok: false, ...checked.error });
+    const { retrieval } = glossaryFor(checked.transcript);
+    if (!retrieval) return res.status(503).json({ ok: false, error: 'knowledge-unavailable', message: 'Local terminology pack is not loaded' });
+    res.json({ ok: true, retrieval });
+  });
+
   app.post('/api/ai/triage-assist', async (req, res) => {
     const parsed = parseAiBody(req);
     if (parsed.errorRes) return res.status(parsed.httpStatus || 400).json(parsed.errorRes);
@@ -223,6 +232,8 @@ function createApp(db, {
     app.post(`/api/${plural}/:id/revisions`, (req, res) => res.json(saveRecord(db, kind, req.params.id, req.body)));
   }
 
+  // The draft file lives in public/ which the Vite build does not copy into dist/.
+  app.get('/setups.json', (_req, res) => res.sendFile(path.join(__dirname, 'public', 'setups.json')));
   const dashboard = existsSync(path.join(__dirname, 'dist/index.html')) ? 'dist' : 'public';
   app.use(express.static(path.join(__dirname, dashboard)));
   app.use((error, _req, res, _next) => {

@@ -1,0 +1,1661 @@
+{
+ "status": "unreviewed-draft",
+ "note": "Draft resource setups for the hospital board, written by the development team. They name rooms, teams and equipment to get ready and nothing else: no treatments, drugs, doses, priorities or urgency. They have NOT been reviewed by a qualified clinician. The hospital's own mappings in dashboard.js take precedence. Replace or correct this file from your emergency department's protocols before real use.",
+ "tags": [
+  "Active cooling",
+  "Active warming",
+  "Airway + warming",
+  "Animal bite service",
+  "Antivenom",
+  "Blood / OR",
+  "Burn care",
+  "CT / neurosurgery",
+  "Cardiac monitor",
+  "Decontamination",
+  "ECG / cardiology",
+  "Eye / ENT",
+  "Glucose check",
+  "Haemostasis",
+  "IV fluids",
+  "Isolation room",
+  "Mental health / safety watch",
+  "Neuro obs",
+  "OB / delivery",
+  "Oxygen / airway",
+  "Paediatrics",
+  "Poison control / toxicology",
+  "Protection services",
+  "Resus bay",
+  "Spinal precautions",
+  "Stroke team / CT",
+  "Surgical team",
+  "Suturing",
+  "Trauma team",
+  "Wound care",
+  "X-ray / ortho"
+ ],
+ "setups": {
+  "Abdominal injury": [
+   "Trauma team",
+   "Surgical team"
+  ],
+  "Acute respiratory distress": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Aggression": [
+   "Mental health / safety watch"
+  ],
+  "Agitation": [
+   "Mental health / safety watch"
+  ],
+  "Airway obstruction": [
+   "Oxygen / airway"
+  ],
+  "Alcohol poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Alcohol withdrawal": [
+   "Neuro obs"
+  ],
+  "Amputated part": [
+   "Trauma team"
+  ],
+  "Anaphylactic shock": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Anaphylaxis": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Angina": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Animal attack": [
+   "Trauma team"
+  ],
+  "Animal bite": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Aortic dissection": [
+   "Resus bay",
+   "Cardiac monitor",
+   "Surgical team"
+  ],
+  "Appendicitis": [
+   "Surgical team"
+  ],
+  "Asthma": [
+   "Oxygen / airway"
+  ],
+  "Atrial fibrillation": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Baby coming out": [
+   "OB / delivery",
+   "Paediatrics"
+  ],
+  "Baby crowning": [
+   "OB / delivery",
+   "Paediatrics"
+  ],
+  "Baby fell": [
+   "Trauma team"
+  ],
+  "Baby not breathing": [
+   "Resus bay",
+   "Paediatrics",
+   "Oxygen / airway"
+  ],
+  "Baby not crying": [
+   "Resus bay",
+   "Paediatrics",
+   "Oxygen / airway"
+  ],
+  "Back injury from fall": [
+   "Spinal precautions"
+  ],
+  "Bacterial wound infection": [
+   "Wound care"
+  ],
+  "Beaten": [
+   "Trauma team"
+  ],
+  "Bicycle crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Black stool": [
+   "Blood / OR"
+  ],
+  "Blast injury": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Bleeding from ear": [
+   "Haemostasis"
+  ],
+  "Bleeding from head": [
+   "Haemostasis"
+  ],
+  "Bleeding from wound that soaks through": [
+   "Haemostasis"
+  ],
+  "Bleeding shock": [
+   "Resus bay",
+   "Blood / OR"
+  ],
+  "Bleeding that will not stop": [
+   "Blood / OR",
+   "Haemostasis"
+  ],
+  "Bloody stool": [
+   "Blood / OR"
+  ],
+  "Boat capsized": [
+   "Airway + warming"
+  ],
+  "Brain bleed": [
+   "CT / neurosurgery",
+   "Neuro obs"
+  ],
+  "Brain injury": [
+   "CT / neurosurgery",
+   "Neuro obs"
+  ],
+  "Brawl": [
+   "Trauma team"
+  ],
+  "Breathing stopped suddenly": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Breathless lying flat": [
+   "Oxygen / airway"
+  ],
+  "Breech baby": [
+   "OB / delivery"
+  ],
+  "Broken ankle": [
+   "X-ray / ortho"
+  ],
+  "Broken arm": [
+   "X-ray / ortho"
+  ],
+  "Broken back": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Broken cheekbone": [
+   "X-ray / ortho"
+  ],
+  "Broken collarbone": [
+   "X-ray / ortho"
+  ],
+  "Broken elbow": [
+   "X-ray / ortho"
+  ],
+  "Broken finger": [
+   "X-ray / ortho"
+  ],
+  "Broken foot": [
+   "X-ray / ortho"
+  ],
+  "Broken hip": [
+   "X-ray / ortho"
+  ],
+  "Broken jaw": [
+   "X-ray / ortho"
+  ],
+  "Broken knee": [
+   "X-ray / ortho"
+  ],
+  "Broken leg": [
+   "X-ray / ortho"
+  ],
+  "Broken nose": [
+   "X-ray / ortho"
+  ],
+  "Broken pelvis": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Broken ribs": [
+   "X-ray / ortho"
+  ],
+  "Broken shoulder": [
+   "X-ray / ortho"
+  ],
+  "Broken thigh": [
+   "X-ray / ortho"
+  ],
+  "Broken wrist": [
+   "X-ray / ortho"
+  ],
+  "Bronchiolitis": [
+   "Oxygen / airway"
+  ],
+  "Building collapse": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Buried by landslide": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Buried in rubble": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Burn": [
+   "Burn care"
+  ],
+  "Burn on foot": [
+   "Burn care"
+  ],
+  "Burn on hand": [
+   "Burn care"
+  ],
+  "Bus crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Bus fell": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "COPD": [
+   "Oxygen / airway"
+  ],
+  "COVID-19": [
+   "Isolation room"
+  ],
+  "Cannot breathe": [
+   "Oxygen / airway"
+  ],
+  "Car crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Carbon monoxide poisoning": [
+   "Oxygen / airway"
+  ],
+  "Cardiac arrest": [
+   "Resus bay",
+   "Cardiac monitor"
+  ],
+  "Cardiac tamponade": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Cassava poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Chainsaw injury": [
+   "Trauma team",
+   "Haemostasis"
+  ],
+  "Chemical burn": [
+   "Burn care",
+   "Decontamination"
+  ],
+  "Chemical exposure": [
+   "Decontamination"
+  ],
+  "Chemical in eye": [
+   "Decontamination",
+   "Eye / ENT"
+  ],
+  "Chemical on skin": [
+   "Decontamination"
+  ],
+  "Chemical spill": [
+   "Decontamination"
+  ],
+  "Chest indrawing": [
+   "Oxygen / airway",
+   "Paediatrics"
+  ],
+  "Chest injury": [
+   "Trauma team"
+  ],
+  "Chest tightness": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Chickenpox": [
+   "Isolation room"
+  ],
+  "Child abuse": [
+   "Protection services"
+  ],
+  "Child burned": [
+   "Burn care",
+   "Paediatrics"
+  ],
+  "Child choking": [
+   "Oxygen / airway",
+   "Paediatrics"
+  ],
+  "Child fell": [
+   "Trauma team"
+  ],
+  "Child fell into water": [
+   "Airway + warming"
+  ],
+  "Child poisoned": [
+   "Poison control / toxicology"
+  ],
+  "Child swallowed object": [
+   "Paediatrics"
+  ],
+  "Childbirth": [
+   "OB / delivery"
+  ],
+  "Choking": [
+   "Oxygen / airway"
+  ],
+  "Choking on food": [
+   "Oxygen / airway"
+  ],
+  "Cholera": [
+   "Isolation room",
+   "IV fluids"
+  ],
+  "Cold exposure": [
+   "Active warming"
+  ],
+  "Collapsed lung": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Collapsed roof": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Collapsed wall": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Coma": [
+   "Resus bay",
+   "Neuro obs"
+  ],
+  "Compartment syndrome": [
+   "X-ray / ortho",
+   "Surgical team"
+  ],
+  "Concussion": [
+   "CT / neurosurgery",
+   "Neuro obs"
+  ],
+  "Confusion": [
+   "Neuro obs"
+  ],
+  "Conjunctivitis": [
+   "Eye / ENT"
+  ],
+  "Contractions": [
+   "OB / delivery"
+  ],
+  "Conveyor accident": [
+   "Trauma team"
+  ],
+  "Convulsions in pregnancy": [
+   "OB / delivery",
+   "Neuro obs"
+  ],
+  "Coral cut": [
+   "Wound care"
+  ],
+  "Cord around neck": [
+   "OB / delivery"
+  ],
+  "Cord prolapse": [
+   "OB / delivery"
+  ],
+  "Cord visible": [
+   "OB / delivery"
+  ],
+  "Corneal abrasion": [
+   "Eye / ENT"
+  ],
+  "Coughing blood": [
+   "Blood / OR"
+  ],
+  "Covered in blood": [
+   "Haemostasis"
+  ],
+  "Crane accident": [
+   "Trauma team"
+  ],
+  "Crocodile attack": [
+   "Trauma team"
+  ],
+  "Croup": [
+   "Oxygen / airway"
+  ],
+  "Crush injury": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Crush syndrome": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Crushed limb": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Cut": [
+   "Suturing"
+  ],
+  "Cut by glass": [
+   "Suturing"
+  ],
+  "Cut by knife": [
+   "Suturing"
+  ],
+  "Cut by machine": [
+   "Wound care"
+  ],
+  "Cyanide poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Decreased baby movement": [
+   "OB / delivery"
+  ],
+  "Deep cut": [
+   "Suturing"
+  ],
+  "Deep wound on arm": [
+   "Suturing",
+   "Haemostasis"
+  ],
+  "Deep wound on leg": [
+   "Suturing",
+   "Haemostasis"
+  ],
+  "Dehydration": [
+   "IV fluids"
+  ],
+  "Diabetic emergency": [
+   "Glucose check",
+   "IV fluids",
+   "Cardiac monitor"
+  ],
+  "Diarrhea": [
+   "IV fluids"
+  ],
+  "Difficulty waking": [
+   "Neuro obs"
+  ],
+  "Diphtheria": [
+   "Isolation room"
+  ],
+  "Dislocated finger": [
+   "X-ray / ortho"
+  ],
+  "Dislocated hip": [
+   "X-ray / ortho"
+  ],
+  "Dislocated knee": [
+   "X-ray / ortho"
+  ],
+  "Dislocated shoulder": [
+   "X-ray / ortho"
+  ],
+  "Dislocation": [
+   "X-ray / ortho"
+  ],
+  "Disorientation": [
+   "Neuro obs"
+  ],
+  "Diverticulitis": [
+   "Surgical team"
+  ],
+  "Dog attack": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Dog bite": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Domestic violence": [
+   "Protection services"
+  ],
+  "Drowning in bathtub": [
+   "Airway + warming"
+  ],
+  "Drowning in flood": [
+   "Airway + warming"
+  ],
+  "Drowning in pool": [
+   "Airway + warming"
+  ],
+  "Drowning in river": [
+   "Airway + warming"
+  ],
+  "Drowning in sea": [
+   "Airway + warming"
+  ],
+  "Drug overdose": [
+   "Poison control / toxicology",
+   "Oxygen / airway"
+  ],
+  "Dynamite fishing blast": [
+   "Trauma team",
+   "Blood / OR",
+   "Burn care"
+  ],
+  "Ear infection": [
+   "Eye / ENT"
+  ],
+  "Eclampsia": [
+   "OB / delivery",
+   "Neuro obs"
+  ],
+  "Ectopic pregnancy": [
+   "OB / delivery"
+  ],
+  "Ejected from vehicle": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Electric shock": [
+   "Cardiac monitor"
+  ],
+  "Electrical accident": [
+   "Cardiac monitor"
+  ],
+  "Electrical burn": [
+   "Burn care"
+  ],
+  "Electrocution": [
+   "Cardiac monitor"
+  ],
+  "Encephalitis": [
+   "Isolation room",
+   "Neuro obs"
+  ],
+  "Endocarditis": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Epidural hematoma": [
+   "CT / neurosurgery",
+   "Trauma team"
+  ],
+  "Epilepsy": [
+   "Neuro obs"
+  ],
+  "Esophageal varices": [
+   "Blood / OR"
+  ],
+  "Explosion": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Eye injury": [
+   "Eye / ENT"
+  ],
+  "Eye wound": [
+   "Eye / ENT"
+  ],
+  "Facial burns": [
+   "Burn care",
+   "Oxygen / airway"
+  ],
+  "Facial drooping": [
+   "Stroke team / CT"
+  ],
+  "Facial injury": [
+   "Trauma team"
+  ],
+  "Fall at construction site": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fall from bed": [
+   "X-ray / ortho"
+  ],
+  "Fall from height": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fall from stairs": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fall injury": [
+   "X-ray / ortho"
+  ],
+  "Fall on head": [
+   "CT / neurosurgery"
+  ],
+  "Farm accident": [
+   "Trauma team"
+  ],
+  "Fast heartbeat": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Febrile seizure": [
+   "Neuro obs",
+   "Paediatrics"
+  ],
+  "Fell from bicycle": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fell from coconut tree": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fell from ladder": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fell from motorcycle": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fell from tree": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Fell into hole": [
+   "Trauma team"
+  ],
+  "Fell into well": [
+   "Trauma team"
+  ],
+  "Fell off boat": [
+   "Airway + warming"
+  ],
+  "Fell on stairs": [
+   "Trauma team"
+  ],
+  "Fever and rash": [
+   "Isolation room"
+  ],
+  "Fever and stiff neck": [
+   "Isolation room",
+   "Neuro obs"
+  ],
+  "Finger cut off": [
+   "Trauma team",
+   "Blood / OR",
+   "Surgical team"
+  ],
+  "Fingers turning blue": [
+   "Oxygen / airway"
+  ],
+  "Fire": [
+   "Burn care"
+  ],
+  "Fire in house": [
+   "Burn care",
+   "Oxygen / airway"
+  ],
+  "Firecracker injury": [
+   "Burn care",
+   "Trauma team"
+  ],
+  "First degree burn": [
+   "Burn care"
+  ],
+  "Fish poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Flail chest": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Flaring nostrils": [
+   "Oxygen / airway",
+   "Paediatrics"
+  ],
+  "Food poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Foreign body in eye": [
+   "Eye / ENT"
+  ],
+  "Forklift accident": [
+   "Trauma team"
+  ],
+  "Fracture": [
+   "X-ray / ortho"
+  ],
+  "Frostbite": [
+   "Active warming"
+  ],
+  "Gang violence": [
+   "Trauma team"
+  ],
+  "Gangrene": [
+   "Surgical team"
+  ],
+  "Gas explosion": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Gas exposure": [
+   "Decontamination"
+  ],
+  "Gas leak": [
+   "Decontamination"
+  ],
+  "Gasping": [
+   "Oxygen / airway"
+  ],
+  "Gastroenteritis": [
+   "IV fluids"
+  ],
+  "Gastrointestinal bleeding": [
+   "Blood / OR"
+  ],
+  "Grunting breath": [
+   "Oxygen / airway",
+   "Paediatrics"
+  ],
+  "Gunshot to abdomen": [
+   "Trauma team",
+   "Surgical team",
+   "Blood / OR"
+  ],
+  "Gunshot to chest": [
+   "Trauma team",
+   "Blood / OR",
+   "Oxygen / airway"
+  ],
+  "Gunshot to head": [
+   "Trauma team",
+   "CT / neurosurgery",
+   "Blood / OR"
+  ],
+  "Gunshot to limb": [
+   "Trauma team",
+   "Haemostasis"
+  ],
+  "Gunshot wound": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Hacked with bolo": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Hand caught in machine": [
+   "Trauma team"
+  ],
+  "Hand cut off": [
+   "Trauma team",
+   "Blood / OR",
+   "Surgical team"
+  ],
+  "Hanging": [
+   "Resus bay",
+   "Spinal precautions"
+  ],
+  "Hearing voices": [
+   "Mental health / safety watch"
+  ],
+  "Heart attack": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Heart failure": [
+   "Oxygen / airway",
+   "Cardiac monitor"
+  ],
+  "Heat exhaustion": [
+   "IV fluids"
+  ],
+  "Heat exposure": [
+   "Active cooling"
+  ],
+  "Heat stroke": [
+   "Resus bay",
+   "Active cooling"
+  ],
+  "Heavy bleeding": [
+   "Blood / OR"
+  ],
+  "Helicopter crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Hemothorax": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Hepatic encephalopathy": [
+   "Neuro obs"
+  ],
+  "Hernia": [
+   "Surgical team"
+  ],
+  "High blood sugar": [
+   "Glucose check"
+  ],
+  "Hit and run": [
+   "Trauma team"
+  ],
+  "Hit by boat propeller": [
+   "Trauma team",
+   "Haemostasis"
+  ],
+  "Hit by falling object": [
+   "Trauma team"
+  ],
+  "Hit by falling tree": [
+   "Trauma team"
+  ],
+  "Hit by flying debris": [
+   "Trauma team"
+  ],
+  "Hit by vehicle": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Hit on head": [
+   "CT / neurosurgery"
+  ],
+  "Hold-up": [
+   "Trauma team"
+  ],
+  "Home delivery": [
+   "OB / delivery"
+  ],
+  "Hot oil burn": [
+   "Burn care"
+  ],
+  "Human bite": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Hyperemesis gravidarum": [
+   "OB / delivery"
+  ],
+  "Hyperkalemia": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Hypertensive crisis": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Hypothermia": [
+   "Active warming"
+  ],
+  "Hypoxia": [
+   "Oxygen / airway"
+  ],
+  "Industrial accident": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Industrial chemical exposure": [
+   "Decontamination"
+  ],
+  "Influenza": [
+   "Isolation room"
+  ],
+  "Internal bleeding": [
+   "Blood / OR",
+   "Trauma team"
+  ],
+  "Intestinal obstruction": [
+   "Surgical team"
+  ],
+  "Intestines visible": [
+   "Trauma team",
+   "Surgical team"
+  ],
+  "Irregular heartbeat": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Jeepney accident": [
+   "Trauma team"
+  ],
+  "Just gave birth": [
+   "OB / delivery",
+   "Paediatrics"
+  ],
+  "Labor pains": [
+   "OB / delivery"
+  ],
+  "Landslide": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Large burn": [
+   "Burn care",
+   "Trauma team"
+  ],
+  "Lead poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Leaking fluid in pregnancy": [
+   "OB / delivery"
+  ],
+  "Leg cut off": [
+   "Trauma team",
+   "Blood / OR",
+   "Surgical team"
+  ],
+  "Lightning strike": [
+   "Cardiac monitor"
+  ],
+  "Lips turning blue": [
+   "Oxygen / airway"
+  ],
+  "Loss of vision": [
+   "Eye / ENT"
+  ],
+  "Lost at sea": [
+   "Airway + warming"
+  ],
+  "Low birth weight": [
+   "Paediatrics"
+  ],
+  "Low blood sugar": [
+   "Glucose check"
+  ],
+  "Machete injury": [
+   "Trauma team"
+  ],
+  "Malignant hyperthermia": [
+   "Resus bay"
+  ],
+  "Measles": [
+   "Isolation room"
+  ],
+  "Meconium aspiration": [
+   "Oxygen / airway",
+   "Paediatrics"
+  ],
+  "Memory loss": [
+   "Neuro obs"
+  ],
+  "Meningitis": [
+   "Isolation room",
+   "Neuro obs"
+  ],
+  "Mercury exposure": [
+   "Poison control / toxicology"
+  ],
+  "Methanol poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Mine accident": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Mini stroke": [
+   "Stroke team / CT"
+  ],
+  "Miscarriage": [
+   "OB / delivery"
+  ],
+  "Molar pregnancy": [
+   "OB / delivery"
+  ],
+  "Motorcycle crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Mpox": [
+   "Isolation room"
+  ],
+  "Muscle tear": [
+   "X-ray / ortho"
+  ],
+  "Mushroom poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Nail puncture": [
+   "Wound care"
+  ],
+  "Near drowning": [
+   "Airway + warming"
+  ],
+  "Neck injury": [
+   "Spinal precautions",
+   "CT / neurosurgery"
+  ],
+  "Neck pain after accident": [
+   "Spinal precautions"
+  ],
+  "Necrotizing fasciitis": [
+   "Surgical team"
+  ],
+  "Neonatal asphyxia": [
+   "Paediatrics"
+  ],
+  "Neonatal sepsis": [
+   "Paediatrics"
+  ],
+  "Neuroleptic malignant syndrome": [
+   "Resus bay"
+  ],
+  "No baby movement": [
+   "OB / delivery"
+  ],
+  "No heartbeat": [
+   "Resus bay",
+   "Cardiac monitor"
+  ],
+  "Noisy breathing": [
+   "Oxygen / airway"
+  ],
+  "Nosebleed": [
+   "Haemostasis"
+  ],
+  "Not breathing": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Not waking up": [
+   "Neuro obs",
+   "Glucose check"
+  ],
+  "Object in ear": [
+   "Eye / ENT"
+  ],
+  "Object in nose": [
+   "Eye / ENT"
+  ],
+  "Obstructed labor": [
+   "OB / delivery"
+  ],
+  "Open fracture": [
+   "X-ray / ortho",
+   "Wound care"
+  ],
+  "Open head wound": [
+   "Suturing",
+   "CT / neurosurgery"
+  ],
+  "Open wound": [
+   "Suturing"
+  ],
+  "Organophosphate poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Outer ear infection": [
+   "Eye / ENT"
+  ],
+  "Overdosed on pills": [
+   "Poison control / toxicology"
+  ],
+  "Pain spreading to arm": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Palpitations": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Pancreatitis": [
+   "Surgical team"
+  ],
+  "Paracetamol overdose": [
+   "Poison control / toxicology"
+  ],
+  "Passenger thrown": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Passing blood in stool": [
+   "Blood / OR"
+  ],
+  "Pedestrian hit": [
+   "Trauma team"
+  ],
+  "Pelvic injury": [
+   "Trauma team"
+  ],
+  "Pericarditis": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Peritonitis": [
+   "Surgical team"
+  ],
+  "Pesticide exposure": [
+   "Poison control / toxicology"
+  ],
+  "Placenta previa": [
+   "OB / delivery"
+  ],
+  "Placental abruption": [
+   "OB / delivery"
+  ],
+  "Plane crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Pleural effusion": [
+   "Oxygen / airway"
+  ],
+  "Pneumonia": [
+   "Oxygen / airway"
+  ],
+  "Pneumothorax": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Postpartum bleeding": [
+   "OB / delivery",
+   "Blood / OR"
+  ],
+  "Pre-eclampsia": [
+   "OB / delivery"
+  ],
+  "Pregnancy complication": [
+   "OB / delivery"
+  ],
+  "Premature baby": [
+   "Paediatrics"
+  ],
+  "Preterm labor": [
+   "OB / delivery"
+  ],
+  "Psychosis": [
+   "Mental health / safety watch"
+  ],
+  "Pufferfish poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Pulled from water": [
+   "Airway + warming"
+  ],
+  "Pulled muscle": [
+   "X-ray / ortho"
+  ],
+  "Pulmonary edema": [
+   "Oxygen / airway",
+   "Cardiac monitor"
+  ],
+  "Pulmonary embolism": [
+   "Oxygen / airway"
+  ],
+  "Pulsing bleeding": [
+   "Blood / OR",
+   "Haemostasis",
+   "Trauma team"
+  ],
+  "Puncture wound": [
+   "Wound care"
+  ],
+  "Rapid breathing": [
+   "Oxygen / airway"
+  ],
+  "Rat bite": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Rat poison ingestion": [
+   "Poison control / toxicology"
+  ],
+  "Red tide poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Repeated vomiting": [
+   "IV fluids"
+  ],
+  "Respiratory failure": [
+   "Resus bay",
+   "Oxygen / airway"
+  ],
+  "Retained placenta": [
+   "OB / delivery"
+  ],
+  "Retinal detachment": [
+   "Eye / ENT"
+  ],
+  "Rhabdomyolysis": [
+   "IV fluids",
+   "Cardiac monitor"
+  ],
+  "Rice mill accident": [
+   "Trauma team"
+  ],
+  "Road crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Sank underwater": [
+   "Airway + warming"
+  ],
+  "Scaffolding collapse": [
+   "Trauma team"
+  ],
+  "Scald": [
+   "Burn care"
+  ],
+  "Scrape": [
+   "Wound care"
+  ],
+  "Sea snake bite": [
+   "Antivenom",
+   "Cardiac monitor"
+  ],
+  "Sea urchin injury": [
+   "Wound care"
+  ],
+  "Second degree burn": [
+   "Burn care"
+  ],
+  "Seizure": [
+   "Neuro obs"
+  ],
+  "Self-harm": [
+   "Mental health / safety watch"
+  ],
+  "Sepsis": [
+   "Resus bay",
+   "IV fluids",
+   "Cardiac monitor"
+  ],
+  "Septic shock": [
+   "Resus bay",
+   "IV fluids",
+   "Cardiac monitor"
+  ],
+  "Serotonin syndrome": [
+   "Resus bay"
+  ],
+  "Severe dehydration": [
+   "IV fluids"
+  ],
+  "Severe headache in pregnancy": [
+   "OB / delivery"
+  ],
+  "Sexual assault": [
+   "Protection services"
+  ],
+  "Shaken baby": [
+   "Paediatrics",
+   "CT / neurosurgery",
+   "Protection services"
+  ],
+  "Shark attack": [
+   "Trauma team"
+  ],
+  "Shingles": [
+   "Isolation room"
+  ],
+  "Shock": [
+   "Resus bay",
+   "IV fluids",
+   "Cardiac monitor"
+  ],
+  "Shooting": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Shortness of breath": [
+   "Oxygen / airway"
+  ],
+  "Shot by police": [
+   "Trauma team"
+  ],
+  "Shoulder dystocia": [
+   "OB / delivery"
+  ],
+  "Skull fracture": [
+   "CT / neurosurgery",
+   "Trauma team"
+  ],
+  "Slashed neck": [
+   "Trauma team",
+   "Oxygen / airway",
+   "Haemostasis"
+  ],
+  "Slip and fall": [
+   "X-ray / ortho"
+  ],
+  "Slow heartbeat": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Slurred speech": [
+   "Stroke team / CT"
+  ],
+  "Smoke inhalation": [
+   "Oxygen / airway",
+   "Burn care"
+  ],
+  "Snake bite": [
+   "Antivenom",
+   "Cardiac monitor"
+  ],
+  "Snakebite envenomation": [
+   "Antivenom",
+   "Cardiac monitor"
+  ],
+  "Spinal cord injury": [
+   "Spinal precautions",
+   "CT / neurosurgery"
+  ],
+  "Spinal injury": [
+   "Spinal precautions",
+   "CT / neurosurgery"
+  ],
+  "Splinter": [
+   "Wound care"
+  ],
+  "Sports injury": [
+   "X-ray / ortho"
+  ],
+  "Sprain": [
+   "X-ray / ortho"
+  ],
+  "Stab wound": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Stab wound to abdomen": [
+   "Trauma team",
+   "Surgical team"
+  ],
+  "Stab wound to back": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Stab wound to chest": [
+   "Trauma team",
+   "Blood / OR",
+   "Oxygen / airway"
+  ],
+  "Stab wound to neck": [
+   "Trauma team",
+   "Oxygen / airway",
+   "Haemostasis"
+  ],
+  "Stabbing": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Status epilepticus": [
+   "Resus bay",
+   "Neuro obs"
+  ],
+  "Stillbirth": [
+   "Paediatrics"
+  ],
+  "Stonefish sting": [
+   "Wound care"
+  ],
+  "Strain": [
+   "X-ray / ortho"
+  ],
+  "Stroke": [
+   "Stroke team / CT"
+  ],
+  "Struck by lightning": [
+   "Cardiac monitor"
+  ],
+  "Struck by object": [
+   "Trauma team"
+  ],
+  "Subarachnoid hemorrhage": [
+   "CT / neurosurgery",
+   "Trauma team"
+  ],
+  "Subdural hematoma": [
+   "CT / neurosurgery",
+   "Trauma team"
+  ],
+  "Sudden difficulty speaking": [
+   "Stroke team / CT"
+  ],
+  "Sudden infant death": [
+   "Resus bay"
+  ],
+  "Sudden loss of vision": [
+   "Stroke team / CT",
+   "Eye / ENT"
+  ],
+  "Sudden numbness": [
+   "Stroke team / CT"
+  ],
+  "Sudden severe headache": [
+   "Stroke team / CT"
+  ],
+  "Sudden weakness": [
+   "Stroke team / CT"
+  ],
+  "Suicidal thoughts": [
+   "Mental health / safety watch"
+  ],
+  "Suicide attempt": [
+   "Mental health / safety watch"
+  ],
+  "Sunburn": [
+   "Burn care"
+  ],
+  "Suspected COVID-19": [
+   "Isolation room"
+  ],
+  "Suspected TB": [
+   "Isolation room"
+  ],
+  "Suspected appendicitis": [
+   "Surgical team"
+  ],
+  "Suspected fracture": [
+   "X-ray / ortho"
+  ],
+  "Suspected head injury": [
+   "CT / neurosurgery"
+  ],
+  "Suspected heart attack": [
+   "ECG / cardiology",
+   "Cardiac monitor"
+  ],
+  "Suspected internal bleeding": [
+   "Trauma team",
+   "Blood / OR"
+  ],
+  "Suspected overdose": [
+   "Poison control / toxicology"
+  ],
+  "Suspected pneumonia": [
+   "Oxygen / airway"
+  ],
+  "Suspected poisoning": [
+   "Poison control / toxicology"
+  ],
+  "Suspected rabies exposure": [
+   "Wound care",
+   "Animal bite service"
+  ],
+  "Suspected spinal injury": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Suspected stroke": [
+   "Stroke team / CT"
+  ],
+  "Swallowed alcohol": [
+   "Poison control / toxicology"
+  ],
+  "Swallowed chemical": [
+   "Poison control / toxicology"
+  ],
+  "Swallowed cleaning product": [
+   "Poison control / toxicology"
+  ],
+  "Swallowed kerosene or gasoline": [
+   "Poison control / toxicology"
+  ],
+  "Swallowed medicine": [
+   "Poison control / toxicology"
+  ],
+  "Swallowed pesticide": [
+   "Poison control / toxicology"
+  ],
+  "Swept away by flood": [
+   "Trauma team",
+   "Airway + warming"
+  ],
+  "Swept away by river": [
+   "Trauma team",
+   "Airway + warming"
+  ],
+  "Swollen face in pregnancy": [
+   "OB / delivery"
+  ],
+  "Tension pneumothorax": [
+   "Trauma team",
+   "Oxygen / airway"
+  ],
+  "Testicular torsion": [
+   "Surgical team"
+  ],
+  "Third degree burn": [
+   "Burn care"
+  ],
+  "Threatening to harm others": [
+   "Mental health / safety watch"
+  ],
+  "Threatening to harm self": [
+   "Mental health / safety watch"
+  ],
+  "Thyroid storm": [
+   "Resus bay"
+  ],
+  "Torn ligament": [
+   "X-ray / ortho"
+  ],
+  "Train accident": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Trapped": [
+   "Trauma team",
+   "Cardiac monitor",
+   "IV fluids"
+  ],
+  "Trapped in fire": [
+   "Burn care",
+   "Oxygen / airway"
+  ],
+  "Trapped in flood": [
+   "Airway + warming"
+  ],
+  "Tricycle crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Tripped": [
+   "X-ray / ortho"
+  ],
+  "Truck collision": [
+   "Trauma team"
+  ],
+  "Truck crash": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Tuberculosis": [
+   "Isolation room"
+  ],
+  "Twisted ankle": [
+   "X-ray / ortho"
+  ],
+  "Unable to speak": [
+   "Stroke team / CT"
+  ],
+  "Uterine rupture": [
+   "OB / delivery"
+  ],
+  "Uveitis": [
+   "Eye / ENT"
+  ],
+  "Vaginal bleeding": [
+   "OB / delivery"
+  ],
+  "Vehicle fell into river": [
+   "Airway + warming"
+  ],
+  "Vehicle fell off cliff": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Vehicle rollover": [
+   "Trauma team",
+   "Spinal precautions"
+  ],
+  "Violent outburst": [
+   "Mental health / safety watch"
+  ],
+  "Vomiting after head injury": [
+   "CT / neurosurgery",
+   "Neuro obs"
+  ],
+  "Vomiting blood": [
+   "Blood / OR"
+  ],
+  "Vomiting with blood": [
+   "Blood / OR"
+  ],
+  "Water diarrhea": [
+   "IV fluids",
+   "Isolation room"
+  ],
+  "Weakness on one side": [
+   "Stroke team / CT"
+  ],
+  "Wheezing": [
+   "Oxygen / airway"
+  ],
+  "Whiplash": [
+   "Spinal precautions",
+   "CT / neurosurgery"
+  ],
+  "Whooping cough": [
+   "Isolation room"
+  ],
+  "Wound": [
+   "Suturing"
+  ],
+  "Wound on face": [
+   "Suturing"
+  ],
+  "Wound on foot": [
+   "Suturing"
+  ],
+  "Wound on hand": [
+   "Suturing"
+  ],
+  "Wound on head": [
+   "Suturing"
+  ]
+ }
+}
