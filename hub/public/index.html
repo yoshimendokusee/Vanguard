@@ -96,19 +96,17 @@
   .app > * { min-width: 0; }
 
   /* ---------- teal rail ---------- */
-  .rail { background: var(--rail); color: var(--on-rail); border-radius: var(--r-2xl); margin: var(--s3); padding: var(--s5) var(--s2); display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr); align-items: stretch; gap: var(--s5); }
+  .rail { background: var(--rail); color: var(--on-rail); border-radius: var(--r-2xl); margin: var(--s3); padding: var(--s5) var(--s2); display: grid; grid-template-columns: minmax(0, 1fr); align-content: center; align-items: stretch; gap: var(--s5); }
   /* the rail never scrolls away with the page: pinned to the viewport, and scrolls on its own only if it cannot fit */
   .rail { position: sticky; top: var(--s3); align-self: start; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
   @media (min-width: 1200px) { .rail { height: calc(100vh - 4 * var(--s3)); height: calc(100dvh - 4 * var(--s3)); } } /* page padding: keeps the pinned rail from being pushed up at the end of the page */
-  .rail .word { font-size: 0.9375rem; font-weight: 600; text-align: center; line-height: 1.2; align-self: start; }
-  .vtabs { display: grid; gap: var(--s2); }
-  .railbtn { display: grid; justify-items: center; align-content: center; gap: 4px; min-height: 76px; padding: var(--s2) 4px; border: 0; border-radius: 999px; background: transparent; color: var(--on-rail); font-weight: 400; font-size: 0.75rem; line-height: 1.2; text-align: center; }
-  .railbtn svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .vtabs { display: grid; gap: var(--s4); }
+  .railbtn { display: grid; justify-items: center; align-content: center; gap: 6px; min-height: 88px; padding: var(--s3) 4px; border: 0; border-radius: 999px; background: transparent; color: var(--on-rail); font-weight: 400; font-size: 0.75rem; line-height: 1.2; text-align: center; }
+  .railbtn svg { width: 30px; height: 30px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
   .railbtn:hover { background: rgba(0, 0, 0, 0.18); }
   .railbtn:active { background: rgba(0, 0, 0, 0.28); }
   .railbtn[aria-selected="true"], .railbtn[aria-expanded="true"] { background: var(--rail-active-bg); color: var(--rail-active-fg); font-weight: 600; }
   .railbtn .n { font-weight: 700; }
-  .rail .gear { align-self: end; }
   .rail :focus-visible { outline-color: var(--on-rail); }
 
   /* ---------- left column of cards ---------- */
@@ -178,6 +176,11 @@
 
   .settings { display: flex; flex-wrap: wrap; gap: var(--s4); align-items: flex-end; padding: var(--s3) var(--s4); background: var(--panel-2); border-radius: var(--r-lg); }
   .settings[hidden] { display: none; }
+  /* Settings is its own page: only the header and the settings show, and the patient cards step aside */
+  .app[data-view="settings"] :is(.catbar, #sline, #filters, #alert, #view-panel, .note, .search, .left) { display: none; }
+  .app:not([data-view="settings"]) #settings { display: none; }
+  .settings { padding: var(--s5); gap: var(--s5); }
+  @media (min-width: 1181px) { .app[data-view="settings"] .panel-main { grid-column: 2 / -1; } }
   .foot-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dim); margin-bottom: var(--s1); }
   .seg { display: grid; grid-template-columns: repeat(3, minmax(4.5rem, 1fr)); gap: 4px; padding: 4px; background: var(--panel); border-radius: var(--r-md); }
   .seg button { border: 0; background: var(--soft-bg); color: var(--soft-fg); border-radius: var(--r-sm); min-height: 44px; font-weight: 500; font-size: 0.875rem; }
@@ -299,34 +302,35 @@
   /* ---------- responsive: rail becomes a top bar, cards stack ---------- */
   @media (max-width: 1180px) {
     .app { grid-template-columns: minmax(0, 1fr); }
+    .app[data-view="settings"] { align-content: start; }
     .left { display: contents; }
     .rail { display: flex; position: static; height: auto; overflow: visible; order: 0; flex-direction: row; flex-wrap: wrap; align-items: center; margin: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); padding: var(--s2) var(--s3) var(--s3); gap: var(--s2); }
-    .rail .word { text-align: left; font-size: 1.125rem; align-self: auto; }
-    .rail .gear { order: 2; align-self: auto; margin-top: 0; margin-left: auto; min-height: 48px; grid-auto-flow: column; gap: var(--s2); padding: 0 var(--s4); }
-    .rail .gear svg { width: 22px; height: 22px; }
     .vtabs { order: 3; flex: 1 1 100%; grid-template-columns: repeat(auto-fit, minmax(min(4rem, 100%), 1fr)); }
-    .railbtn { min-height: 64px; border-radius: var(--r-lg); }
+    .vtabs { gap: var(--s2); }
+    .railbtn { min-height: 64px; gap: 4px; padding: var(--s2) 4px; border-radius: var(--r-lg); }
+    .railbtn svg { width: 26px; height: 26px; }
     .hero { order: 1; margin: var(--s3) var(--s3) 0; }
     .panel-main { order: 2; margin: var(--s3); padding: var(--s4); }
     #due { order: 3; margin: 0 var(--s3); }
     #prep { order: 4; margin: 0 var(--s3) var(--s3); }
   }
   @media (max-width: 1180px) and (min-width: 600px) and (orientation: landscape) {
-    .app { grid-template-columns: 6.75rem minmax(0, 1fr); }
-    .rail { position: sticky; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-y: auto; order: 0; grid-column: 1; grid-row: 1 / span 12; flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: var(--s3); border-radius: var(--r-2xl); padding: var(--s5) var(--s2); gap: var(--s5); }
-    .rail .word { text-align: center; font-size: 0.9375rem; }
-    .rail .gear { order: 0; align-self: end; margin: 0; min-height: 76px; grid-auto-flow: row; gap: 4px; padding: var(--s2) 4px; }
-    .rail .gear svg { width: 26px; height: 26px; }
+    .app, .app[data-view="settings"] { grid-template-columns: 6.75rem minmax(0, 1fr); align-content: normal; }
+    .rail { justify-content: center; position: sticky; height: calc(100vh - 2 * var(--s3)); height: calc(100dvh - 2 * var(--s3)); overflow-y: auto; order: 0; grid-column: 1; grid-row: 1 / span 12; flex-direction: column; flex-wrap: nowrap; align-items: stretch; margin: var(--s3); border-radius: var(--r-2xl); padding: var(--s5) var(--s2); gap: var(--s5); }
     .vtabs { order: 0; flex: none; grid-template-columns: none; }
-    .railbtn { min-height: 76px; border-radius: 999px; }
+    .railbtn { min-height: 88px; border-radius: 999px; }
     .hero, .panel-main, #due, #prep { grid-column: 2; }
+  }
+  @media (max-height: 720px) and (min-width: 600px) and (orientation: landscape) {
+    .vtabs { gap: var(--s2); }
+    .railbtn { min-height: 76px; padding: var(--s2) 4px; }
+    .railbtn svg { width: 28px; height: 28px; }
   }
   @media (max-height: 560px) and (orientation: landscape) {
     .rail { padding: var(--s2); gap: var(--s2); overflow-x: hidden; }
-    .rail .word { font-size: 0.875rem; }
     .vtabs { gap: var(--s1); }
-    .railbtn, .rail .gear { min-height: 48px; gap: 2px; padding: 2px; font-size: 0.6875rem; line-height: 1.15; }
-    .railbtn svg, .rail .gear svg { width: 18px; height: 18px; }
+    .railbtn { min-height: 48px; gap: 2px; padding: 2px; font-size: 0.6875rem; line-height: 1.15; }
+    .railbtn svg { width: 18px; height: 18px; }
   }
   @media (max-width: 560px) {
     .search { flex: 1; } .search input { width: 100%; }
@@ -348,19 +352,19 @@
 
 <div class="app">
   <div class="rail">
-    <h1 class="word">Vanguard<span class="sr-only"> ED pre-arrival board</span></h1>
+    <h1 class="sr-only">Vanguard ED pre-arrival board</h1>
     <div class="vtabs" role="tablist" aria-label="Report status" aria-orientation="vertical">
       <button class="railbtn vtab" role="tab" id="tab-inbound" data-f="inbound" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12h14M13 6l6 6-6 6"/></svg><span>On the way</span><span class="n" id="t-inbound">0</span></button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 12h13M12.5 5.5l6.5 6.5-6.5 6.5"/></svg><span>On the way</span><span class="n" id="t-inbound">0</span></button>
       <button class="railbtn vtab" role="tab" id="tab-arrived" data-f="arrived" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.7 2.7L16 9.5"/></svg><span>Arrived</span><span class="n" id="t-arrived">0</span></button>
       <button class="railbtn vtab" role="tab" id="tab-cancelled" data-f="cancelled" type="button">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg><span>Cancelled</span><span class="n" id="t-cancelled">0</span></button>
       <button class="railbtn vtab" role="tab" id="tab-all" data-f="all" type="button">
-        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5"/></svg><span>All reports</span><span class="n" id="t-all">0</span></button>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="13.5" y="3.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="3.5" y="13.5" width="7" height="7" rx="2" fill="currentColor"/><rect x="13.5" y="13.5" width="7" height="7" rx="2" fill="currentColor"/></svg><span>All reports</span><span class="n" id="t-all">0</span></button>
+      <button class="railbtn vtab" role="tab" id="tab-settings" data-f="settings" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.8" fill="currentColor"/><circle cx="15" cy="16" r="2.8" fill="currentColor"/></svg><span>Settings</span></button>
     </div>
-    <button class="railbtn gear" id="gear" type="button" aria-expanded="false" aria-controls="settings">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14M5 16h14"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/></svg><span>Settings</span></button>
   </div>
 
   <aside class="left" aria-label="Next patient and teams">
@@ -386,7 +390,7 @@
       </div>
     </header>
 
-    <section class="settings" id="settings" aria-label="Display settings" hidden>
+    <section class="settings" id="settings" role="tabpanel" aria-labelledby="tab-settings">
       <div>
         <span class="foot-label" id="theme-label">Theme</span>
         <div class="seg" role="group" aria-labelledby="theme-label">
@@ -467,7 +471,7 @@
   const TRIAGE = ['Immediate', 'Unassessed', 'Delayed', 'Minor', 'Deceased'];
   const RANK = { Immediate: 0, Unassessed: 1, Delayed: 2, Minor: 3, Deceased: 4 };
   const LABEL = { Immediate: 'Immediate', Unassessed: 'Not sure', Delayed: 'Delayed', Minor: 'Minor', Deceased: 'Deceased' };
-  const VIEW_TITLE = { inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports' };
+  const VIEW_TITLE = { inbound: 'On the way', arrived: 'Arrived', cancelled: 'Cancelled', all: 'All reports', settings: 'Settings' };
 
   let rows = [];
   let view = 'inbound';
@@ -706,7 +710,8 @@
       b.setAttribute('aria-selected', String(on));
       b.tabIndex = on ? 0 : -1; // roving tabindex: arrow keys move between tabs
     });
-    $('view-panel').setAttribute('aria-labelledby', 'tab-' + view);
+    if (view !== 'settings') $('view-panel').setAttribute('aria-labelledby', 'tab-' + view);
+    document.querySelector('.app').dataset.view = view;
     $('view-title').textContent = VIEW_TITLE[view];
   }
 
@@ -1095,7 +1100,7 @@
 
   // ---------- controls ----------
   // Where you are (status tab, category, search) lives in the URL, so refresh and the Back button keep it.
-  const VIEWS = ['inbound', 'arrived', 'cancelled', 'all'];
+  const VIEWS = ['inbound', 'arrived', 'cancelled', 'all', 'settings'];
   const qInput = $('q');
   function readUrl() {
     const p = new URLSearchParams(location.search);
@@ -1138,12 +1143,6 @@
   function setQuery(v) { query = v; qInput.value = v; sel = null; limit = PAGE; writeUrl(false); render(); }
   qInput.addEventListener('input', () => { query = qInput.value; sel = null; limit = PAGE; writeUrl(false); render(); });
   $('qx').onclick = () => { setQuery(''); qInput.focus(); };
-
-  $('gear').onclick = () => {
-    const s = $('settings');
-    s.hidden = !s.hidden;
-    $('gear').setAttribute('aria-expanded', String(!s.hidden));
-  };
 
   const soundBtn = $('sound');
   function paintSound() {
