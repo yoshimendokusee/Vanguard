@@ -443,6 +443,8 @@ import './hub-client.js';
   // Everything one patient needs, opened from their row: counts, readiness checklist, notes and actions.
   function renderDetail(r) {
     const box = el('div', 'detail');
+    const extractedFindings = (r.processing?.findings || []).filter((finding) =>
+      finding.source === 'model-inferred' && (finding.excerpt || finding.contradictory));
     const stats = el('div', 'stats');
     const stat = (k, v) => { const d = el('div', 'stat'); d.append(el('small', '', k), el('b', '', v)); return d; };
     stats.append(stat('Patients', r.patient_count_known === false ? 'Unknown' : '×' + num(r.patient_count)), stat('Age', r.age_group === 'Unspecified' ? 'Unknown' : r.age_group), stat('Category', LABEL[category(r)]));
@@ -452,6 +454,18 @@ import './hub-client.js';
     if (r.clinician_override) box.append(el('p', 'note', `Operator override: ${r.clinician_override} · computed: ${r.computed_triage} · identity unverified`));
     for (const uncertainty of r.uncertainties || []) box.append(el('p', 'warn', uncertainty));
     if (r.current_transcript !== r.raw_text) box.append(el('p', 'r-raw', 'Current corrected transcript: ' + r.current_transcript));
+    if (extractedFindings.length) {
+      const extracted = el('details', 'rnote');
+      extracted.append(el('summary', '', 'Extracted findings · unverified'));
+      const labels = { breathing: 'Breathing', consciousness: 'Consciousness', severeBleeding: 'Severe bleeding', walking: 'Walking' };
+      for (const finding of extractedFindings) {
+        const label = labels[finding.name] || finding.name;
+        const value = finding.contradictory ? ': conflicting; verification required'
+          : finding.value === 'reported' ? '' : `: ${finding.value}${finding.unit ? ' ' + finding.unit : ''}`;
+        extracted.append(el('p', '', `${label}${value}${finding.excerpt ? ` — “${finding.excerpt}”` : ''}`));
+      }
+      box.append(extracted);
+    }
 
     // readiness checklist (kept in this browser only)
     const items = r.status === 'inbound' && category(r) !== 'Deceased' ? readyItems(r) : [];
@@ -499,7 +513,7 @@ import './hub-client.js';
     const unmapped = r.injuries.split(',').map((x) => x.trim()).filter((x) => x && x !== 'Unspecified' && (r.source_findings_current === false ? !PREP[x] : !prepFor(x).length));
     if (category(r) !== 'Deceased' && r.status === 'inbound' && (unmapped.length || r.injuries === 'Unspecified')) {
       box.append(el('p', 'warn', r.injuries === 'Unspecified'
-        ? 'No findings were understood. Read the note first.'
+        ? extractedFindings.length ? 'Machine-extracted findings are listed above for review; none are clinician-verified.' : 'No findings were understood. Read the note first.'
         : suggested.length
           ? `No hospital-approved preparation is mapped for ${unmapped.join(', ')}; see the draft suggestion above. Read the note.`
           : `No preparation mapped for ${unmapped.join(', ')}. Read the note.`));
@@ -908,7 +922,7 @@ import './hub-client.js';
 
     // 2. Top Row: 4 Stat KPI Cards Grid (Powered by Real System Data)
     const kpiGrid = el('div', 'dash-kpi-grid');
-    
+
     // Card 1 (Featured active teal card)
     const card1 = el('div', 'dash-kpi-card featured');
     card1.onclick = () => setView('all');
@@ -951,12 +965,12 @@ import './hub-client.js';
     const chartCard = el('div', 'dash-card analytics-card');
     chartCard.append(el('h4', 'dash-card-title', 'Triage Acuity Distribution'));
     chartCard.append(el('p', 'hint', 'Total patient count dynamically categorized by START triage urgency'));
-    
+
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('viewBox', '0 0 540 220');
     svg.setAttribute('class', 'project-analytics-svg');
-    
+
     const defs = document.createElementNS(svgNS, 'defs');
     const pat = document.createElementNS(svgNS, 'pattern');
     pat.setAttribute('id', 'stripe-pattern');
@@ -1034,7 +1048,7 @@ import './hub-client.js';
     const urgentInbound = inbRows.filter((r) => category(r) === 'Immediate');
     const remCard = el('div', 'dash-card rem-card');
     remCard.append(el('span', 'dash-card-tag', 'Emergency Alert'));
-    
+
     if (urgentInbound.length > 0) {
       const topReport = urgentInbound[0];
       const m = minsLeft(topReport);
@@ -1131,7 +1145,7 @@ import './hub-client.js';
     const gSvg = document.createElementNS(svgNS, 'svg');
     gSvg.setAttribute('viewBox', '0 0 200 130');
     gSvg.setAttribute('class', 'gauge-svg');
-    
+
     // Background arc
     const bgArc = document.createElementNS(svgNS, 'path');
     bgArc.setAttribute('d', 'M 20 110 A 80 80 0 0 1 180 110');
@@ -1581,11 +1595,13 @@ import './hub-client.js';
       var t = document.createElement('div'); t.className = 'ai-table';
       var obs = data.processing.observations;
       Object.keys(OBS_LABEL).forEach(function (k) { rowOf(t, OBS_LABEL[k], obs[k]); });
+      if (data.fields.symptomDuration) rowOf(t, 'Symptom duration', data.fields.symptomDuration.value + ' ' + data.fields.symptomDuration.unit);
       resultEl.append(t);
       var ev = document.createElement('p'); ev.className = 'ai-ev';
       var quotes = Object.keys(OBS_LABEL).map(function (k) {
         return OBS_LABEL[k] + ': ' + (data.evidence && data.evidence[k] ? '\u201C' + data.evidence[k] + '\u201D' : 'not stated');
       }).join(' · ');
+      if (data.fields.symptomDuration && data.fieldEvidence.symptomDuration) quotes += ' · Symptom duration: “' + data.fieldEvidence.symptomDuration + '”';
       ev.textContent = 'Evidence — ' + quotes;
       resultEl.append(ev);
       (data.processing.uncertainties || []).forEach(function (u) {

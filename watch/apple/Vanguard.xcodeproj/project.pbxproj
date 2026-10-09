@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		14EFAEADB20AB92F5C06A5A0 /* VanguardApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3BDD155A68B6776525F0AF /* VanguardApp.swift */; };
 		1788FC58174D2686FEB3BCBE /* qwen3-0.6b in Resources */ = {isa = PBXBuildFile; fileRef = ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */; };
+		A19E6D7B14E54B378DCD9701 /* whisper-tiny-q5_1 in Resources */ = {isa = PBXBuildFile; fileRef = B88E8BA940624F96AFA67C67 /* whisper-tiny-q5_1 */; };
 		3A691FB40A085D777E89D4BA /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7C8DAF42A99026818F257681 /* Foundation.framework */; };
 		407274C91B1E234F51AD0B51 /* VanguardWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = AEB3DF43CF73C18E2C397CA4 /* VanguardWatch.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		602DD91DF2251838313B41E5 /* qwen3-0.6b in Resources */ = {isa = PBXBuildFile; fileRef = ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */; };
@@ -47,6 +48,7 @@
 		7943DA2C5396872A123A8144 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/WatchOS.platform/Developer/SDKs/WatchOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		7C8DAF42A99026818F257681 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; name = "qwen3-0.6b"; path = "../../models/qwen3-0.6b"; sourceTree = "<group>"; };
+		B88E8BA940624F96AFA67C67 /* whisper-tiny-q5_1 */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder; name = "whisper-tiny-q5_1"; path = "../../models/whisper-tiny-q5_1"; sourceTree = "<group>"; };
 		AEB3DF43CF73C18E2C397CA4 /* VanguardWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VanguardWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FE3BDD155A68B6776525F0AF /* VanguardApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VanguardApp.swift; sourceTree = "<group>"; };
 		5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Vanguard.xcconfig; path = Config/Vanguard.xcconfig; sourceTree = "<group>"; };
@@ -90,6 +92,7 @@
 				9E182DD132E1C2FBC3C1B91C /* Frameworks */,
 				AA18CD65454D186D992B46D1 /* App */,
 				ADB688B2E5B6703E2F0C76F3 /* qwen3-0.6b */,
+				B88E8BA940624F96AFA67C67 /* whisper-tiny-q5_1 */,
 				5C1A9E3F0B7D4E2A8F6C1D03 /* Vanguard.xcconfig */,
 			);
 			sourceTree = "<group>";
@@ -159,6 +162,7 @@
 			buildConfigurationList = 124FD6EB643ADB44C71A5987 /* Build configuration list for PBXNativeTarget "VanguardWatch" */;
 			buildPhases = (
 				ABCD01234567890123456788 /* Verify pinned Qwen */,
+				D4D1442F27104D5A91DD34DF /* Verify pinned Whisper */,
 				EB33ED172B6CBC1908C2A20E /* Sources */,
 				459855A1DC07986499255891 /* Frameworks */,
 				6CBD4D1E8D63C33B0EC3A967 /* Resources */,
@@ -222,6 +226,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				602DD91DF2251838313B41E5 /* qwen3-0.6b in Resources */,
+				A19E6D7B14E54B378DCD9701 /* whisper-tiny-q5_1 in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -247,6 +252,16 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -eu\ncd \"$SRCROOT/../../models/qwen3-0.6b\"\n/usr/bin/shasum -a 256 --check checksums.sha256\n";
+		};
+		D4D1442F27104D5A91DD34DF /* Verify pinned Whisper */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = ();
+			name = "Verify pinned Whisper";
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\ncd \"$SRCROOT/../../models/whisper-tiny-q5_1\"\n/usr/bin/shasum -a 256 --check checksums.sha256\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

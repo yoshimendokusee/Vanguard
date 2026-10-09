@@ -1,4 +1,5 @@
-FROM node:22-bookworm-slim AS dependencies
+# Use the Docker Official Image hosted in ECR Public to avoid Docker Hub pull limits.
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS dependencies
 WORKDIR /app
 # The locked better-sqlite3 version compiles a native addon.
 RUN apt-get update \
@@ -7,7 +8,7 @@ RUN apt-get update \
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 
-FROM node:22-bookworm-slim AS development
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS development
 WORKDIR /app
 COPY --from=dependencies /app/node_modules ./node_modules
 COPY . .
@@ -17,7 +18,7 @@ CMD ["npm", "run", "dev"]
 FROM development AS build
 RUN npm run build && npm prune --omit=dev --no-audit --no-fund
 
-FROM node:22-bookworm-slim AS production
+FROM public.ecr.aws/docker/library/node:22-bookworm-slim AS production
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY . .

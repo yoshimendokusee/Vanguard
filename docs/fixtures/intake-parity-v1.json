@@ -21,13 +21,15 @@
     "location": "Arnaldo",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "in arnaldo",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -55,13 +57,15 @@
     "location": "Barangay Arnaldo",
     "patientCount": 2,
     "ageGroup": "Child",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Arnaldo",
     "patientCount": "Dalawang bata",
     "ageGroup": "bata",
-    "etaMinutes": "sampung minuto"
+    "etaMinutes": "sampung minuto",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -104,13 +108,15 @@
     "location": "Barangay San Roque",
     "patientCount": null,
     "ageGroup": "Adult",
-    "etaMinutes": 15
+    "etaMinutes": 15,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Brgy. San Roque",
     "patientCount": null,
     "ageGroup": "30 years old",
-    "etaMinutes": "15 minutes"
+    "etaMinutes": "15 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -143,13 +149,15 @@
     "location": "Purok 5 Bagumbayan",
     "patientCount": null,
     "ageGroup": "Child",
-    "etaMinutes": 20
+    "etaMinutes": 20,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Purok 5 Bagumbayan",
     "patientCount": null,
     "ageGroup": "8 years old",
-    "etaMinutes": "20 minutes"
+    "etaMinutes": "20 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -187,13 +195,15 @@
     "location": "Sitio Mabini",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 12
+    "etaMinutes": 12,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Sitio Mabini",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "12 mins"
+    "etaMinutes": "12 mins",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -216,13 +226,15 @@
     "location": "Plaza Rizal",
     "patientCount": 1,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "near Plaza Rizal",
     "patientCount": "one patient",
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -270,13 +282,15 @@
     "location": "Riverside Road",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 25
+    "etaMinutes": 25,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "at Riverside Road",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "25 minutes"
+    "etaMinutes": "25 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -309,13 +323,15 @@
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "Elderly",
-    "etaMinutes": 5
+    "etaMinutes": 5,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "72 anyos",
-    "etaMinutes": "5 minutes"
+    "etaMinutes": "5 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -343,13 +359,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Child",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": "10 years old",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -392,13 +410,15 @@
     "location": "Barangay Dos",
     "patientCount": null,
     "ageGroup": "Child",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Dos.",
     "patientCount": null,
     "ageGroup": "bata",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -441,13 +461,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 15
+    "etaMinutes": 15,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "15 minutes"
+    "etaMinutes": "15 minutes",
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -475,13 +497,15 @@
     "location": "Poblacion",
     "patientCount": 3,
     "ageGroup": "Unspecified",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "at Poblacion",
     "patientCount": "Tatlong pasyente",
     "ageGroup": null,
-    "etaMinutes": "10 minutes"
+    "etaMinutes": "10 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -514,13 +538,15 @@
     "location": "Barangay Tres",
     "patientCount": null,
     "ageGroup": "Adult",
-    "etaMinutes": 30
+    "etaMinutes": 30,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Tres",
     "patientCount": null,
     "ageGroup": "40 years old",
-    "etaMinutes": "30 minutes"
+    "etaMinutes": "30 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -548,13 +574,15 @@
     "location": "Purok 2",
     "patientCount": null,
     "ageGroup": "Infant",
-    "etaMinutes": 12
+    "etaMinutes": 12,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Purok 2",
     "patientCount": null,
     "ageGroup": "3 months old",
-    "etaMinutes": "12 mins"
+    "etaMinutes": "12 mins",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -582,13 +610,15 @@
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "ten minutes"
+    "etaMinutes": "ten minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -606,13 +636,15 @@
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Uno.",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -640,13 +672,18 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Elderly",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": {
+     "value": 30,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": "60 years old",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": "30 minutes na"
    },
    "locationBasis": null,
    "notes": []
@@ -679,13 +716,18 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Elderly",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": {
+     "value": 30,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": "60 years old",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": "30 minutes ago"
    },
    "locationBasis": null,
    "notes": []
@@ -697,13 +739,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -726,13 +770,18 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": {
+     "value": 10,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": "for 10 minutes"
    },
    "locationBasis": null,
    "notes": []
@@ -744,13 +793,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -768,13 +819,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -792,13 +845,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -821,13 +876,15 @@
     "location": "Riverside Road",
     "patientCount": 3,
     "ageGroup": "Unspecified",
-    "etaMinutes": 60
+    "etaMinutes": 60,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "at Riverside Road",
     "patientCount": "three patients",
     "ageGroup": "child / adult",
-    "etaMinutes": "1 hour"
+    "etaMinutes": "1 hour",
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": [
@@ -852,13 +909,15 @@
     "location": "Plaza Rizal",
     "patientCount": 1,
     "ageGroup": "Elderly",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "near Plaza Rizal",
     "patientCount": "one patient",
     "ageGroup": "72 anyos",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -886,13 +945,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -920,13 +981,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -944,13 +1007,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -968,13 +1033,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -992,13 +1059,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1016,13 +1085,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1040,13 +1111,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1064,13 +1137,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1098,13 +1173,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1116,13 +1193,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1134,13 +1213,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1188,13 +1269,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1206,13 +1289,15 @@
     "location": null,
     "patientCount": 2,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": "Dalawang pasyente",
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1224,13 +1309,15 @@
     "location": "Barangay Cinco",
     "patientCount": 5,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Cinco",
     "patientCount": "5 injured",
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1242,13 +1329,18 @@
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": {
+     "value": 10,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": "Brgy. Uno",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "sampung minuto"
+    "etaMinutes": "sampung minuto",
+    "symptomDuration": "sampung minuto na"
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1260,13 +1352,18 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 5
+    "etaMinutes": 5,
+    "symptomDuration": {
+     "value": 5,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "limang minuto"
+    "etaMinutes": "limang minuto",
+    "symptomDuration": "limang minuto na"
    },
    "locationBasis": null,
    "notes": []
@@ -1278,13 +1375,15 @@
     "location": null,
     "patientCount": 2,
     "ageGroup": "Child",
-    "etaMinutes": 15
+    "etaMinutes": 15,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": "two children",
     "ageGroup": "children",
-    "etaMinutes": "15 mins"
+    "etaMinutes": "15 mins",
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1307,13 +1406,15 @@
     "location": "Sitio Uno",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 20
+    "etaMinutes": 20,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Sitio Uno",
     "patientCount": null,
     "ageGroup": "child / adult",
-    "etaMinutes": "20 minutes"
+    "etaMinutes": "20 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": [
@@ -1333,13 +1434,15 @@
     "location": "Barangay hall",
     "patientCount": null,
     "ageGroup": "Child",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "barangay hall",
     "patientCount": null,
     "ageGroup": "Child",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1362,13 +1465,15 @@
     "location": "Barangay Isa",
     "patientCount": null,
     "ageGroup": "Infant",
-    "etaMinutes": 8
+    "etaMinutes": 8,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Isa",
     "patientCount": null,
     "ageGroup": "Newborn",
-    "etaMinutes": "8 minutes"
+    "etaMinutes": "8 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1391,13 +1496,15 @@
     "location": "Barangay Tabi Three victims",
     "patientCount": 3,
     "ageGroup": "Unspecified",
-    "etaMinutes": 12
+    "etaMinutes": 12,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Tabi. Three victims",
     "patientCount": "Three victims",
     "ageGroup": null,
-    "etaMinutes": "12 minutes"
+    "etaMinutes": "12 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1420,13 +1527,15 @@
     "location": "Zone 3 Riverside",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 30
+    "etaMinutes": 30,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Zone 3 Riverside",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "30 minutes"
+    "etaMinutes": "30 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1444,13 +1553,15 @@
     "location": "Barangay Pantalan",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 6
+    "etaMinutes": 6,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Pantalan",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "6 mins"
+    "etaMinutes": "6 mins",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1473,13 +1584,15 @@
     "location": "Barangay Sampaguita",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Sampaguita",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1507,13 +1620,15 @@
     "location": "Barangay Linis",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 9
+    "etaMinutes": 9,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Linis",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "9 minutes"
+    "etaMinutes": "9 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1541,13 +1656,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Elderly",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": "85 years old",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1565,13 +1682,15 @@
     "location": "Barangay Palay",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 25
+    "etaMinutes": 25,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Palay",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "25 minutes"
+    "etaMinutes": "25 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1599,13 +1718,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 12
+    "etaMinutes": 12,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "12 minutes"
+    "etaMinutes": "12 minutes",
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1633,13 +1754,15 @@
     "location": "Barangay Maligaya",
     "patientCount": null,
     "ageGroup": "Elderly",
-    "etaMinutes": 18
+    "etaMinutes": 18,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Brgy. Maligaya",
     "patientCount": null,
     "ageGroup": "68 years old",
-    "etaMinutes": "18 min"
+    "etaMinutes": "18 min",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1667,13 +1790,15 @@
     "location": "Barangay Kainan",
     "patientCount": 3,
     "ageGroup": "Unspecified",
-    "etaMinutes": 40
+    "etaMinutes": 40,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Kainan",
     "patientCount": "tatlong tao",
     "ageGroup": null,
-    "etaMinutes": "40 minutes"
+    "etaMinutes": "40 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1685,13 +1810,15 @@
     "location": "Barangay Ñandú",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 7
+    "etaMinutes": 7,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Ñandú",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "7 minutes"
+    "etaMinutes": "7 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1703,13 +1830,15 @@
     "location": "Poblacion",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "at Poblacion",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": "inferred",
    "notes": []
@@ -1721,13 +1850,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1739,13 +1870,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 5
+    "etaMinutes": 5,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "5 minutes"
+    "etaMinutes": "5 minutes",
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1757,13 +1890,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1775,13 +1910,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1799,13 +1936,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1838,13 +1977,18 @@
     "location": "Barangay Lamok",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 22
+    "etaMinutes": 22,
+    "symptomDuration": {
+     "value": 4,
+     "unit": "days"
+    }
    },
    "evidence": {
     "location": "Barangay Lamok",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "22 minutes"
+    "etaMinutes": "22 minutes",
+    "symptomDuration": "for 4 days"
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1872,13 +2016,15 @@
     "location": "Barangay Puso",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 4
+    "etaMinutes": 4,
+    "symptomDuration": null
    },
    "evidence": {
     "location": "Barangay Puso",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "4 minutes"
+    "etaMinutes": "4 minutes",
+    "symptomDuration": null
    },
    "locationBasis": "explicit",
    "notes": []
@@ -1896,13 +2042,15 @@
     "location": null,
     "patientCount": 2,
     "ageGroup": "Unspecified",
-    "etaMinutes": 7
+    "etaMinutes": 7,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": "two patients",
     "ageGroup": null,
-    "etaMinutes": "7 minutes"
+    "etaMinutes": "7 minutes",
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1925,13 +2073,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1946,7 +2096,7 @@
     },
     {
      "id": "not-breathing",
-     "matched": "hindi na humihinga",
+     "matched": "hindi humihinga",
      "negated": false
     }
    ],
@@ -1954,13 +2104,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -1983,13 +2135,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
@@ -2001,13 +2155,18 @@
     "location": "Barangay Uno",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": {
+     "value": 30,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": "Barangay Uno.",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "10 minutes"
+    "etaMinutes": "10 minutes",
+    "symptomDuration": "30 minutes ago"
    },
    "locationBasis": "explicit",
    "notes": []
@@ -2019,13 +2178,18 @@
     "location": "Barangay Dos",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 10
+    "etaMinutes": 10,
+    "symptomDuration": {
+     "value": 30,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": "Barangay Dos.",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "Sampung minuto"
+    "etaMinutes": "Sampung minuto",
+    "symptomDuration": "30 minutes na"
    },
    "locationBasis": "explicit",
    "notes": []
@@ -2037,13 +2201,18 @@
     "location": "Barangay Tres",
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": 5
+    "etaMinutes": 5,
+    "symptomDuration": {
+     "value": 5,
+     "unit": "minutes"
+    }
    },
    "evidence": {
     "location": "Brgy. Tres",
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": "limang minuto"
+    "etaMinutes": "limang minuto",
+    "symptomDuration": "limang minuto na"
    },
    "locationBasis": "explicit",
    "notes": []
@@ -2071,13 +2240,15 @@
     "location": null,
     "patientCount": null,
     "ageGroup": "Unspecified",
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "evidence": {
     "location": null,
     "patientCount": null,
     "ageGroup": null,
-    "etaMinutes": null
+    "etaMinutes": null,
+    "symptomDuration": null
    },
    "locationBasis": null,
    "notes": []
