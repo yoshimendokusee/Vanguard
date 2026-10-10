@@ -77,7 +77,7 @@ final class WatchScreenshotTests: XCTestCase {
         let out = ProcessInfo.processInfo.environment["VANGUARD_SCREENSHOT_DIR"].map { URL(fileURLWithPath: $0) }
         if let out { try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true) }
         for (title, _, screen) in screens {
-            let data = try png(Frame(title: title.hasPrefix("1.") ? "Vanguard" : "", size: size, content: screen))
+            let data = try png(Frame(title: title.hasPrefix("1.") ? "WristCue" : "", size: size, content: screen))
             XCTAssertGreaterThan(data.count, 4_000, "\(title) rendered blank")
             if let out { try data.write(to: out.appendingPathComponent(title.replacingOccurrences(of: " ", with: "_").replacingOccurrences(of: ".", with: "") + ".png")) }
         }
@@ -88,7 +88,7 @@ final class WatchScreenshotTests: XCTestCase {
                     ForEach(0..<5, id: \.self) { column in
                         let item = screens[row * 5 + column]
                         VStack(spacing: 6) {
-                            Frame(title: item.0.hasPrefix("1.") ? "Vanguard" : "", size: size, content: item.2)
+                            Frame(title: item.0.hasPrefix("1.") ? "WristCue" : "", size: size, content: item.2)
                             Text(item.0).font(.system(size: 12, weight: .semibold)).foregroundStyle(.black)
                             Text(item.1).font(.system(size: 10)).foregroundStyle(.gray)
                         }

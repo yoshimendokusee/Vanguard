@@ -692,7 +692,7 @@ import QRCode from 'qrcode';
         b.onclick = () => { cat = null; setQuery(''); writeUrl(true); };
         e.append(b);
       } else if (!rows.length) {
-        e.append(el('b', '', 'No triage reports received yet.'), el('p', '', 'Reports submitted from Vanguard Apple Watch devices will appear here automatically.'));
+        e.append(el('b', '', 'No triage reports received yet.'), el('p', '', 'Reports submitted from WristCue Apple Watch devices will appear here automatically.'));
       } else {
         e.append(el('b', '', `No ${view === 'all' ? '' : VIEW_TITLE[view].toLowerCase() + ' '}reports yet`), el('p', '', 'Reports appear here when their status is updated.'));
       }

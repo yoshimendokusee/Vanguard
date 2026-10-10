@@ -1,4 +1,4 @@
-# Vanguard-Wrist architecture — source of truth
+# WristCue architecture — source of truth
 
 Original prototype reconciled with commit `6ef35c4`; platform scope and CI updated
 on 2026-10-09. This document records both the
