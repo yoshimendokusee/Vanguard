@@ -1,7 +1,7 @@
 const { createHash, timingSafeEqual } = require('node:crypto');
 const { existsSync } = require('node:fs');
 
-function hubAccess(raw = process.env.HUB_USERS || '') {
+function hubAccess(raw = process.env.HUB_USERS || '', db = null) {
   let users;
   try { users = raw ? JSON.parse(raw) : []; } catch { throw Error('HUB_USERS must be valid JSON; credential values are not logged'); }
   if (!Array.isArray(users) || users.some(user => !user || !/^[A-Za-z0-9_-]{1,64}$/.test(user.id || '')
@@ -14,9 +14,13 @@ function hubAccess(raw = process.env.HUB_USERS || '') {
   const hash = value => createHash('sha256').update(value).digest();
   const identities = users.map(({ token, ...user }) => ({ ...user, digest: hash(token) }));
   return (req, res, next) => {
-    if (!identities.length || req.path === '/health') return next();
+    const dynamic = db ? db.prepare('SELECT id, watch_id, token_digest FROM enrolled_devices').all()
+      .map(({ id, watch_id, token_digest }) => ({ id, role: 'device', watchIds: [watch_id], digest: Buffer.from(token_digest, 'hex') })) : [];
+    if ((!identities.length && !dynamic.length) || req.path === '/health'
+      || (req.method === 'POST' && req.path === '/enrollment/redeem')) return next();
     const token = /^Bearer (\S+)$/.exec(req.get('authorization') || '')?.[1];
-    const user = token && identities.find(identity => timingSafeEqual(identity.digest, hash(token)));
+    const digest = token && hash(token);
+    const user = token && [...identities, ...dynamic].find(identity => identity.digest.length === digest.length && timingSafeEqual(identity.digest, digest));
     if (!user) return res.status(401).json({ ok: false, contractVersion: 1, requestId: req.requestId, error: 'authentication-required', message: 'Use your assigned hub access token' });
     req.user = user;
     if (user.role === 'operator' || ['/config', '/ai/health', '/ai/status', '/ai/extract', '/ai/triage-assist'].includes(req.path)) return next();

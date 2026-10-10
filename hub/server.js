@@ -8,7 +8,7 @@ const { riskForRow } = require('./risk');
 const { aiConfig, aiStatus, aiHealth, extractEmergency, triageAssist, validateTranscriptInput, glossaryFor, AiError } = require('./ai');
 const { reportView, listReports, reviseReport } = require('./clinical');
 const { getRecord, saveRecord, isId, fail } = require('./records');
-const { randomUUID } = require('node:crypto');
+const { randomBytes, createHash, randomUUID } = require('node:crypto');
 const { hubAccess, validateLanAccess } = require('./access');
 const { createCloudSync } = require('./cloud');
 
@@ -27,8 +27,50 @@ function createApp(db, {
     next();
   });
   app.use(express.json({ limit: '1mb' }));
-  app.use('/api', hubAccess());
+  app.use('/api', hubAccess(undefined, db));
   app.locals.cloud = cloud;
+
+  // Enrollment codes are volatile and single-use. A hub restart invalidates unused codes;
+  // issued device credentials are durable in SQLite.
+  const enrollments = new Map();
+  const enrollmentCode = () => randomBytes(8).toString('hex').toUpperCase();
+  const purgeEnrollments = () => {
+    const now = Date.now();
+    for (const [code, entry] of enrollments) if (entry.expiresAt <= now) enrollments.delete(code);
+    while (enrollments.size > 100) enrollments.delete(enrollments.keys().next().value);
+  };
+
+  app.post('/api/enrollment/codes', (req, res) => {
+    purgeEnrollments();
+    const code = enrollmentCode();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+    enrollments.set(code, { expiresAt: Date.parse(expiresAt) });
+    res.json({ ok: true, code, expiresAt, qrText: `VANGUARD-ENROLL:${code}` });
+  });
+
+  app.post('/api/enrollment/redeem', (req, res) => {
+    purgeEnrollments();
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
+    const watchId = typeof req.body?.watchId === 'string' ? req.body.watchId.trim() : '';
+    const pending = enrollments.get(code);
+    if (!pending || pending.expiresAt <= Date.now() || !/^(APPLE-WATCH|IPHONE)-[A-Za-z0-9-]{1,52}$/.test(watchId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid or expired enrollment code' });
+    }
+    const token = randomBytes(32).toString('base64url');
+    const id = `enrolled-${randomUUID()}`;
+    const digest = createHash('sha256').update(token).digest('hex');
+    try {
+      db.prepare('INSERT INTO enrolled_devices (id, watch_id, token_digest, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, watchId, digest, new Date().toISOString());
+      enrollments.delete(code);
+      res.json({ ok: true, token, id, watchId });
+    } catch (error) {
+      if (String(error.message).includes('UNIQUE constraint failed: enrolled_devices.watch_id')) {
+        return res.status(409).json({ ok: false, error: 'This device is already enrolled' });
+      }
+      throw error;
+    }
+  });
 
   // --- live updates (Server-Sent Events) -----------------------------------
   const clients = new Set();

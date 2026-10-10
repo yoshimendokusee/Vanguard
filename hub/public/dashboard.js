@@ -1,4 +1,5 @@
 import './hub-client.js';
+import QRCode from 'qrcode';
 
   const VanguardApi = window.VanguardApi;
   // What to get ready for, per finding (advisory; edit freely, no watch update needed).
@@ -59,6 +60,24 @@ import './hub-client.js';
     hubTokenSaveBtn.onclick = async () => {
       try { await VanguardApi.setToken($('hub-token')?.value || ''); $('hub-token').value = ''; await load(); connect(); }
       catch (error) { toast(error.message); }
+    };
+  }
+  const enrollmentCreateBtn = $('enrollment-create');
+  if (enrollmentCreateBtn) {
+    enrollmentCreateBtn.onclick = async () => {
+      enrollmentCreateBtn.disabled = true;
+      try {
+        const response = await VanguardApi.request('/api/enrollment/codes', { method: 'POST' });
+        const body = await response.json();
+        if (!response.ok || body.ok !== true || typeof body.qrText !== 'string' || typeof body.code !== 'string') {
+          throw Error(body.error || 'Could not create enrollment code');
+        }
+        await QRCode.toCanvas($('enrollment-qr'), body.qrText, { errorCorrectionLevel: 'M', margin: 1, width: 220 });
+        $('enrollment-code').textContent = body.code;
+        $('enrollment-expires').textContent = `Expires ${new Date(body.expiresAt).toLocaleTimeString()}`;
+        $('enrollment-result').hidden = false;
+      } catch (error) { toast(error.message); }
+      finally { enrollmentCreateBtn.disabled = false; }
     };
   }
   const fmt = (iso) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

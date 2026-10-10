@@ -50,6 +50,24 @@ final class HubTests: XCTestCase {
         XCTAssertEqual(request.url?.absoluteString, "https://hospital-b.local:8443/api/sync-triage")
     }
 
+    func testEnrollmentRedeemsOnlyTheShortLivedCodeShape() async throws {
+        let config = URLSessionConfiguration.ephemeral; config.protocolClasses = [ReceiptProtocol.self]
+        let session = URLSession(configuration: config); defer { session.invalidateAndCancel() }
+        let endpoint = try HubEndpoint("http://hospital.local:3000")
+        ReceiptProtocol.reply = { request in
+            XCTAssertEqual(request.url?.path, "/api/enrollment/redeem")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertNil(request.value(forHTTPHeaderField: "Authorization"))
+            return (200, Data("{\"ok\":true,\"token\":\"synthetic-enrolled-token-12345678901234567890\"}".utf8))
+        }
+        let token = try await HubEnrollment.redeem(code: "0123456789ABCDEF", watchID: "APPLE-WATCH-SYNTHETIC", at: endpoint, session: session)
+        XCTAssertGreaterThanOrEqual(token.utf8.count, 32)
+        do {
+            _ = try await HubEnrollment.redeem(code: "short", watchID: "APPLE-WATCH-SYNTHETIC", at: endpoint, session: session)
+            XCTFail("Short codes must be rejected before networking")
+        } catch {}
+    }
+
     func testDisconnectAndInvalidReceiptRetainOutboxUntilReconnect() async throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }

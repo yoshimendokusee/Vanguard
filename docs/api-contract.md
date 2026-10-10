@@ -14,6 +14,8 @@ storage encryption or pagination. Use synthetic data on isolated networks only.
 | --- | --- | --- |
 | `GET /api/health` | `200 {"ok":true,"time":"<hub ISO UTC>"}` | Liveness; not a database durability/readiness guarantee. |
 | `GET /api/config` | `200 {"hospital":"<configured name>"}` | `HOSPITAL_NAME` or the default receiving hospital label. |
+| `POST /api/enrollment/codes` | `200 {"ok":true,"code":"<16 hex chars>","expiresAt":"<ISO>","qrText":"VANGUARD-ENROLL:<code>"}` | Operator-authenticated. Creates a volatile, single-use code valid for 10 minutes. The permanent device token is never returned here. |
+| `POST /api/enrollment/redeem` | `200 {"ok":true,"token":"<device token>","id":"<credential id>","watchId":"<device id>"}` | Unauthenticated by design so a newly installed Watch can enroll. Requires the exact one-time code and a validated device ID; the code is consumed on success. |
 | `POST /api/sync-triage` | See below | One SQLite ingest transaction; acknowledges accepted and duplicate reports. |
 | `GET /api/triage` | `200 [<stored row>, ...]` | Includes all statuses; inbound first, then effective hospital priority (Immediate, Unassessed, Delayed, Minor, Deceased); known ETA before unknown, then expected arrival and creation time. Original `triage` is preserved. |
 | `PATCH /api/triage/:id` | `200 {"ok":true}` | Body `{"status":"inbound|arrived|cancelled"}`. `400 {"ok":false,"error":"Bad status"}` or `404 {"ok":false,"error":"Not found"}`. All three statuses remain reversible; each actual change is recorded atomically as a status event. Repeating the same status adds no event. |
@@ -27,6 +29,14 @@ unchanged to the Docker hub on port 3000, including SSE. Legacy/production Expre
 serves optimized dashboard assets when `dist` exists, otherwise source assets.
 Native devices keep using the computer's isolated LAN API address/port; their own
 localhost cannot reach the computer. No wire format or acknowledgment changes.
+
+The dashboard's **Enroll a Watch** control renders a QR payload and the same short
+code for manual entry. The phone camera may scan the payload, but the current
+prototype still requires the rescuer to enter the code on the Watch; it does not
+transfer the code over Bluetooth or WatchConnectivity. On redemption, the Watch
+saves the returned credential in its Keychain and uses it for future sync. Hub
+credentials are stored only as SHA-256 digests in the persistent `enrolled_devices`
+table; enrollment codes remain in hub memory and disappear on restart or expiry.
 
 ## Batch request
 
