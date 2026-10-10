@@ -70,3 +70,37 @@ test('invalid credentials and unauthenticated LAN binding fail before startup', 
     }
   }
 });
+
+test('operator enrollment issues a single-use device credential that can sync', async () => {
+  const previous = process.env.HUB_USERS;
+  process.env.HUB_USERS = JSON.stringify([{ id: 'hospital-operator', role: 'operator', token: 'c'.repeat(32) }]);
+  const db = openDb(':memory:');
+  const server = createApp(db).listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const headers = { Authorization: `Bearer ${'c'.repeat(32)}` };
+  try {
+    const created = await (await fetch(base + '/api/enrollment/codes', { method: 'POST', headers })).json();
+    assert.equal(created.ok, true);
+    assert.match(created.code, /^[A-F0-9]{16}$/);
+    assert.match(created.qrText, /^VANGUARD-ENROLL:/);
+    assert.equal(created.token, undefined, 'the dashboard receives no permanent device token');
+
+    const watchId = 'APPLE-WATCH-ENROLLED';
+    const redeemed = await fetch(base + '/api/enrollment/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: created.code, watchId }) });
+    const credential = await redeemed.json();
+    assert.equal(redeemed.status, 200);
+    assert.equal(credential.ok, true);
+    assert.ok(credential.token.length >= 32);
+    assert.equal((await fetch(base + '/api/enrollment/redeem', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code: created.code, watchId: 'APPLE-WATCH-SECOND' }) })).status, 400);
+
+    const sync = await fetch(base + '/api/sync-triage', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credential.token}` },
+      body: JSON.stringify({ watchId, reports: [] }) });
+    assert.equal(sync.status, 200);
+  } finally {
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); db.close();
+    if (previous === undefined) delete process.env.HUB_USERS; else process.env.HUB_USERS = previous;
+  }
+});

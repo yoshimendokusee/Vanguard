@@ -41,7 +41,7 @@ function temporaryDatabase(t) {
 test('creates a fresh hub database from the initial migration and reopens it', (t) => {
   const file = temporaryDatabase(t);
   const db = openDb(file);
-  assert.strictEqual(db.pragma('user_version', { simple: true }), 3);
+  assert.strictEqual(db.pragma('user_version', { simple: true }), 4);
   assert.deepStrictEqual(
     db.pragma('table_info(triage_reports)').map((column) => column.name),
     ['id', 'watch_id', 'location', 'injuries', 'triage', 'patient_count',
@@ -50,7 +50,7 @@ test('creates a fresh hub database from the initial migration and reopens it', (
   db.close();
 
   const reopened = openDb(file);
-  assert.strictEqual(reopened.pragma('user_version', { simple: true }), 3);
+  assert.strictEqual(reopened.pragma('user_version', { simple: true }), 4);
   assert.strictEqual(
     reopened.prepare('SELECT COUNT(*) AS count FROM triage_reports').get().count,
     0,
@@ -83,7 +83,7 @@ test('adopts a populated legacy database without changing reports or status', (t
   legacy.close();
 
   const db = openDb(file);
-  assert.strictEqual(db.pragma('user_version', { simple: true }), 3);
+  assert.strictEqual(db.pragma('user_version', { simple: true }), 4);
   const rows = db.prepare('SELECT * FROM triage_reports').all();
   assert.strictEqual(rows.length, 1);
   assert.deepStrictEqual(
@@ -223,7 +223,7 @@ function populatedVersion2(t, extraSql = '') {
   db.close();
   // Synthetic stand-in for a database written by the v2 binary.
   const v2 = new Database(file);
-  v2.exec(`DROP TABLE cloud_sync; ${extraSql}`);
+  v2.exec(`DROP TABLE cloud_sync; DROP TABLE enrolled_devices; ${extraSql}`);
   v2.pragma('user_version = 2');
   const before = {
     reports: v2.prepare('SELECT * FROM triage_reports').all(),
@@ -237,7 +237,7 @@ function populatedVersion2(t, extraSql = '') {
 test('upgrades populated version 2 to cloud sync state without changing reports or history', (t) => {
   const { file, before } = populatedVersion2(t);
   let db = openDb(file);
-  assert.equal(db.pragma('user_version', { simple: true }), 3);
+  assert.equal(db.pragma('user_version', { simple: true }), 4);
   assert.deepEqual(db.prepare('SELECT * FROM triage_reports').all(), before.reports);
   assert.deepEqual(db.prepare('SELECT * FROM report_revisions').all(), before.revisions);
   assert.deepEqual(db.prepare('SELECT * FROM report_events').all(), before.events);

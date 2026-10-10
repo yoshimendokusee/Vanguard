@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-public enum HubFailure: Error { case invalidURL, loopbackOnDevice, missingCredential, invalidReceipt }
+public enum HubFailure: Error { case invalidURL, loopbackOnDevice, missingCredential, invalidReceipt, enrollmentRejected }
 
 /// LAN configuration has no relationship to the on-device inference engine.
 public struct HubEndpoint: Sendable {
@@ -44,5 +44,28 @@ public enum HubCredential {
             item[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
             guard SecItemAdd(item as CFDictionary, nil) == errSecSuccess else { throw HubFailure.missingCredential }
         } else if status != errSecSuccess { throw HubFailure.missingCredential }
+    }
+}
+
+public enum HubEnrollment {
+    private struct Reply: Decodable { let ok: Bool; let token: String?; let error: String? }
+
+    /// Redeems a short-lived operator-issued code. The permanent token is returned only to this client and is
+    /// saved by the caller in Keychain; it is never displayed by the hub dashboard.
+    public static func redeem(code: String, watchID: String, at endpoint: HubEndpoint, session: URLSession = .shared) async throws -> String {
+        let value = code.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard value.range(of: "^[A-F0-9]{16}$", options: .regularExpression) != nil,
+              watchID.range(of: "^(APPLE-WATCH|IPHONE)-[A-Za-z0-9-]{1,52}$", options: .regularExpression) != nil else {
+            throw HubFailure.enrollmentRejected
+        }
+        var request = try endpoint.request(path: "api/enrollment/redeem", token: "", requestID: UUID().uuidString.lowercased())
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: ["code": value, "watchId": watchID])
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200,
+              let reply = try? JSONDecoder().decode(Reply.self, from: data), reply.ok,
+              let token = reply.token, token.utf8.count >= 32 else { throw HubFailure.enrollmentRejected }
+        return token
     }
 }

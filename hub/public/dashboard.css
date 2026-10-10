@@ -939,6 +939,11 @@ button:disabled { cursor: not-allowed; }
   border: 1px solid var(--line);
 }
 .setting-card { display: flex; flex-direction: column; gap: var(--s2); }
+.enrollment-card { min-width: 250px; max-width: 280px; }
+.enrollment-card button { min-height: 40px; padding: 0 var(--s3); border: 0; border-radius: var(--r-md); background: var(--sel-bg); color: var(--sel-fg); font-weight: 600; }
+#enrollment-result { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); }
+#enrollment-qr { width: 220px; height: 220px; background: #fff; padding: 8px; border-radius: var(--r-md); }
+#enrollment-code { font-size: 1.05rem; letter-spacing: 0.12em; color: var(--text); }
 .foot-label { display: block; font-size: 0.8125rem; font-weight: 600; color: var(--dim); }
 
 .seg {

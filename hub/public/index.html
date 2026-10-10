@@ -98,6 +98,16 @@
         <input id="hub-token" type="password" autocomplete="off">
         <button id="hub-token-save" type="button">Connect</button>
       </div>
+      <div class="setting-card enrollment-card">
+        <span class="foot-label">Enroll a Watch</span>
+        <p class="hint">Create a one-time code. Scan the QR with a phone, then enter the code on the Watch.</p>
+        <button id="enrollment-create" type="button">Create enrollment QR</button>
+        <div id="enrollment-result" hidden>
+          <canvas id="enrollment-qr" width="220" height="220" aria-label="One-time Watch enrollment QR code"></canvas>
+          <code id="enrollment-code"></code>
+          <span id="enrollment-expires" class="hint"></span>
+        </div>
+      </div>
     </section>
 
     <div class="catbar">

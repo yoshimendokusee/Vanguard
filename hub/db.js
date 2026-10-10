@@ -106,6 +106,7 @@ function migrate(db) {
     }
     assertLegacySchema(db);
     assertClinicalSchema(db);
+    assertEnrollmentSchema(db);
   }).immediate();
 }
 
@@ -121,6 +122,10 @@ function assertClinicalSchema(db) {
   }
   db.prepare(`SELECT c.report_id, c.cloud_report_id, c.queued_at, c.synced_at, c.owner_id, c.rejected_reason
     FROM cloud_sync c JOIN triage_reports r ON r.id = c.report_id LIMIT 0`);
+}
+
+function assertEnrollmentSchema(db) {
+  db.prepare('SELECT id, watch_id, token_digest, created_at FROM enrolled_devices LIMIT 0');
 }
 
 function openDb(file = process.env.DB_PATH || path.join(__dirname, 'data', 'vanguard.db')) {

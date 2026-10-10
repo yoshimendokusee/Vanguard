@@ -226,6 +226,7 @@ struct TranscriptEditor: View {
 struct HospitalConnectionView: View {
     @State private var hub = UserDefaults.standard.string(forKey: "vanguard-hub") ?? ((try? AppConfiguration.load())?.hubURL.absoluteString ?? "")
     @State private var token = HubCredential.read()
+    @State private var enrollmentCode = ""
     @State private var status = ""
     let onRetry: () async -> Void
     var body: some View {
@@ -234,6 +235,28 @@ struct HospitalConnectionView: View {
             TextField("Hospital LAN URL", text: $hub).autocorrectionDisabled()
             SecureField("Device access token", text: $token)
             Text("Device: " + (UserDefaults.standard.string(forKey: "vanguard-device") ?? "Unknown")).font(.caption2)
+            if token.isEmpty {
+                TextField("One-time enrollment code", text: $enrollmentCode).textInputAutocapitalization(.characters).autocorrectionDisabled()
+                CapsuleButton(title: "Enroll Watch", style: .secondary) {
+                    Task {
+                        guard !enrollmentCode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                            status = "Enter the one-time code first."
+                            return
+                        }
+                        do {
+                            let endpoint = try HubEndpoint(hub)
+                            let deviceID = UserDefaults.standard.string(forKey: "vanguard-device") ?? ""
+                            let credential = try await HubEnrollment.redeem(code: enrollmentCode, watchID: deviceID, at: endpoint)
+                            try HubCredential.save(credential)
+                            token = credential; enrollmentCode = ""
+                            status = "Watch enrolled; pending reports will retry."
+                            await onRetry()
+                        } catch { status = "Enrollment failed. Check the code and try again." }
+                    }
+                }
+            } else {
+                Text("Watch enrolled; device token is stored securely.").font(.caption)
+            }
             CapsuleButton(title: "Save and retry") {
                 do {
                     let endpoint = try HubEndpoint(hub)

@@ -14,7 +14,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^13.0.3",
-    "express": "^4.21.0"
+    "express": "^4.21.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "vite": "8.3.4"
