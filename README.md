@@ -19,16 +19,29 @@ and the proposed React replacement are still target work.
 
 ```
 WristCue/
-├── AGENTS.md                 AI agent guardrails
-├── docs/                     Architecture, actual API, conventions, audit, legacy guide
-├── .github/                  PR/issue templates and CI
-├── database/migrations/      Migration ownership and upgrade guide
-├── supabase/migrations/      PostgreSQL report table and RLS migration
-├── compose.yaml              Includes the existing hub Docker Compose service
-├── watch/   Flutter app (Wear OS): Vosk STT → triage_parser.dart → sqflite → HTTP send
-├── hub/     Node + Express + SQLite migrations: POST /api/sync-triage, ED board, Docker
-└── fake-watch.sh   curl stand-in for a watch (demo backup / hub smoke test)
+├── AGENTS.md                 Repository guardrails for contributors and coding agents
+├── .env.example              Safe Docker configuration template; docker-up.sh creates .env
+├── .github/                  Pull request and issue templates, CI, branch policy
+├── compose.yaml              Root Docker stack for the hub, dashboard and local AI
+├── database/migrations/      SQLite migration ownership and upgrade guidance
+├── docs/                     Architecture, API, setup, implementation evidence and QA guides
+├── exports/                  CSV review data for medical terms and dashboard suggestions
+├── hub/                      Node/Express API, SQLite, hospital dashboard and Docker files
+├── models/                   Local Qwen and Whisper model files, manifests and licenses
+├── qa/                       Isolated QA Compose setup, Windows script and verification image
+├── scripts/                  Docker startup, Apple build/setup, connectivity and model checks
+├── supabase/migrations/      PostgreSQL report table and row-level security migration
+├── vendor/                   Vendored llama.cpp and whisper.cpp native inference libraries
+├── watch/
+│   ├── apple/                Native SwiftUI iPhone/watchOS apps and shared local processing
+│   └── lib/                  Legacy Flutter Wear OS app: Vosk → Taglish parser → SQLite → HTTP
+├── fake-watch.sh             curl stand-in for a watch (demo backup / hub smoke test)
+└── README.md                 Plug-and-play setup and project guide
 ```
+
+The startup script creates the ignored root `.env` from `.env.example` on first
+run. Local build output, dependency caches, and Xcode DerivedData are generated
+on each developer's machine and are not part of the source tree shown here.
 
 | Document | Responsibility |
 | --- | --- |
