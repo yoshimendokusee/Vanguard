@@ -18,7 +18,7 @@ SQLite/hospital flows and optional Supabase path remain in place. BLE, Realtime
 and the proposed React replacement are still target work.
 
 ```
-vanguard-wrist/
+WristCue/
 ├── AGENTS.md                 AI agent guardrails
 ├── docs/                     Architecture, actual API, conventions, audit, legacy guide
 ├── .github/                  PR/issue templates and CI
@@ -38,6 +38,39 @@ vanguard-wrist/
 | [Reverse-engineering report](docs/reverse-engineering.md) | Dated verification, evidence, gaps and next steps |
 | [Migration layout](database/migrations/README.md) | Schema owners and safe upgrade requirements |
 | [Developer Guide](docs/DEVELOPER_GUIDE.md) | Detailed prototype feature reference; historical claims are labeled |
+
+## WristCue quickstart
+
+Follow these steps in order. Docker runs the hub, website, and local AI. Building
+the native Apple apps needs a Mac with Xcode, Node.js 22+, CMake, and an iPhone /
+Apple Watch or simulator. Installing on physical devices also needs an Apple
+signing team. Native apps cannot be built inside Docker.
+
+1. **Start Docker.** Open Docker Desktop, then from the repository folder run:
+
+   ```sh
+   ./scripts/docker-up.sh
+   ```
+
+   First run creates a private, ignored `.env`, downloads the locked dependencies
+   and model files, and starts the hub. Keep the computer online while it downloads.
+2. **Open the website:** [http://localhost:3301/](http://localhost:3301/).
+   Leave Docker running. On this computer, the production dashboard is also at
+   [http://localhost:3000/](http://localhost:3000/).
+3. **Build and install the Apple apps.** In another terminal, run:
+
+   ```sh
+   ./scripts/qwen-setup.sh --model-only
+   open watch/apple/Vanguard.xcodeproj
+   ```
+
+   In Xcode, select your Apple signing team, choose the `VanguardWatch` scheme and
+   your Watch (or simulator), then click **Run**. Open **Hospital connection** on
+   the Watch. The detailed steps below connect it to this Docker hub.
+4. **Enroll the Watch.** Paste the operator token into the website, create an
+   enrollment QR, then enter its one-time code on the Watch. The server creates and
+   stores a device credential automatically.
+5. **Send a synthetic report** from WristCue and confirm it appears on the website.
 
 ## What one spoken sentence produces
 
@@ -103,28 +136,41 @@ for your area.
   light/dark/auto theme, no CDN dependencies.
 - Set the hospital name: `HOSPITAL_NAME="Santiago District Hospital · ED"` (env var).
 
-## Docker development with live updates
+## Run the hospital hub and web dashboard
 
-Install Git and Docker Desktop (or Docker Engine with Compose **2.20.3+**).
-Clone normally. A one-shot model initializer copies verified checkout weights or
-downloads the pinned GGUF when the checkout contains only an LFS pointer. No host
-Ollama or Git LFS installation is required for Docker startup.
-No host Node.js, npm, Vite or backend libraries are needed. From the repository root:
+Install Git and Docker Desktop (or Docker Engine with Compose **2.20.3+**), then
+run this from the repository root:
 
 ```sh
-docker compose up -d --build   # first run; installs locked dependencies in Docker
+./scripts/docker-up.sh
 # Open http://localhost:3301/
-docker compose up -d           # subsequent runs; no rebuild
 
 docker compose ps
 docker compose logs -f model-init frontend hub ollama
-docker compose down           # preserves hub/data and model volumes
+docker compose down            # preserves hub/data and model volumes
 ```
 
-Every teammate runs an independent copy at the same localhost URL. Exchange code
-through Git commits/pulls; Vite updates only the files edited on your own computer.
-The initial build/image pull needs internet. Prepared images, dependencies and
-model weights run locally afterward; no cloud service is required for report capture.
+If your Docker installation only provides the standalone Compose command, use
+`docker-compose` in place of `docker compose`; the startup script detects either form.
+
+On first use, the script creates a git-ignored root `.env` from `.env.example`
+with owner-only file permissions, then builds and starts the stack. Review `.env`
+before adding credentials. Docker installs the locked Node/Vite/backend dependencies
+inside its images; the host needs Docker and Compose, not Node or npm. The first
+build and missing image/model downloads need internet. After provisioning, the
+hub, dashboard, database and local Ollama service run in Docker. Report capture
+and the board do not require Supabase or AI readiness.
+
+Every tester runs an independent copy at `http://localhost:3301/`. Vite updates
+files edited on that tester's computer. To rebuild after Dockerfile, backend or
+dependency changes, run `./scripts/docker-up.sh` again. To start without rebuilding,
+run `docker compose up -d` after the first setup.
+
+Docker runs the hospital hub, browser dashboard and local AI service. It does not
+build or install native iPhone/Apple Watch apps; those require Xcode and an Apple
+device or simulator. The native apps save reports locally and send them to this
+Docker hub over the same Wi-Fi network. The detailed native build/model requirements
+are in [Qwen integration](docs/QWEN_INTEGRATION.md) and the [Apple setup record](docs/shared-hub-setup.md).
 
 Edit `hub/public/index.html`, `dashboard.css`, `dashboard.js` and frontend assets
 with your editor. Root Compose adds a Vite frontend on **localhost:3301** to the
@@ -178,17 +224,56 @@ Common fixes:
   `AI Live` requires real completed tokens, not just a model tag. The board/intake
   remain usable without AI.
 
-For synthetic LAN testing, configure per-user/device `HUB_USERS` credentials and
-set `HUB_BIND_ADDRESS` to the host's LAN interface in `.env`, then recreate the hub.
-The native app accepts a saved hospital URL such as `http://<hub-hostname>.local:3000`
-and an assigned token stored in Keychain. It rejects device localhost and malformed
-origins. Local AI readiness is independent of LAN status. There is no reliable Docker
-multicast discovery here; use the host's LAN hostname/address or a DHCP reservation
-and update the saved URL when the network changes. Legacy Flutter uses explicit
-`HUB_URL` and `HUB_TOKEN` build settings; its former fixed private-IP default is removed.
-Use Settings in the web board to connect with an operator token. LAN credentials do
-not encrypt HTTP or storage: use synthetic data on isolated networks until protected
-transport/storage and clinical validation exist. See [global connectivity setup and
+### Connect the Apple Watch to the web board
+
+For localhost-only dashboard use, the default `.env` works as-is. A physical Watch
+needs the hub computer's Wi-Fi address and a server-side operator credential. Create
+one in `.env` like this (replace the example token with the output of the command):
+
+   ```sh
+   openssl rand -hex 32
+   ```
+
+   ```dotenv
+   HUB_BIND_ADDRESS=192.168.1.25
+   HUB_USERS='[{"id":"hospital-operator","role":"operator","token":"<paste-random-token-here>"}]'
+   ```
+
+Use the Mac's current Wi-Fi IP for `HUB_BIND_ADDRESS`. Keep `.env` private; the
+operator token is a server credential. Recreate the hub to load these settings:
+
+```sh
+docker compose up -d --no-deps --force-recreate hub
+```
+
+Then connect the Watch:
+
+1. On the hub computer, open [http://localhost:3301/](http://localhost:3301/).
+   In **Settings → Hospital access token**, paste the operator token from `.env`
+   and select **Connect**.
+2. In Settings, choose **Create enrollment QR**. The page shows the QR and its
+   matching 16-character one-time code. Use a phone camera/QR reader to read the
+   code, or copy it from the page. The code expires after 10 minutes and can enroll
+   one device once. A hub restart invalidates unused codes.
+3. On the Watch, open **Hospital connection**. Set **Hospital LAN URL** to
+   `http://<hub-computer-wifi-ip>:3000`, enter the one-time code, and tap
+   **Enroll Watch**. Then tap **Save and retry**. The Watch receives a permanent
+   device token, saves it in Keychain, and uses it for future reports. Do not enter
+   the operator token on the Watch.
+4. Send a synthetic report from WristCue and confirm it appears at
+   `http://localhost:3301/`. Use synthetic data only.
+
+The board is at `http://localhost:3301/` for Docker development; the production
+entry point serves the board at `http://localhost:3000/`. On another device, use
+the hub computer's LAN address and port 3000. The development dashboard at 3301
+is intentionally bound to localhost, so it is not a LAN-facing web app.
+
+LAN binding requires configured `HUB_USERS`; the default remains loopback-only.
+The native apps cannot use their own `localhost` as the hub address. There is no
+reliable Docker multicast discovery; use a DHCP reservation or update the saved
+address after network changes. Legacy Flutter separately uses explicit `HUB_URL`
+and `HUB_TOKEN` build settings. LAN credentials do not encrypt HTTP or storage:
+use synthetic data on an isolated network. See [global connectivity setup and
 verification](docs/global-ai-connectivity.md).
 
 To build the hub address into the Apple apps instead of typing it on each device,

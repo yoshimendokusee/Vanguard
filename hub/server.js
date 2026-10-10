@@ -45,7 +45,7 @@ function createApp(db, {
     const code = enrollmentCode();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
     enrollments.set(code, { expiresAt: Date.parse(expiresAt) });
-    res.json({ ok: true, code, expiresAt, qrText: `VANGUARD-ENROLL:${code}` });
+    res.json({ ok: true, code, expiresAt, qrText: `WRISTCUE-ENROLL:${code}` });
   });
 
   app.post('/api/enrollment/redeem', (req, res) => {

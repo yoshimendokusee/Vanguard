@@ -1,4 +1,4 @@
-# Vanguard-Wrist Developer Guide
+# WristCue Developer Guide
 
 **Prototype reference, reconciled 2026-10-09.** Read
 [architecture.md](architecture.md) for the approved target versus actual code,
@@ -33,7 +33,7 @@ still unverified. For a quick start and the demo script, see the [README](../REA
 ## 1. Purpose and scope
 
 During severe floods, cloud infrastructure and cellular networks fail, but hospitals still
-need to know **what is coming** before boats and trucks arrive. Vanguard-Wrist lets a rescuer
+need to know **what is coming** before boats and trucks arrive. WristCue lets a rescuer
 dictate a patient report to a wrist-worn device that works with **no internet**, and delivers
 it to a hospital emergency department as soon as the two share a local Wi-Fi network.
 
@@ -120,7 +120,7 @@ sequenceDiagram
 ## 3. Repository layout
 
 ```
-vanguard-wrist/
+WristCue/
 ├── README.md                  Quick start, demo script
 ├── docs/DEVELOPER_GUIDE.md    This file
 ├── fake-watch.sh              curl stand-in for a watch

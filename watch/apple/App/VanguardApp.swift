@@ -265,7 +265,7 @@ struct CaptureView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 12) {
-                Text("Vanguard").font(.headline)
+                Text("WristCue").font(.headline)
                 Text("Local Qwen extraction · provisional").font(.caption)
                 Text("Local AI: \(model.localAI.rawValue)").font(.caption).accessibilityIdentifier("local-ai-state")
                 Text("LAN Hub: \(model.lanStatus)").font(.caption).accessibilityIdentifier("lan-state")

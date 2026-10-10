@@ -303,6 +303,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WristCue";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Transcribe patient audio on this iPhone without network recognition.";
@@ -329,6 +330,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WristCue Watch";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Transcribe patient audio on this iPhone without network recognition.";
@@ -356,6 +358,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WristCue Watch";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Transcribe patient audio on this iPhone without network recognition.";
@@ -385,6 +388,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Config/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "WristCue";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Relay locally stored reports to the hospital LAN hub.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Record an offline patient report.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Transcribe patient audio on this iPhone without network recognition.";

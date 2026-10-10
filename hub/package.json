@@ -1,7 +1,7 @@
 {
-  "name": "vanguard-hub",
+  "name": "wristcue-hub",
   "version": "0.1.0",
-  "description": "Air-gapped command hub for Vanguard-Wrist: LAN sync endpoint + live dispatch dashboard",
+  "description": "Air-gapped command hub for WristCue: LAN sync endpoint + live dispatch dashboard",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

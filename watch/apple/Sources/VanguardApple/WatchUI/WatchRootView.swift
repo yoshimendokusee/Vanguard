@@ -24,7 +24,7 @@ public struct WatchRootView: View {
             ScrollView { rootContent.padding(.horizontal, 4) }
                 .scrollIndicators(.hidden)
                 .modifier(WatchChrome())
-                .navigationTitle("Vanguard")    // watchOS draws the title in the tint color, teal here, with the system clock
+                .navigationTitle("WristCue")    // watchOS draws the title in the tint color, teal here, with the system clock
                 #if !os(watchOS)
                 .toolbar(.hidden)
                 #endif
@@ -189,7 +189,7 @@ struct HostTitleBar: View {
                 }
                 .buttonStyle(.plain).accessibilityLabel("Back")
             }
-            Text("Vanguard").font(.system(size: 14, weight: .semibold)).foregroundStyle(VanguardPalette.accent)
+            Text("WristCue").font(.system(size: 14, weight: .semibold)).foregroundStyle(VanguardPalette.accent)
                 .lineLimit(1).minimumScaleFactor(0.7)
             Spacer(minLength: 4)
             TimelineView(.periodic(from: .now, by: 1)) { context in

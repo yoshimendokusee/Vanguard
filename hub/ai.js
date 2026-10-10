@@ -1,5 +1,5 @@
 /**
- * Vanguard-Wrist local AI module (Qwen via Ollama).
+ * WristCue local AI module (Qwen via Ollama).
  *
  * Runs inside the existing Express hub — no new server, container or framework.
  * Qwen is an information-extraction assistant only: it returns structured

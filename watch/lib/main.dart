@@ -23,7 +23,7 @@ class VanguardWristApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => MaterialApp(
-    title: 'Vanguard-Wrist',
+    title: 'WristCue',
     debugShowCheckedModeBanner: false,
     theme: buildTheme(Brightness.light),
     darkTheme: buildTheme(Brightness.dark),

@@ -14,7 +14,7 @@ storage encryption or pagination. Use synthetic data on isolated networks only.
 | --- | --- | --- |
 | `GET /api/health` | `200 {"ok":true,"time":"<hub ISO UTC>"}` | Liveness; not a database durability/readiness guarantee. |
 | `GET /api/config` | `200 {"hospital":"<configured name>"}` | `HOSPITAL_NAME` or the default receiving hospital label. |
-| `POST /api/enrollment/codes` | `200 {"ok":true,"code":"<16 hex chars>","expiresAt":"<ISO>","qrText":"VANGUARD-ENROLL:<code>"}` | Operator-authenticated. Creates a volatile, single-use code valid for 10 minutes. The permanent device token is never returned here. |
+| `POST /api/enrollment/codes` | `200 {"ok":true,"code":"<16 hex chars>","expiresAt":"<ISO>","qrText":"WRISTCUE-ENROLL:<code>"}` | Operator-authenticated. Creates a volatile, single-use code valid for 10 minutes. The permanent device token is never returned here. |
 | `POST /api/enrollment/redeem` | `200 {"ok":true,"token":"<device token>","id":"<credential id>","watchId":"<device id>"}` | Unauthenticated by design so a newly installed Watch can enroll. Requires the exact one-time code and a validated device ID; the code is consumed on success. |
 | `POST /api/sync-triage` | See below | One SQLite ingest transaction; acknowledges accepted and duplicate reports. |
 | `GET /api/triage` | `200 [<stored row>, ...]` | Includes all statuses; inbound first, then effective hospital priority (Immediate, Unassessed, Delayed, Minor, Deceased); known ETA before unknown, then expected arrival and creation time. Original `triage` is preserved. |

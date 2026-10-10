@@ -1,6 +1,6 @@
 import SwiftUI
 
-// The ten screens of the Vanguard Apple Watch storyboard. Every value shown comes from persisted report data
+// The ten screens of the WristCue Apple Watch storyboard. Every value shown comes from persisted report data
 // or the live recorder. Nothing here is a sample. The system draws the clock, so screens do not draw their own.
 
 enum ReportTime {

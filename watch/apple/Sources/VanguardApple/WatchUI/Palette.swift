@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Colors sampled from the Vanguard Apple Watch storyboard (the visual source of truth).
+/// Colors sampled from the WristCue Apple Watch storyboard (the visual source of truth).
 public enum VanguardPalette {
     public static let background = Color.black
     /// Primary capsule buttons (Next, Send, View details).

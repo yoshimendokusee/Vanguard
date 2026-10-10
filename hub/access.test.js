@@ -83,7 +83,7 @@ test('operator enrollment issues a single-use device credential that can sync', 
     const created = await (await fetch(base + '/api/enrollment/codes', { method: 'POST', headers })).json();
     assert.equal(created.ok, true);
     assert.match(created.code, /^[A-F0-9]{16}$/);
-    assert.match(created.qrText, /^VANGUARD-ENROLL:/);
+    assert.match(created.qrText, /^WRISTCUE-ENROLL:/);
     assert.equal(created.token, undefined, 'the dashboard receives no permanent device token');
 
     const watchId = 'APPLE-WATCH-ENROLLED';
